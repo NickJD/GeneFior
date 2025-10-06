@@ -1,0 +1,22 @@
+{
+  "version": "1.2",
+  "dbname": "protein_fasta_protein_homolog_model_SID_blastdb",
+  "dbtype": "Protein",
+  "db-version": 5,
+  "description": "protein_fasta_protein_homolog_model_SID.fasta",
+  "number-of-letters": 1938365,
+  "number-of-sequences": 6052,
+  "last-updated": "2025-10-05T14:24:00",
+  "number-of-volumes": 1,
+  "bytes-total": 2701400,
+  "bytes-to-cache": 1993002,
+  "files": [
+    "protein_fasta_protein_homolog_model_SID_blastdb.pdb",
+    "protein_fasta_protein_homolog_model_SID_blastdb.phr",
+    "protein_fasta_protein_homolog_model_SID_blastdb.pin",
+    "protein_fasta_protein_homolog_model_SID_blastdb.pot",
+    "protein_fasta_protein_homolog_model_SID_blastdb.psq",
+    "protein_fasta_protein_homolog_model_SID_blastdb.ptf",
+    "protein_fasta_protein_homolog_model_SID_blastdb.pto"
+  ]
+}

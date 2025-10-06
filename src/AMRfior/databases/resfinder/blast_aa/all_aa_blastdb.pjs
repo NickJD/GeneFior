@@ -1,0 +1,22 @@
+{
+  "version": "1.2",
+  "dbname": "all_aa_blastdb",
+  "dbtype": "Protein",
+  "db-version": 5,
+  "description": "all_aa.fa",
+  "number-of-letters": 996607,
+  "number-of-sequences": 3212,
+  "last-updated": "2025-10-03T21:28:00",
+  "number-of-volumes": 1,
+  "bytes-total": 1381420,
+  "bytes-to-cache": 1025612,
+  "files": [
+    "all_aa_blastdb.pdb",
+    "all_aa_blastdb.phr",
+    "all_aa_blastdb.pin",
+    "all_aa_blastdb.pot",
+    "all_aa_blastdb.psq",
+    "all_aa_blastdb.ptf",
+    "all_aa_blastdb.pto"
+  ]
+}

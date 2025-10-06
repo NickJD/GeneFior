@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AMRfior"
+version = "0.1.0"
+authors = [
+    {name = "Nicholas Dimonaco", email = "nicholas@dimonaco.co.uk"}
+]
+description = "AMRfior: A toolkit that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against AMR databases (DNA and AA) such as CARD/RGI and ResFinder."
+readme = "README.md"
+requires-python = ">=3.6"
+license = {file = "LICENSE"}
+keywords = ["Antimicrobial Resistance", "Sequence Searching"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # Add your install_requires here if any
+]
+
+[project.urls]
+Homepage = "https://github.com/NickJD/AMRfior"
+"Bug Tracker" = "https://github.com/NickJD/AMRfior/issues"
+
+[project.scripts]
+AMRfior = "AMRfior.AMRfior:main"
+amrfior = "AMRfior.AMRfior:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["AMRfior*"]
+
+[tool.setuptools.package-data]
+AMRfior = [
+    "databases/card/diamond/*",
+    "databases/card/bwa/*",
+    "databases/card/minimap2/*",
+    "databases/card/bowtie2/*",
+    "databases/card/blast_dna/*",
+    "databases/card/blast_aa/*",
+    "databases/resfinder/diamond/*",
+    "databases/resfinder/bwa/*",
+    "databases/resfinder/minimap2/*",
+    "databases/resfinder/bowtie2/*",
+    "databases/resfinder/blast_dna/*",
+    "databases/resfinder/blast_aa/*",
+]
