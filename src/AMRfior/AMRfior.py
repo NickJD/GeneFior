@@ -35,10 +35,21 @@ Examples:
     )
 
     # Required arguments
-    parser.add_argument('-i', '--input', required=True,
+    required_group = parser.add_argument_group('Required selection')
+    required_group.add_argument('-i', '--input', required=True,
                         help='Input FASTA file with sequences to analyse')
-    parser.add_argument('-o', '--output', required=True,
+    required_group.add_argument('-o', '--output', required=True,
                         help='Output directory for results')
+
+    # Output selection
+    output_group = parser.add_argument_group('Output selection')
+    output_group.add_argument('--report_fasta',
+                            choices=['None', 'all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
+                            default=[None], #, 'hmmer_dna','hmmer_protein'],
+                            help='Specify whether to output sequences that "mapped" to genes.'
+                                 '"all" should only be used for deep investigation/debugging.'
+                                 '"detected" will report the reads that passed detection thresholds for each detected gene.'
+                                 '"detected-all" will report all reads for each detected gene.  (default: None)')
 
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
@@ -129,7 +140,7 @@ Examples:
 
 
     # Run Workflow
-    pipeline = AMRWorkflow(
+    workflow = AMRWorkflow(
         input_fasta=options.input,
         output_dir=options.output,
         resfinder_dbs=resfinder_dbs,
@@ -141,10 +152,11 @@ Examples:
         min_coverage=options.min_coverage,
         min_identity=options.min_identity,
         run_dna=run_dna,
-        run_protein=run_protein
+        run_protein=run_protein,
+        report_fasta=options.report_fasta
     )
 
-    results = pipeline.run_pipeline(options)
+    results = workflow.run_workflow(options)
 
     # Exit with error code if all tools failed
     all_failed = True

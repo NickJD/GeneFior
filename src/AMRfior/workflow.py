@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Set, Tuple
+import pysam
 
 try:
     from .gene_stats import GeneStats
@@ -22,7 +23,10 @@ class AMRWorkflow:
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
                  #evalue: float = 1e-10,
                  min_coverage: float = 80.0, min_identity: float = 80.0,
-                 run_dna: bool = True, run_protein: bool = True):
+                 min_query_coverage: float = 50.0,  # NEW: Query coverage threshold
+
+                 run_dna: bool = True, run_protein: bool = True,
+                 report_fasta: str = None):
         self.input_fasta = Path(input_fasta)
         self.output_dir = Path(output_dir)
         self.resfinder_dbs = resfinder_dbs
@@ -33,8 +37,11 @@ class AMRWorkflow:
        # self.evalue = evalue
         self.min_coverage = min_coverage
         self.min_identity = min_identity
+        self.min_query_coverage = min_query_coverage
+
         self.run_dna = run_dna
         self.run_protein = run_protein
+        self.report_fasta = report_fasta  # 'All', 'Detected', or None
 
         # Create output directory structure
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -42,6 +49,9 @@ class AMRWorkflow:
         self.raw_dir.mkdir(exist_ok=True)
         self.stats_dir = self.output_dir / "tool_stats"
         self.stats_dir.mkdir(exist_ok=True)
+        if self.report_fasta != None:
+            self.fasta_dir = self.output_dir / "fasta_outputs"
+            self.fasta_dir.mkdir(exist_ok=True)
 
         # Setup logging
         log_file = self.output_dir / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -92,252 +102,67 @@ class AMRWorkflow:
             self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
             return False
 
-    def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
-        """Parse BLAST/DIAMOND tabular output and extract genes meeting thresholds.
-        Detection logic:
-        - Only sequences with identity >= min_identity are considered
-        - Track which positions on the subject/gene are covered by alignments
-        - Gene is detected if combined coverage of gene >= min_coverage
-        """
-        detected_genes = set()
-        gene_lengths = {}  # Store gene lengths
+    def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
+                             gene_reads: dict, all_reads: dict):
+        """Helper method to write FASTA files for mapped reads."""
 
-        if not output_file.exists():
-            return detected_genes
+        if self.report_fasta == 'all':
+            self.logger.info(f"Writing FASTA files for all mapped reads in {database}...")
+            for gene, read_types in gene_reads.items():
+                read_names = set(read_types['all'])  # Use set to avoid duplicates
+                if not read_names:
+                    continue
 
-        try:
-            with open(output_file, 'r') as f:
-                for line in f:
-                    if line.startswith('#'):
-                        continue
-                    fields = line.strip().split('\t')
-                    if len(fields) < 13:
-                        continue
+                safe_gene = gene.replace('|', '_').replace('/', '_')
+                fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
-                    gene = fields[1]  # sseqid
-                    identity = float(fields[2])  # pident
-                    sstart = int(fields[8])  # subject start
-                    send = int(fields[9])  # subject end
-                    slen = int(fields[12])  # subject length (added to output format)
+                with open(fasta_path, "w") as fasta_out:
+                    count = 0
+                    for read_name in read_names:
+                        if read_name in all_reads:
+                            seq = all_reads[read_name]
+                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            count += 1
+                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
-                    # Store gene length
-                    if gene in gene_lengths:
-                        gene_lengths[gene] = max(gene_lengths[gene], slen)
-                    else:
-                        gene_lengths[gene] = slen
+        elif self.report_fasta == 'detected':
+            self.logger.info(
+                f"Writing FASTA files for threshold-passing reads mapped to detected genes in {database}...")
+            for gene in detected_genes:
+                read_names = set(gene_reads[gene].get('passing', []))
+                if not read_names:
+                    continue
 
-                    # Only process sequences meeting identity threshold
-                    if identity >= self.min_identity:
-                        # Initialise stats if first hit for this gene
-                        if gene not in self.gene_stats[database][tool_name]:
-                            self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+                safe_gene = gene.replace('|', '_').replace('/', '_')
+                fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
-                        # Add hit to statistics
-                        self.gene_stats[database][tool_name][gene].add_hit(
-                            sstart, send, identity, gene_lengths[gene]
-                        )
+                with open(fasta_path, "w") as fasta_out:
+                    count = 0
+                    for read_name in read_names:
+                        if read_name in all_reads:
+                            seq = all_reads[read_name]
+                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            count += 1
+                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
-            # finalise statistics and determine detection based on gene coverage
-            for gene in self.gene_stats[database][tool_name]:
-                stats = self.gene_stats[database][tool_name][gene]
-                stats.finalise()
+        elif self.report_fasta == 'detected-all':
+            self.logger.info(f"Writing FASTA files for all reads mapped to detected genes in {database}...")
+            for gene in detected_genes:
+                read_names = set(gene_reads[gene].get('all', []))
+                if not read_names:
+                    continue
 
-                # Gene is detected if gene coverage meets threshold
-                if stats.gene_coverage >= self.min_coverage:
-                    detected_genes.add(gene)
-                    self.detections[database][gene][tool_name] = True
+                safe_gene = gene.replace('|', '_').replace('/', '_')
+                fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
-        except Exception as e:
-            self.logger.error(f"Error parsing {output_file}: {e}")
-
-        return detected_genes
-
-    def parse_sam_results(self, sam_file: Path, database: str, tool_name: str) -> Set[str]:
-        """Parse SAM file from Bowtie2 and extract genes meeting thresholds."""
-        detected_genes = set()
-        gene_lengths = {}  # Store gene lengths from @SQ headers
-
-        if not sam_file.exists():
-            return detected_genes
-
-        try:
-            with open(sam_file, 'r') as f:
-                for line in f:
-                    if line.startswith('@'):
-                        # Extract reference lengths from @SQ header lines
-                        if line.startswith('@SQ'):
-                            parts = line.strip().split('\t')
-                            ref_name = None
-                            ref_len = None
-                            for part in parts:
-                                if part.startswith('SN:'):
-                                    ref_name = part[3:]
-                                elif part.startswith('LN:'):
-                                    ref_len = int(part[3:])
-                            if ref_name and ref_len:
-                                gene_lengths[ref_name] = ref_len
-                        continue
-
-                    fields = line.strip().split('\t')
-                    if len(fields) < 11:
-                        continue
-
-                    #query = fields[0]
-                    gene = fields[2]
-                    if gene == '*':  # Unmapped
-                        continue
-
-                    pos = int(fields[3])  # 1-based leftmost mapping position
-                    cigar = fields[5]
-                   # seq = fields[9]
-
-                    # Parse CIGAR to get alignment positions on reference
-                    import re
-                    cigar_ops = re.findall(r'(\d+)([MIDNSHP=X])', cigar)
-
-                    ref_pos = pos
-                    ref_end = pos
-                    aligned_bases = 0  # For identity calculation
-
-                    for length_str, op in cigar_ops:
-                        length = int(length_str)
-                        # Operations that consume reference: M, D, N, =, X
-                        if op in 'MDN=X':
-                            ref_end = ref_pos + length
-                            ref_pos = ref_end
-                        # M, =, X consume both query and reference (alignment)
-                        if op in 'M=X':
-                            aligned_bases += length
-
-                    sstart = pos
-                    send = ref_end - 1  # -1 because ref_end is exclusive
-
-                    # Get gene length
-                    gene_len = gene_lengths.get(gene, send)  # Use end pos if length unknown
-
-                    # Calculate identity from NM tag (edit distance)
-                    nm = 0
-                    for tag in fields[11:]:
-                        if tag.startswith('NM:i:'):
-                            nm = int(tag.split(':')[2])
-                            break
-
-                    # Identity = (aligned_bases - mismatches) / aligned_bases
-                    identity = ((aligned_bases - nm) / aligned_bases) * 100 if aligned_bases > 0 else 0
-
-                    # Only process sequences meeting identity threshold
-                    if identity >= self.min_identity:
-                        # Initialise stats if first hit for this gene
-                        if gene not in self.gene_stats[database][tool_name]:
-                            self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-
-                        # Add hit to statistics
-                        self.gene_stats[database][tool_name][gene].add_hit(
-                            sstart, send, identity, gene_len
-                        )
-
-            # finalise statistics and determine detection based on gene coverage
-            for gene in self.gene_stats[database][tool_name]:
-                stats = self.gene_stats[database][tool_name][gene]
-                stats.finalise()
-
-                # Gene is detected if gene coverage meets threshold
-                if stats.gene_coverage >= self.min_coverage:
-                    detected_genes.add(gene)
-                    self.detections[database][gene][tool_name] = True
-
-        except Exception as e:
-            self.logger.error(f"Error parsing {sam_file}: {e}")
-
-        return detected_genes
-
-
-
-    def parse_hmmer_results(self, tbl_file: Path, database: str, tool_name: str) -> Set[str]:
-        """Parse HMMER table output and extract genes meeting thresholds."""
-        detected_genes = set()
-        if not tbl_file.exists():
-            return detected_genes
-
-        try:
-            with open(tbl_file, 'r') as f:
-                for line in f:
-                    if line.startswith('#'):
-                        continue
-                    fields = line.strip().split()
-                    if len(fields) < 6:
-                        continue
-
-                    gene = fields[0]  # target name
-                    evalue = float(fields[4])
-                    score = float(fields[5]) if len(fields) > 5 else 0.0
-
-                    # Initialise stats if first hit for this gene
-                    if gene not in self.gene_stats[database][tool_name]:
-                        self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-
-                    # For HMMER, use score as proxy for coverage/identity
-                    # This is not perfect but HMMER doesn't give direct coverage
-                    self.gene_stats[database][tool_name][gene].add_hit(score, score)
-
-                    # HMMER doesn't directly give coverage/identity like BLAST
-                    # Use E-value as primary filter
-                    if evalue <= self.evalue:
-                        detected_genes.add(gene)
-                        self.detections[database][gene][tool_name] = True
-
-            # finalise statistics
-            for gene in self.gene_stats[database][tool_name]:
-                self.gene_stats[database][tool_name][gene].finalise()
-
-        except Exception as e:
-            self.logger.error(f"Error parsing {tbl_file}: {e}")
-
-        return detected_genes
-
-    def write_tool_stats(self, database: str, tool_name: str):
-        """Write detailed statistics for a specific tool to TSV.
-
-        Output columns:
-        - Gene: AMR gene name
-        - Gene_Length: Length of the gene in the database (bp)
-        - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= min_identity
-        - Gene_Coverage: Percentage of the gene covered by all qualifying alignments combined (%)
-        - Avg_Identity: Average identity across all qualifying sequences (%)
-        - Detected: 1 if gene_coverage >= min_coverage threshold, 0 otherwise
-        """
-        stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
-
-        gene_stats = self.gene_stats[database][tool_name]
-        if not gene_stats:
-            self.logger.warning(f"No statistics to write for {database} - {tool_name}")
-            return
-
-        with open(stats_file, 'w', newline='') as f:
-            writer = csv.writer(f, delimiter='\t')
-
-            # Header
-            header = ['Gene', 'Gene_Length', 'Num_Sequences_Mapped', 'Gene_Coverage', 'Avg_Identity', 'Detected']
-            writer.writerow(header)
-
-            # Sort genes alphabetically
-            genes = sorted(gene_stats.keys())
-
-            for gene in genes:
-                stats = gene_stats[gene]
-                detected = self.detections[database][gene][tool_name]
-
-                row = [
-                    gene,
-                    stats.gene_length,
-                    stats.num_sequences,
-                    f"{stats.gene_coverage:.2f}",
-                    f"{stats.avg_identity:.2f}",
-                    '1' if detected else '0'
-                ]
-                writer.writerow(row)
-
-        self.logger.info(f"  Stats file: {stats_file}")
+                with open(fasta_path, "w") as fasta_out:
+                    count = 0
+                    for read_name in read_names:
+                        if read_name in all_reads:
+                            seq = all_reads[read_name]
+                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            count += 1
+                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
         """Run BLAST in DNA or protein mode."""
@@ -425,7 +250,8 @@ class AMRWorkflow:
             return False, set()
 
         sam_file = self.raw_dir / f"{database}_bowtie2_results.sam"
-        bam_file = self.raw_dir / f"{database}_bowtie2_results.sorted.bam"
+        bam_file = self.raw_dir / f"{database}_bowtie2_results.bam"
+        sorted_bam_file = self.raw_dir / f"{database}_bowtie2_results_sorted.bam"
         summary_file = self.raw_dir / f"{database}_bowtie2_summary.txt"
         tool_name = "Bowtie2"
 
@@ -446,50 +272,43 @@ class AMRWorkflow:
             cmd.append(sensitivity)
 
         success = self.run_command(cmd, f"{database} - {tool_name}")
-        detected = set()
-        if success:
-            # Convert SAM to sorted BAM
-            sort_cmd = [
-                'samtools', 'sort',
-                '-@', str(self.threads),
-                '-o', str(bam_file),
-                str(sam_file)
-            ]
-            sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
-            if sort_success:
-                detected = self.parse_sam_results(bam_file, database, tool_name)
-                self.write_tool_stats(database, tool_name)
-            success = success and sort_success
+        if not success:
+            return False, set()
+
+        # Convert SAM to BAM
+        sam_to_bam_cmd = ['samtools', 'view', '-bS', str(sam_file), '-o', str(bam_file)]
+        if not self.run_command(sam_to_bam_cmd, f"{database} - SAM to BAM conversion"):
+            return False, set()
+
+        # Sort BAM
+        sort_cmd = ['samtools', 'sort', str(bam_file), '-o', str(sorted_bam_file)]
+        if not self.run_command(sort_cmd, f"{database} - BAM sorting"):
+            return False, set()
+
+        # Index BAM (optional but recommended)
+        index_cmd = ['samtools', 'index', str(sorted_bam_file)]
+        self.run_command(index_cmd, f"{database} - BAM indexing")
+
+        # Parse results
+        detected = self.parse_bam_results(sorted_bam_file, database, tool_name)
+        self.write_tool_stats(database, tool_name)
+        # detected = set()
+        # if success:
+        #     # Convert SAM to sorted BAM
+        #     sort_cmd = [
+        #         'samtools', 'sort',
+        #         '-@', str(self.threads),
+        #         '-o', str(bam_file),
+        #         str(sam_file)
+        #     ]
+        #     sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
+        #     if sort_success:
+        #         detected = self.parse_bam_results(bam_file, database, tool_name)
+        #         self.write_tool_stats(database, tool_name)
+        #     success = success and sort_success
         return success, detected
 
-    # def run_bwa(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
-    #     """Run BWA alignment (DNA mode)."""
-    #     if not db_path:
-    #         return False, set()
-    #
-    #     sam_file = self.raw_dir / f"{database}_bwa_results.sam"
-    #     tool_name = "BWA"
-    #
-    #     cmd = [
-    #         'bwa', 'mem',
-    #         '-t', str(self.threads),
-    #         db_path,
-    #         str(self.input_fasta)
-    #     ]
-    #
-    #     # Run BWA and write output to SAM file
-    #     try:
-    #         with open(sam_file, 'w') as out_f:
-    #             success = self.run_command(cmd + ['-o', str(sam_file)], f"{database} - {tool_name}")
-    #     except Exception as e:
-    #         self.logger.error(f"Error running BWA: {e}")
-    #         return False, set()
-    #
-    #     detected = set()
-    #     if success:
-    #         detected = self.parse_sam_results(sam_file, database, tool_name)
-    #         self.write_tool_stats(database, tool_name)
-    #     return success, detected
+
 
     def run_bwa(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
         """Run BWA alignment (DNA mode) and output sorted BAM."""
@@ -497,7 +316,8 @@ class AMRWorkflow:
             return False, set()
 
         sam_file = self.raw_dir / f"{database}_bwa_results.sam"
-        bam_file = self.raw_dir / f"{database}_bwa_results.sorted.bam"
+        bam_file = self.raw_dir / f"{database}_bwa_results.bam"
+        sorted_bam = self.raw_dir / f"{database}_bwa_results_sorted.bam"
         tool_name = "BWA"
 
         cmd = [
@@ -514,20 +334,41 @@ class AMRWorkflow:
             self.logger.error(f"Error running BWA: {e}")
             return False, set()
 
-        detected = set()
-        if success:
-            # Convert SAM to sorted BAM
-            sort_cmd = [
-                'samtools', 'sort',
-                '-@', str(self.threads),
-                '-o', str(bam_file),
-                str(sam_file)
-            ]
-            sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
-            if sort_success:
-                detected = self.parse_sam_results(bam_file, database, tool_name)
-                self.write_tool_stats(database, tool_name)
-            success = success and sort_success
+        if not success:
+            return False, set()
+
+            # Convert SAM to BAM
+        sam_to_bam_cmd = ['samtools', 'view', '-bS', str(sam_file), '-o', str(bam_file)]
+        if not self.run_command(sam_to_bam_cmd, f"{database} - SAM to BAM conversion"):
+            return False, set()
+
+        # Sort BAM
+        sort_cmd = ['samtools', 'sort', str(bam_file), '-o', str(sorted_bam)]
+        if not self.run_command(sort_cmd, f"{database} - BAM sorting"):
+            return False, set()
+
+        # Index BAM (optional but recommended)
+        index_cmd = ['samtools', 'index', str(sorted_bam)]
+        self.run_command(index_cmd, f"{database} - BAM indexing")
+
+        # Parse results
+        detected = self.parse_bam_results(sorted_bam, database, tool_name)
+        self.write_tool_stats(database, tool_name)
+
+        # detected = set()
+        # if success:
+        #     # Convert SAM to sorted BAM
+        #     sort_cmd = [
+        #         'samtools', 'sort',
+        #         '-@', str(self.threads),
+        #         '-o', str(bam_file),
+        #         str(sam_file)
+        #     ]
+        #     sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
+        #     if sort_success:
+        #         detected = self.parse_bam_results(bam_file, database, tool_name)
+        #         self.write_tool_stats(database, tool_name)
+        #     success = success and sort_success
         return success, detected
 
 
@@ -562,7 +403,7 @@ class AMRWorkflow:
             ]
             sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
             if sort_success:
-                detected = self.parse_sam_results(bam_file, database, tool_name)
+                detected = self.parse_bam_results(bam_file, database, tool_name)
                 self.write_tool_stats(database, tool_name)
             success = success and sort_success
         return success, detected
@@ -593,6 +434,317 @@ class AMRWorkflow:
             detected = self.parse_hmmer_results(output_file, database, tool_name)
             self.write_tool_stats(database, tool_name)
         return success, detected
+
+    def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
+        """Parse BLAST/DIAMOND tabular output and extract genes meeting thresholds.
+        Detection logic:
+        - Only sequences with identity >= min_identity are considered
+        - Track which positions on the subject/gene are covered by alignments
+        - Gene is detected if combined coverage of gene >= min_coverage
+        """
+        detected_genes = set()
+        gene_lengths = {}  # Store gene lengths
+
+        if not output_file.exists():
+            return detected_genes
+
+        try:
+            with open(output_file, 'r') as f:
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    fields = line.strip().split('\t')
+                    if len(fields) < 13:
+                        continue
+
+                    gene = fields[1]  # sseqid
+                    identity = float(fields[2])  # pident
+                    sstart = int(fields[8])  # subject start
+                    send = int(fields[9])  # subject end
+                    slen = int(fields[12])  # subject length (added to output format)
+
+                    # Store gene length
+                    if gene in gene_lengths:
+                        gene_lengths[gene] = max(gene_lengths[gene], slen)
+                    else:
+                        gene_lengths[gene] = slen
+
+                    # Only process sequences meeting identity threshold
+                    if identity >= self.min_identity:
+                        # Initialise stats if first hit for this gene
+                        if gene not in self.gene_stats[database][tool_name]:
+                            self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+
+                        # Add hit to statistics
+                        self.gene_stats[database][tool_name][gene].add_hit(
+                            sstart, send, identity, gene_lengths[gene]
+                        )
+
+            # finalise statistics and determine detection based on gene coverage
+            for gene in self.gene_stats[database][tool_name]:
+                stats = self.gene_stats[database][tool_name][gene]
+                stats.finalise()
+
+                # Gene is detected if gene coverage meets threshold
+                if stats.gene_coverage >= self.min_coverage:
+                    detected_genes.add(gene)
+                    self.detections[database][gene][tool_name] = True
+
+        except Exception as e:
+            self.logger.error(f"Error parsing {output_file}: {e}")
+
+        return detected_genes
+
+    def parse_bam_results(self, bam_file: Path, database: str, tool_name: str) -> Set[str]:
+        """Parse BAM file from Bowtie2 and extract genes meeting thresholds.
+
+        Detection logic:
+        - Only sequences with identity >= min_identity are considered
+        - Track which positions on the subject/gene are covered by ALIGNED bases only
+        - Gene is detected if combined coverage of gene >= min_coverage
+
+        Identity calculation matches DIAMOND/BLAST: (matches / alignment_length) * 100
+        Coverage tracks only M/=/X operations (actual aligned bases on reference)
+        """
+        detected_genes = set()
+        gene_lengths = {}  # Store gene lengths from BAM header
+        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
+
+        if not bam_file.exists():
+            self.logger.error(f"BAM file not found: {bam_file}")
+            return detected_genes
+
+        # Open BAM file
+        bamfile = pysam.AlignmentFile(str(bam_file), "rb")
+
+        # Extract reference lengths from header
+        for ref_name, ref_length in zip(bamfile.references, bamfile.lengths):
+            gene_lengths[ref_name] = ref_length
+
+        # Store all reads for later FASTA output
+        all_reads = {}  # {read_name: sequence}
+
+        # Process alignments
+        try:
+            for read in bamfile.fetch():
+                # Store read sequence for later
+                if read.query_name not in all_reads and read.query_sequence:
+                    all_reads[read.query_name] = read.query_sequence
+
+                # Skip unmapped reads
+                if read.is_unmapped:
+                    continue
+
+                gene = read.reference_name
+                gene_len = gene_lengths.get(gene, 0)
+                # if 'ant(6)-Ib_1_FN594949' in gene:
+                #     print(222222222222222222222222222222222222222222222222222222222222222222)
+
+                # Track this read maps to this gene (before filtering)
+                gene_reads[gene]['all'].append(read.query_name)
+
+                # Get NM tag (edit distance: mismatches + indels)
+                try:
+                    nm = read.get_tag('NM')
+                except KeyError:
+                    nm = 0
+                if nm > 0:
+                    print("11")
+                    print(read.query_name)
+
+                # Parse CIGAR to get actual aligned positions on reference
+                # and calculate alignment length for identity
+                ref_pos = read.reference_start  # 0-based
+                aligned_positions = set()  # Positions on reference that have aligned bases
+                alignment_length = 0  # Total alignment columns (for identity calc)
+
+                #for op, length in read.cigartuples:
+                    # BAM CIGAR operations:
+                    # 0 = M (match or mismatch) - consumes both query and reference
+                    # 1 = I (insertion to reference) - consumes query only
+                    # 2 = D (deletion from reference) - consumes reference only
+                    # 3 = N (skipped region) - consumes reference only
+                    # 4 = S (soft clip) - consumes query only
+                    # 5 = H (hard clip) - consumes neither
+                    # 6 = P (padding) - consumes neither
+                    # 7 = = (sequence match) - consumes both
+                    # 8 = X (sequence mismatch) - consumes both
+
+                for op, length in read.cigartuples:
+                    if op in [0, 7, 8]:  # M, =, X - actual aligned bases
+                        # Add these reference positions to coverage
+                        # for i in range(length):
+                        #     aligned_positions.add(ref_pos + i)
+                        aligned_positions.update(range(ref_pos, ref_pos + length))
+                        ref_pos += length
+                        alignment_length += length
+
+                    elif op == 1:  # I - insertion (gap in reference)
+                        # Doesn't consume reference, but counts in alignment length
+                        alignment_length += length
+
+                    elif op == 2:  # D - deletion from reference
+                        # These positions on reference are NOT covered (no bases aligned)
+                        # But count in alignment length for identity calculation
+                        ref_pos += length
+                        alignment_length += length
+
+                    elif op == 3:  # N (spliced/skipped region)
+                        ref_pos += length
+
+
+                    elif op in [ 4, 5]:  # S, H - soft/hard clips
+                        # Don't consume reference, don't count in alignment
+                        pass
+
+                # Calculate identity: matches = alignment_length - edit_distance
+                # This matches BLAST/DIAMOND pident calculation
+                matches = alignment_length - nm
+                identity = (matches / alignment_length) * 100 if alignment_length > 0 else 0
+
+                # Calculate query coverage
+                query_length = read.query_length
+                query_coverage = (len(aligned_positions) / query_length) * 100 if query_length > 0 else 0
+
+                # Only process sequences meeting identity threshold
+                if (identity >= self.min_identity and query_coverage >= self.min_query_coverage): # put in menu
+                    # Initialise stats if first hit for this gene
+                    if gene not in self.gene_stats[database][tool_name]:
+                        self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+
+                    # Add aligned positions using add_positions method (this handles everything)
+                    self.gene_stats[database][tool_name][gene].add_positions(
+                        aligned_positions, identity, gene_len
+                    )
+
+                    # Add aligned positions to gene coverage
+                    # We need to modify add_hit to accept a set of positions
+                    #stats = self.gene_stats[database][tool_name][gene]
+                    #stats.num_sequences += 1
+                    #stats.identities.append(identity)
+
+                    # Add all aligned positions
+                    #stats.covered_positions.update(aligned_positions)
+
+                    # Track reads that pass thresholds
+                    gene_reads[gene]['passing'].append(read.query_name)
+
+                else:
+                    print("Not passing " + gene + " " + str(identity) + " " + str(alignment_length) + " " + str(read.query_name))
+
+        except Exception as e:
+            self.logger.error(f"Error reading BAM file: {e}")
+        finally:
+            bamfile.close()
+
+
+        # Finalise statistics and determine detection based on gene coverage
+        for gene in self.gene_stats[database][tool_name]:
+            stats = self.gene_stats[database][tool_name][gene]
+            stats.finalize()
+
+            # Gene is detected if gene coverage meets threshold
+            if stats.gene_coverage >= self.min_coverage:
+                detected_genes.add(gene)
+                self.detections[database][gene][tool_name] = True
+
+        self.logger.info(f"Detected {len(detected_genes)} genes in {database} using {tool_name}")
+
+        # Output FASTA files of reads mapping to genes
+        if self.report_fasta and detected_genes:
+            self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
+
+
+
+        return detected_genes
+
+
+    def parse_hmmer_results(self, tbl_file: Path, database: str, tool_name: str) -> Set[str]:
+        """Parse HMMER table output and extract genes meeting thresholds."""
+        detected_genes = set()
+        if not tbl_file.exists():
+            return detected_genes
+
+        try:
+            with open(tbl_file, 'r') as f:
+                for line in f:
+                    if line.startswith('#'):
+                        continue
+                    fields = line.strip().split()
+                    if len(fields) < 6:
+                        continue
+
+                    gene = fields[0]  # target name
+                    evalue = float(fields[4])
+                    score = float(fields[5]) if len(fields) > 5 else 0.0
+
+                    # Initialise stats if first hit for this gene
+                    if gene not in self.gene_stats[database][tool_name]:
+                        self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+
+                    # For HMMER, use score as proxy for coverage/identity
+                    # This is not perfect but HMMER doesn't give direct coverage
+                    self.gene_stats[database][tool_name][gene].add_hit(score, score)
+
+                    # HMMER doesn't directly give coverage/identity like BLAST
+                    # Use E-value as primary filter
+                    if evalue <= self.evalue:
+                        detected_genes.add(gene)
+                        self.detections[database][gene][tool_name] = True
+
+            # finalise statistics
+            for gene in self.gene_stats[database][tool_name]:
+                self.gene_stats[database][tool_name][gene].finalise()
+
+        except Exception as e:
+            self.logger.error(f"Error parsing {tbl_file}: {e}")
+
+        return detected_genes
+
+    def write_tool_stats(self, database: str, tool_name: str):
+        """Write detailed statistics for a specific tool to TSV.
+
+        Output columns:
+        - Gene: AMR gene name
+        - Gene_Length: Length of the gene in the database (bp)
+        - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= min_identity
+        - Gene_Coverage: Percentage of the gene covered by all qualifying alignments combined (%)
+        - Avg_Identity: Average identity across all qualifying sequences (%)
+        - Detected: 1 if gene_coverage >= min_coverage threshold, 0 otherwise
+        """
+        stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
+
+        gene_stats = self.gene_stats[database][tool_name]
+        if not gene_stats:
+            self.logger.warning(f"No statistics to write for {database} - {tool_name}")
+            return
+
+        with open(stats_file, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='\t')
+
+            # Header
+            header = ['Gene', 'Gene_Length', 'Num_Sequences_Mapped',  'Num_Sequences_Passing_Thresholds', 'Gene_Coverage', 'Avg_Identity', 'Detected']
+            writer.writerow(header)
+
+            # Sort genes alphabetically
+            genes = sorted(gene_stats.keys())
+
+            for gene in genes:
+                stats = gene_stats[gene]
+                detected = self.detections[database][gene][tool_name]
+
+                row = [
+                    gene,
+                    stats.gene_length,
+                    stats.num_sequences,
+                    len([i for i in stats.identities if i >= self.min_identity]),
+                    f"{stats.gene_coverage:.2f}",
+                    f"{stats.avg_identity:.2f}",
+                    '1' if detected else '0'
+                ]
+                writer.writerow(row)
+
+        self.logger.info(f"  Stats file: {stats_file}")
 
     def generate_detection_matrix(self, database: str):
         """Generate TSV matrix of gene detections across tools."""
@@ -648,7 +800,7 @@ class AMRWorkflow:
         self.logger.info(f"  Tools used: {len(all_tools)}")
 
 
-    def run_pipeline(self,options):
+    def run_workflow(self,options):
 
         """Run all configured tools on both databases."""
         self.logger.info("=" * 70)

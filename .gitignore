@@ -4,3 +4,7 @@ dist/
 .idea
 __pycache__
 src/AMRfior.egg-info/
+
+src/AMRfior/databases/resfinder/all_aa.fa
+
+src/AMRfior/databases/resfinder/all.fsa
