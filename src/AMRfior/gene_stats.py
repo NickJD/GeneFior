@@ -55,7 +55,7 @@ class GeneStats:
         if gene_len > 0:
             self.gene_length = max(self.gene_length, gene_len)
 
-    def finalize(self):
+    def finalise(self):
         """Calculate final statistics."""
         if self.num_sequences > 0:
             self.avg_identity = sum(self.identities) / self.num_sequences

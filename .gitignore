@@ -8,3 +8,7 @@ src/AMRfior.egg-info/
 src/AMRfior/databases/resfinder/all_aa.fa
 
 src/AMRfior/databases/resfinder/all.fsa
+
+src/AMRfior/databases/card/nucleotide_fasta_protein_homolog_model_SID.fasta
+
+src/AMRfior/databases/card/protein_fasta_protein_homolog_model_SID.fasta

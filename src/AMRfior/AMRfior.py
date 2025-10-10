@@ -54,20 +54,24 @@ Examples:
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
     tool_group.add_argument('--tools', nargs='+',
-                            choices=['blastn', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=['blastn', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
+                            choices=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna', 'hmmer_protein'],
+                            default=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
                             help='Specify which tools to run (default: all)')
 
+    query_threshold_group = parser.add_argument_group('Query threshold Parameters')
+    query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
+                                      dest='query_min_coverage',
+                                      help='Minimum coverage threshold in percent (default: 40.0)')
 
     gene_detection_group = parser.add_argument_group('Gene Detection Parameters')
-    gene_detection_group.add_argument('--min-cov', '--min-coverage', type=float, default=80.0,
-                              dest='min_coverage',
+    gene_detection_group.add_argument('--d-min-cov', '--detection-min-coverage', type=float, default=80.0,
+                              dest='detection_min_coverage',
                               help='Minimum coverage threshold in percent (default: 80.0)')
-    gene_detection_group.add_argument('--min-id', '--min-identity', type=float, default=80.0,
-                              dest='min_identity',
+    gene_detection_group.add_argument('--d-min-id', '--detection-min-identity', type=float, default=80.0,
+                              dest='detection_min_identity',
                               help='Minimum identity threshold in percent (default: 80.0)')
-    gene_detection_group.add_argument( '--max_target_seqs', dest='max_target_seqs', type=int, default=100,
-                              help='Maximum number of "hits" to return per query sequence (default: 100)')
+    # gene_detection_group.add_argument( '--max_target_seqs', dest='max_target_seqs', type=int, default=100,
+    #                           help='Maximum number of "hits" to return per query sequence (default: 100)')
 
 
     # Mode selection
@@ -78,8 +82,9 @@ Examples:
                             help='Run only protein-based tools')
     mode_group.add_argument('--sensitivity', type=str, default='default',
                             choices=['default', 'conservative', 'sensitive', 'very-sensitive'],
-                            help='Preset sensitivity levels - default means each tool uses its own default settings and very-sensitive applies '
-                                 'DIAMONDs --ultra-sensitive and Bowtie2s --very-sensitive-local presets')
+                            help='Preset sensitivity levels - default means each tool uses its own default settings and '
+                                 'very-sensitive applies DIAMONDs --ultra-sensitive and Bowtie2s'
+                                 ' --very-sensitive-local presets')
 
     # Tool-specific parameters
     tool_params_group = parser.add_argument_group('Tool-Specific Parameters')
@@ -94,6 +99,8 @@ Examples:
     runtime_group = parser.add_argument_group('Runtime Parameters')
     runtime_group.add_argument('-t', '--threads', type=int, default=4,
                               help='Number of threads to use (default: 4)')
+    runtime_group.add_argument('--no_cleanup',  action='store_true',)
+    runtime_group.add_argument('-v', '--verbose', action='store_true',)
 
     options = parser.parse_args()
 
@@ -133,12 +140,6 @@ Examples:
         tool_sensitivity_params['bowtie2'] = {'sensitivity': '--very-sensitive-local'}
         tool_sensitivity_params['diamond'] = {'sensitivity': '--ultra-sensitive'}
 
-
-
-
-
-
-
     # Run Workflow
     workflow = AMRWorkflow(
         input_fasta=options.input,
@@ -149,11 +150,14 @@ Examples:
         tool_sensitivity_params=tool_sensitivity_params,
         #max_target_seqs=options.max_target_seqs,
         #evalue=options.evalue,
-        min_coverage=options.min_coverage,
-        min_identity=options.min_identity,
+        detection_min_coverage=options.detection_min_coverage,
+        detection_min_identity=options.detection_min_identity,
+        query_min_coverage=options.query_min_coverage,
         run_dna=run_dna,
         run_protein=run_protein,
-        report_fasta=options.report_fasta
+        report_fasta=options.report_fasta,
+        no_cleanup=options.no_cleanup,
+        verbose=options.verbose
     )
 
     results = workflow.run_workflow(options)

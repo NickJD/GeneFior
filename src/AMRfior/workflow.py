@@ -10,7 +10,7 @@ import pysam
 try:
     from .gene_stats import GeneStats
     from .constants import *
-except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
+except (ModuleNotFoundError, ImportError) as error: #, NameError, TypeError) as error:
     from gene_stats import GeneStats
     from constants import *
 
@@ -22,11 +22,13 @@ class AMRWorkflow:
                  threads: int = 4, #max_target_seqs: int = 100,
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
                  #evalue: float = 1e-10,
-                 min_coverage: float = 80.0, min_identity: float = 80.0,
-                 min_query_coverage: float = 50.0,  # NEW: Query coverage threshold
+                 detection_min_coverage: float = 80.0, detection_min_identity: float = 80.0,
+                 query_min_coverage: float = 50.0,  # NEW: Query coverage threshold
 
                  run_dna: bool = True, run_protein: bool = True,
-                 report_fasta: str = None):
+                 report_fasta: str = None,
+                 no_cleanup: bool = False,
+                 verbose: bool = False):
         self.input_fasta = Path(input_fasta)
         self.output_dir = Path(output_dir)
         self.resfinder_dbs = resfinder_dbs
@@ -35,9 +37,9 @@ class AMRWorkflow:
       #  self.max_target_seqs = max_target_seqs
         self.tool_sensitivity_params = tool_sensitivity_params
        # self.evalue = evalue
-        self.min_coverage = min_coverage
-        self.min_identity = min_identity
-        self.min_query_coverage = min_query_coverage
+        self.detection_min_coverage = detection_min_coverage
+        self.detection_min_identity = detection_min_identity
+        self.query_min_coverage = query_min_coverage
 
         self.run_dna = run_dna
         self.run_protein = run_protein
@@ -52,6 +54,11 @@ class AMRWorkflow:
         if self.report_fasta != None:
             self.fasta_dir = self.output_dir / "fasta_outputs"
             self.fasta_dir.mkdir(exist_ok=True)
+
+        # misc
+        self.no_cleanup = no_cleanup
+        self.verbose = verbose
+
 
         # Setup logging
         log_file = self.output_dir / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -104,10 +111,11 @@ class AMRWorkflow:
 
     def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
                              gene_reads: dict, all_reads: dict):
-        """Helper method to write FASTA files for mapped reads."""
+        """Method to write FASTA files for mapped reads."""
 
         if self.report_fasta == 'all':
-            self.logger.info(f"Writing FASTA files for all mapped reads in {database}...")
+            if getattr(self, "verbose", True):
+                self.logger.info(f"Writing FASTA files for all mapped reads in {database}...")
             for gene, read_types in gene_reads.items():
                 read_names = set(read_types['all'])  # Use set to avoid duplicates
                 if not read_names:
@@ -123,11 +131,13 @@ class AMRWorkflow:
                             seq = all_reads[read_name]
                             fasta_out.write(f">{read_name}\n{seq}\n")
                             count += 1
-                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+                if getattr(self, "verbose", True):
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
         elif self.report_fasta == 'detected':
-            self.logger.info(
-                f"Writing FASTA files for threshold-passing reads mapped to detected genes in {database}...")
+            if getattr(self, "verbose", True):
+                self.logger.info(
+                    f"Writing FASTA files for threshold-passing reads mapped to detected genes in {database}...")
             for gene in detected_genes:
                 read_names = set(gene_reads[gene].get('passing', []))
                 if not read_names:
@@ -143,10 +153,12 @@ class AMRWorkflow:
                             seq = all_reads[read_name]
                             fasta_out.write(f">{read_name}\n{seq}\n")
                             count += 1
-                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+                if getattr(self, "verbose", True):
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
         elif self.report_fasta == 'detected-all':
-            self.logger.info(f"Writing FASTA files for all reads mapped to detected genes in {database}...")
+            if getattr(self, "verbose", True):
+                self.logger.info(f"Writing FASTA files for all reads mapped to detected genes in {database}...")
             for gene in detected_genes:
                 read_names = set(gene_reads[gene].get('all', []))
                 if not read_names:
@@ -162,10 +174,11 @@ class AMRWorkflow:
                             seq = all_reads[read_name]
                             fasta_out.write(f">{read_name}\n{seq}\n")
                             count += 1
-                self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+                if getattr(self, "verbose", True):
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
-        """Run BLAST in DNA or protein mode."""
+        """Run BLAST in DNA (blastn) or protein (blastx) mode."""
         if not db_path:
             return False, set()
 
@@ -181,13 +194,13 @@ class AMRWorkflow:
                 '-db', db_path,
                 '-out', str(output_file),
                 '-outfmt',
-                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore slen',
-                '-perc_identity', str(self.min_identity),
+                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen',
+                #'-perc_identity', str(self.detection_min_identity),
                 #'-evalue', str(self.evalue),
                 '-num_threads', str(self.threads)#,
                # '-max_target_seqs', str(self.max_target_seqs)
             ]
-        else:
+        elif mode == 'protein':
             blast_cmd = 'blastx'
             cmd = [
                 blast_cmd,
@@ -195,17 +208,20 @@ class AMRWorkflow:
                 '-db', db_path,
                 '-out', str(output_file),
                 '-outfmt',
-                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore slen',
+                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen',
              #   '-evalue', str(self.evalue),
                 '-num_threads', str(self.threads)#,
               #  '-max_target_seqs', str(self.max_target_seqs)
             ]
+        else:
+            self.logger.error(f"Invalid BLAST'ing' mode: {mode}")
+            return False, set()
 
         success = self.run_command(cmd, f"{database} - {tool_name}")
         detected = set()
         if success:
-            detected = self.parse_blast_results(output_file, database, tool_name)
-            self.write_tool_stats(database, tool_name)
+            detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
+            self.write_tool_stats(database, tool_name, gene_reads)
         return success, detected
 
     def run_diamond(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
@@ -226,9 +242,9 @@ class AMRWorkflow:
             '-d', db_path,
             '-o', str(output_file),
             '-f', '6', 'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-            'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'slen',
+            'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'qlen', 'slen',
             '--header',
-            '--id', str(self.min_identity),
+            #'--id', str(self.min_identity),
             #'-e', str(self.evalue),
             '-p', str(self.threads)#,
             #'-k', '10'
@@ -239,8 +255,8 @@ class AMRWorkflow:
         success = self.run_command(cmd, f"{database} - {tool_name}")
         detected = set()
         if success:
-            detected = self.parse_blast_results(output_file, database, tool_name)
-            self.write_tool_stats(database, tool_name)
+            detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
+            self.write_tool_stats(database, tool_name, gene_reads)
         return success, detected
 
 
@@ -290,22 +306,10 @@ class AMRWorkflow:
         self.run_command(index_cmd, f"{database} - BAM indexing")
 
         # Parse results
-        detected = self.parse_bam_results(sorted_bam_file, database, tool_name)
-        self.write_tool_stats(database, tool_name)
-        # detected = set()
-        # if success:
-        #     # Convert SAM to sorted BAM
-        #     sort_cmd = [
-        #         'samtools', 'sort',
-        #         '-@', str(self.threads),
-        #         '-o', str(bam_file),
-        #         str(sam_file)
-        #     ]
-        #     sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
-        #     if sort_success:
-        #         detected = self.parse_bam_results(bam_file, database, tool_name)
-        #         self.write_tool_stats(database, tool_name)
-        #     success = success and sort_success
+        detected, gene_reads = self.parse_bam_results(sorted_bam_file, database, tool_name)
+        self.write_tool_stats(database, tool_name, gene_reads)
+
+
         return success, detected
 
 
@@ -337,7 +341,7 @@ class AMRWorkflow:
         if not success:
             return False, set()
 
-            # Convert SAM to BAM
+        # Convert SAM to BAM
         sam_to_bam_cmd = ['samtools', 'view', '-bS', str(sam_file), '-o', str(bam_file)]
         if not self.run_command(sam_to_bam_cmd, f"{database} - SAM to BAM conversion"):
             return False, set()
@@ -352,23 +356,9 @@ class AMRWorkflow:
         self.run_command(index_cmd, f"{database} - BAM indexing")
 
         # Parse results
-        detected = self.parse_bam_results(sorted_bam, database, tool_name)
-        self.write_tool_stats(database, tool_name)
+        detected, gene_reads = self.parse_bam_results(sorted_bam, database, tool_name)
+        self.write_tool_stats(database, tool_name, gene_reads)
 
-        # detected = set()
-        # if success:
-        #     # Convert SAM to sorted BAM
-        #     sort_cmd = [
-        #         'samtools', 'sort',
-        #         '-@', str(self.threads),
-        #         '-o', str(bam_file),
-        #         str(sam_file)
-        #     ]
-        #     sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
-        #     if sort_success:
-        #         detected = self.parse_bam_results(bam_file, database, tool_name)
-        #         self.write_tool_stats(database, tool_name)
-        #     success = success and sort_success
         return success, detected
 
 
@@ -378,7 +368,8 @@ class AMRWorkflow:
             return False, set()
 
         sam_file = self.raw_dir / f"{database}_minimap2_results.sam"
-        bam_file = self.raw_dir / f"{database}_minimap2_results.sorted.bam"
+        bam_file = self.raw_dir / f"{database}_minimap2_results.bam"
+        sorted_bam = self.raw_dir / f"{database}_minimap2_results_sorted.bam"
         tool_name = "Minimap2"
 
         cmd = [
@@ -391,22 +382,37 @@ class AMRWorkflow:
             '-o', str(sam_file)
         ]
 
-        success = self.run_command(cmd, f"{database} - {tool_name}")
-        detected = set()
-        if success:
-            # Convert SAM to sorted BAM
-            sort_cmd = [
-                'samtools', 'sort',
-                '-@', str(self.threads),
-                '-o', str(bam_file),
-                str(sam_file)
-            ]
-            sort_success = self.run_command(sort_cmd, f"{database} - samtools sort")
-            if sort_success:
-                detected = self.parse_bam_results(bam_file, database, tool_name)
-                self.write_tool_stats(database, tool_name)
-            success = success and sort_success
+        try:
+            success = self.run_command(cmd, f"{database} - {tool_name}")
+        except Exception as e:
+            self.logger.error(f"Error running Minimap2: {e}")
+            return False, set()
+
+        if not success:
+            return False, set()
+
+        # Convert SAM to BAM
+        sam_to_bam_cmd = ['samtools', 'view', '-bS', str(sam_file), '-o', str(bam_file)]
+        if not self.run_command(sam_to_bam_cmd, f"{database} - SAM to BAM conversion"):
+            return False, set()
+
+        # Sort BAM
+        sort_cmd = ['samtools', 'sort', str(bam_file), '-o', str(sorted_bam)]
+        if not self.run_command(sort_cmd, f"{database} - BAM sorting"):
+            return False, set()
+
+        # Index BAM (optional but recommended)
+        index_cmd = ['samtools', 'index', str(sorted_bam)]
+        self.run_command(index_cmd, f"{database} - BAM indexing")
+
+        # Parse results
+        detected, gene_reads = self.parse_bam_results(sorted_bam, database, tool_name)
+        self.write_tool_stats(database, tool_name, gene_reads)
+
         return success, detected
+
+
+
 
     def run_hmmer(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
         """Run HMMER profile search."""
@@ -438,16 +444,39 @@ class AMRWorkflow:
     def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
         """Parse BLAST/DIAMOND tabular output and extract genes meeting thresholds.
         Detection logic:
-        - Only sequences with identity >= min_identity are considered
+        - Only sequences with identity >= detection_min_identity are considered
         - Track which positions on the subject/gene are covered by alignments
-        - Gene is detected if combined coverage of gene >= min_coverage
+        - Gene is detected if combined coverage of gene >= detection_min_coverage
         """
         detected_genes = set()
         gene_lengths = {}  # Store gene lengths
+        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
 
         if not output_file.exists():
             return detected_genes
 
+        # Load all reads from input FASTA for later FASTA output (cached) - Should only load once
+        if not hasattr(self, 'all_reads'):
+            self.all_reads = {}
+            try:
+                with open(self.input_fasta, 'r') as fasta_file:
+                    read_name = None
+                    seq_lines = []
+                    for line in fasta_file:
+                        if line.startswith('>'):
+                            if read_name and seq_lines:
+                                self.all_reads[read_name] = ''.join(seq_lines)
+                            read_name = line[1:].strip()
+                            seq_lines = []
+                        else:
+                            seq_lines.append(line.strip())
+                    if read_name and seq_lines:
+                        self.all_reads[read_name] = ''.join(seq_lines)
+            except Exception as e:
+                self.logger.error(f"Error reading FASTA file: {e}")
+        all_reads = self.all_reads
+        all = 0
+        passing = 0
         try:
             with open(output_file, 'r') as f:
                 for line in f:
@@ -457,11 +486,15 @@ class AMRWorkflow:
                     if len(fields) < 13:
                         continue
 
+                    read_name = fields[0]  # qseqid
                     gene = fields[1]  # sseqid
                     identity = float(fields[2])  # pident
+                    qstart = int(fields[6])  # query start
+                    qend = int(fields[7])  # query end
                     sstart = int(fields[8])  # subject start
                     send = int(fields[9])  # subject end
-                    slen = int(fields[12])  # subject length (added to output format)
+                    qlen = int(fields[12])  # query length (added to output format)
+                    slen = int(fields[13])  # subject length (added to output format)
 
                     # Store gene length
                     if gene in gene_lengths:
@@ -469,8 +502,15 @@ class AMRWorkflow:
                     else:
                         gene_lengths[gene] = slen
 
-                    # Only process sequences meeting identity threshold
-                    if identity >= self.min_identity:
+                    # Only process sequences meeting identity and query coverage thresholds - variable redundancy for clarity
+                    query_length = qlen
+                    query_coverage = ((abs(qend - qstart) + 1) / query_length) * 100 if query_length else 0
+
+                    # Track all reads mapping to this gene
+                    gene_reads[gene]['all'].append(read_name)
+                    all +=1
+
+                    if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
                         # Initialise stats if first hit for this gene
                         if gene not in self.gene_stats[database][tool_name]:
                             self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
@@ -480,30 +520,40 @@ class AMRWorkflow:
                             sstart, send, identity, gene_lengths[gene]
                         )
 
-            # finalise statistics and determine detection based on gene coverage
-            for gene in self.gene_stats[database][tool_name]:
-                stats = self.gene_stats[database][tool_name][gene]
-                stats.finalise()
-
-                # Gene is detected if gene coverage meets threshold
-                if stats.gene_coverage >= self.min_coverage:
-                    detected_genes.add(gene)
-                    self.detections[database][gene][tool_name] = True
+                        # Track reads that pass thresholds
+                        gene_reads[gene]['passing'].append(read_name)
+                        passing +=1
 
         except Exception as e:
             self.logger.error(f"Error parsing {output_file}: {e}")
 
-        return detected_genes
+        # Finalise statistics and determine detection based on gene coverage
+        for gene in self.gene_stats[database][tool_name]:
+            stats = self.gene_stats[database][tool_name][gene]
+            stats.finalise()
+
+            # Gene is detected if gene coverage meets threshold
+            if stats.gene_coverage >= self.detection_min_coverage:
+                detected_genes.add(gene)
+                self.detections[database][gene][tool_name] = True
+
+        self.logger.info(f"Detected {len(detected_genes)} genes in {database} using {tool_name}")
+
+        # Output FASTA files of reads mapping to genes
+        if self.report_fasta and detected_genes:
+            self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
+
+        return detected_genes, gene_reads
 
     def parse_bam_results(self, bam_file: Path, database: str, tool_name: str) -> Set[str]:
         """Parse BAM file from Bowtie2 and extract genes meeting thresholds.
 
         Detection logic:
-        - Only sequences with identity >= min_identity are considered
+        - Only seqs with identity >= detection_min_identity and query coverage >= query-min-coverage are considered
         - Track which positions on the subject/gene are covered by ALIGNED bases only
-        - Gene is detected if combined coverage of gene >= min_coverage
+        - Gene is detected if combined coverage of gene >= detection_min_coverage
 
-        Identity calculation matches DIAMOND/BLAST: (matches / alignment_length) * 100
+        Identity calculation 'matches' DIAMOND/BLAST: (matches / alignment_length) * 100
         Coverage tracks only M/=/X operations (actual aligned bases on reference)
         """
         detected_genes = set()
@@ -537,8 +587,6 @@ class AMRWorkflow:
 
                 gene = read.reference_name
                 gene_len = gene_lengths.get(gene, 0)
-                # if 'ant(6)-Ib_1_FN594949' in gene:
-                #     print(222222222222222222222222222222222222222222222222222222222222222222)
 
                 # Track this read maps to this gene (before filtering)
                 gene_reads[gene]['all'].append(read.query_name)
@@ -548,7 +596,6 @@ class AMRWorkflow:
                     nm = read.get_tag('NM')
                 except KeyError:
                     nm = 0
-                if nm > 0:
                     print("11")
                     print(read.query_name)
 
@@ -558,7 +605,6 @@ class AMRWorkflow:
                 aligned_positions = set()  # Positions on reference that have aligned bases
                 alignment_length = 0  # Total alignment columns (for identity calc)
 
-                #for op, length in read.cigartuples:
                     # BAM CIGAR operations:
                     # 0 = M (match or mismatch) - consumes both query and reference
                     # 1 = I (insertion to reference) - consumes query only
@@ -592,59 +638,57 @@ class AMRWorkflow:
                     elif op == 3:  # N (spliced/skipped region)
                         ref_pos += length
 
-
                     elif op in [ 4, 5]:  # S, H - soft/hard clips
                         # Don't consume reference, don't count in alignment
                         pass
 
                 # Calculate identity: matches = alignment_length - edit_distance
                 # This matches BLAST/DIAMOND pident calculation
-                matches = alignment_length - nm
-                identity = (matches / alignment_length) * 100 if alignment_length > 0 else 0
+                if alignment_length == 0:
+                    self.logger.warning(
+                        f"Read {read.query_name} has zero alignment length on gene {gene}. Skipping identity calculation.")
+                    identity = 0
+                else:
+                    matches = alignment_length - nm
+                    identity = (matches / alignment_length) * 100
+
+                if not read.has_tag('NM'):
+                    self.logger.warning(f"Read {read.query_name} missing NM tag for gene {gene}. Assuming NM=0.")
+
+                if not read.cigartuples:
+                    self.logger.warning(f"Read {read.query_name} has empty or unusual CIGAR string for gene {gene}.")
 
                 # Calculate query coverage
                 query_length = read.query_length
                 query_coverage = (len(aligned_positions) / query_length) * 100 if query_length > 0 else 0
 
                 # Only process sequences meeting identity threshold
-                if (identity >= self.min_identity and query_coverage >= self.min_query_coverage): # put in menu
+                if (identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage):
                     # Initialise stats if first hit for this gene
                     if gene not in self.gene_stats[database][tool_name]:
                         self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-
                     # Add aligned positions using add_positions method (this handles everything)
                     self.gene_stats[database][tool_name][gene].add_positions(
                         aligned_positions, identity, gene_len
                     )
-
-                    # Add aligned positions to gene coverage
-                    # We need to modify add_hit to accept a set of positions
-                    #stats = self.gene_stats[database][tool_name][gene]
-                    #stats.num_sequences += 1
-                    #stats.identities.append(identity)
-
-                    # Add all aligned positions
-                    #stats.covered_positions.update(aligned_positions)
-
                     # Track reads that pass thresholds
                     gene_reads[gene]['passing'].append(read.query_name)
-
                 else:
-                    print("Not passing " + gene + " " + str(identity) + " " + str(alignment_length) + " " + str(read.query_name))
+                    if getattr(self, "verbose", True):
+                        self.logger.info(f"Not passing {gene} {identity} {alignment_length} {read.query_name}")
 
         except Exception as e:
             self.logger.error(f"Error reading BAM file: {e}")
         finally:
             bamfile.close()
 
-
         # Finalise statistics and determine detection based on gene coverage
         for gene in self.gene_stats[database][tool_name]:
             stats = self.gene_stats[database][tool_name][gene]
-            stats.finalize()
+            stats.finalise()
 
             # Gene is detected if gene coverage meets threshold
-            if stats.gene_coverage >= self.min_coverage:
+            if stats.gene_coverage >= self.detection_min_coverage:
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
 
@@ -655,8 +699,7 @@ class AMRWorkflow:
             self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
 
 
-
-        return detected_genes
+        return detected_genes, gene_reads
 
 
     def parse_hmmer_results(self, tbl_file: Path, database: str, tool_name: str) -> Set[str]:
@@ -699,18 +742,18 @@ class AMRWorkflow:
         except Exception as e:
             self.logger.error(f"Error parsing {tbl_file}: {e}")
 
-        return detected_genes
+        return detected_genes #, gene_reads
 
-    def write_tool_stats(self, database: str, tool_name: str):
+    def write_tool_stats(self, database: str, tool_name: str, gene_reads: dict = None):
         """Write detailed statistics for a specific tool to TSV.
 
         Output columns:
         - Gene: AMR gene name
         - Gene_Length: Length of the gene in the database (bp)
-        - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= min_identity
+        - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= detection-min-identity
         - Gene_Coverage: Percentage of the gene covered by all qualifying alignments combined (%)
         - Avg_Identity: Average identity across all qualifying sequences (%)
-        - Detected: 1 if gene_coverage >= min_coverage threshold, 0 otherwise
+        - Detected: 1 if gene_coverage >= detection-min-coverage threshold, 0 otherwise
         """
         stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
 
@@ -731,13 +774,15 @@ class AMRWorkflow:
 
             for gene in genes:
                 stats = gene_stats[gene]
-                detected = self.detections[database][gene][tool_name]
-
+                try:
+                    detected = self.detections[database][gene][tool_name]
+                except KeyError:
+                    detected = False
                 row = [
                     gene,
                     stats.gene_length,
-                    stats.num_sequences,
-                    len([i for i in stats.identities if i >= self.min_identity]),
+                    len(gene_reads.get(gene, {}).get('all', [])), # 'all' reads mapping to gene
+                    len(gene_reads.get(gene, {}).get('passing', [])), # Just those that 'passed' thresholds
                     f"{stats.gene_coverage:.2f}",
                     f"{stats.avg_identity:.2f}",
                     '1' if detected else '0'
@@ -810,8 +855,9 @@ class AMRWorkflow:
         self.logger.info(f"Output directory: {self.output_dir}")
         self.logger.info(f"Threads: {self.threads}")
        # self.logger.info(f"E-value threshold: {self.evalue}")
-        self.logger.info(f"Min coverage: {self.min_coverage}%")
-        self.logger.info(f"Min identity: {self.min_identity}%")
+        self.logger.info(f"Min query coverage: {self.query_min_coverage}%")
+        self.logger.info(f"Min detection coverage: {self.detection_min_coverage}%")
+        self.logger.info(f"Min detection identity: {self.detection_min_identity}%")
         self.logger.info(f"Run DNA mode: {self.run_dna}")
         self.logger.info(f"Run Protein mode: {self.run_protein}")
         params_str = ", ".join(
@@ -829,9 +875,9 @@ class AMRWorkflow:
                 results['resfinder']['BLASTn-DNA'] = self.run_blast(
                     self.resfinder_dbs['blastn'], 'resfinder', 'dna')
 
-            if self.run_protein and self.resfinder_dbs.get('blastp'):
-                results['resfinder']['BLASTp-AA'] = self.run_blast(
-                    self.resfinder_dbs['blastp'], 'resfinder', 'protein')
+            if self.run_protein and self.resfinder_dbs.get('blastx'):
+                results['resfinder']['BLASTx-AA'] = self.run_blast(
+                    self.resfinder_dbs['blastx'], 'resfinder', 'protein')
 
             if self.run_protein and self.resfinder_dbs.get('diamond'):
                 results['resfinder']['DIAMOND-AA'] = self.run_diamond(
@@ -867,9 +913,9 @@ class AMRWorkflow:
                 results['card']['BLASTn-DNA'] = self.run_blast(
                     self.card_dbs['blastn'], 'card', 'dna')
 
-            if self.run_protein and self.card_dbs.get('blastp'):
-                results['card']['BLASTp-AA'] = self.run_blast(
-                    self.card_dbs['blastp'], 'card', 'protein')
+            if self.run_protein and self.card_dbs.get('blastx'):
+                results['card']['BLASTx-AA'] = self.run_blast(
+                    self.card_dbs['blastx'], 'card', 'protein')
 
             if self.run_protein and self.card_dbs.get('diamond'):
                 results['card']['DIAMOND-AA'] = self.run_diamond(
