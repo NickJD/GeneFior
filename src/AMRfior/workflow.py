@@ -113,6 +113,14 @@ class AMRWorkflow:
                              gene_reads: dict, all_reads: dict):
         """Method to write FASTA files for mapped reads."""
 
+        def sanitise_gene_name(gene: str) -> str:
+            safe_gene = gene.replace('|', '_').replace('/', '_').replace(':','_').replace('-','_')
+            if not hasattr(self, 'gene_name_changes'):
+                self.gene_name_changes = []
+            self.gene_name_changes.append((gene, safe_gene))
+            return safe_gene
+
+
         if self.report_fasta == 'all':
             if getattr(self, "verbose", True):
                 self.logger.info(f"Writing FASTA files for all mapped reads in {database}...")
@@ -121,7 +129,7 @@ class AMRWorkflow:
                 if not read_names:
                     continue
 
-                safe_gene = gene.replace('|', '_').replace('/', '_')
+                safe_gene = sanitise_gene_name(gene)
                 fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
                 with open(fasta_path, "w") as fasta_out:
@@ -143,7 +151,7 @@ class AMRWorkflow:
                 if not read_names:
                     continue
 
-                safe_gene = gene.replace('|', '_').replace('/', '_')
+                safe_gene = sanitise_gene_name(gene)
                 fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
                 with open(fasta_path, "w") as fasta_out:
@@ -164,7 +172,7 @@ class AMRWorkflow:
                 if not read_names:
                     continue
 
-                safe_gene = gene.replace('|', '_').replace('/', '_')
+                safe_gene = sanitise_gene_name(gene)
                 fasta_path = self.fasta_dir / f"{database}_{tool_name}_{safe_gene}_reads.fasta"
 
                 with open(fasta_path, "w") as fasta_out:
@@ -176,6 +184,9 @@ class AMRWorkflow:
                             count += 1
                 if getattr(self, "verbose", True):
                     self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+
+
+
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
         """Run BLAST in DNA (blastn) or protein (blastx) mode."""
@@ -905,6 +916,17 @@ class AMRWorkflow:
 
             self.generate_detection_matrix('resfinder')
 
+            if options.report_fasta != None:
+                # Write gene name changes to TSV if any changes were made
+                if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
+                    changes_file = self.fasta_dir / f"resfinder_gene_name_changes.tsv"
+                    with open(changes_file, "w", newline='') as f:
+                        writer = csv.writer(f, delimiter='\t')
+                        writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
+                        writer.writerows(self.gene_name_changes)
+                    self.logger.info(f"  Gene name changes file: {changes_file}")
+                    self.gene_name_changes.clear()
+
         # Process CARD database
         if self.card_dbs:
             self.logger.info("\n### Processing CARD Database ###")
@@ -942,6 +964,16 @@ class AMRWorkflow:
             #         self.card_dbs['hmmer_protein'], 'card', 'protein')
 
             self.generate_detection_matrix('card')
+            if options.report_fasta != None:
+                # Write gene name changes to TSV if any changes were made
+                if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
+                    changes_file = self.fasta_dir / f"card_gene_name_changes.tsv"
+                    with open(changes_file, "w", newline='') as f:
+                        writer = csv.writer(f, delimiter='\t')
+                        writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
+                        writer.writerows(self.gene_name_changes)
+                    self.logger.info(f"  Gene name changes file: {changes_file}")
+                    self.gene_name_changes.clear()
 
         # Final summary
         self.logger.info("\n" + "=" * 70)

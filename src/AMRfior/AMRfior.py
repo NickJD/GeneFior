@@ -16,7 +16,7 @@ except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMR Gene Detection Pipeline - Multi-tool alignment with detection matrices',
+        description='AMRfíor - The Multi-Tool AMR Gene Detection Workflow.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -27,10 +27,10 @@ Examples:
   python amr_pipeline.py -i reads.fasta -o results/ \\
     --tools blastn diamond bowtie2
 
-  # Custom thresholds with long reads
+  # Custom thresholds and dna-only mode
   python amr_pipeline.py -i nanopore.fasta -o results/ \\
-    -t 16 --min-cov 90 --min-id 85 \\
-    --minimap-preset map-ont --dna-only
+    -t 16 --d-min-cov 90 --d-min-id 85 \\
+     --dna-only
         """
     )
 
@@ -103,6 +103,9 @@ Examples:
     runtime_group.add_argument('-v', '--verbose', action='store_true',)
 
     options = parser.parse_args()
+
+    if options.report_fasta == ['None']:
+        options.report_fasta = None
 
     # Check input file exists
     if not os.path.exists(options.input):

@@ -6,9 +6,9 @@
   "description": "nucleotide_fasta_protein_homolog_model_SID.fasta",
   "number-of-letters": 5832978,
   "number-of-sequences": 6052,
-  "last-updated": "2025-10-05T13:09:00",
+  "last-updated": "2025-10-15T14:15:00",
   "number-of-volumes": 1,
-  "bytes-total": 2316374,
+  "bytes-total": 2169366,
   "bytes-to-cache": 1535303,
   "files": [
     "nucleotide_fasta_protein_homolog_model_SID_blastdb.ndb",
