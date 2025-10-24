@@ -7,37 +7,43 @@ try:
     from .databases import RESFINDER_DATABASES, CARD_DATABASES
     from .workflow import AMRWorkflow
     from .gene_stats import GeneStats
+    from .utils import *
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
     from constants import *
     from databases import RESFINDER_DATABASES, CARD_DATABASES
     from workflow import AMRWorkflow
     from gene_stats import GeneStats
-
+    from utils import *
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMRfíor - The Multi-Tool AMR Gene Detection Workflow.',
+        description='AMRfíor ' + AMRFIOR_VERSION + '- The Multi-Tool AMR Gene Detection Workflow.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic usage with default tools
-  python amr_pipeline.py -i reads.fasta -o results/
+  # Basic usage with default tools (runs DNA & protein tools)
+  AMRfior -i reads.fasta -st Single-FASTA -o results/
 
-  # Select specific tools
-  python amr_pipeline.py -i reads.fasta -o results/ \\
-    --tools blastn diamond bowtie2
+  # Select specific tools and output detected FASTA sequences
+  AMRfior -i reads.fasta -st Single-FASTA -o results/ \
+    --tools blastn diamond bowtie2 \
+    --report_fasta detected
 
-  # Custom thresholds and dna-only mode
-  python amr_pipeline.py -i nanopore.fasta -o results/ \\
-    -t 16 --d-min-cov 90 --d-min-id 85 \\
-     --dna-only
+  # Custom thresholds, paire-fastq input, threads and dna-only mode
+  AMRfior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
+    -t 16 --d-min-cov 90 --d-min-id 85 \
+    --dna-only
         """
     )
 
     # Required arguments
     required_group = parser.add_argument_group('Required selection')
     required_group.add_argument('-i', '--input', required=True,
-                        help='Input FASTA file with sequences to analyse')
+                        help='Input FASTA/FASTAQ file(s) with sequences to analyse - separate R1 and R2 with a comma for Paired-FASTQ')
+    required_group.add_argument('-st', '--sequence-type', required=True,
+                        choices=['Single-FASTA', 'Paired-FASTQ'],
+                        help='Specify the input Sequence Type: Single-FASTA or Paired-FASTQ (R1+R2) - Will'
+                             'convert paired-fastq to single fasta for BLAST and DIAMOND analyses')
     required_group.add_argument('-o', '--output', required=True,
                         help='Output directory for results')
 
@@ -54,9 +60,10 @@ Examples:
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
     tool_group.add_argument('--tools', nargs='+',
-                            choices=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
-                            help='Specify which tools to run (default: all)')
+                            choices=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2', 'all'], #, 'hmmer_dna', 'hmmer_protein'],
+                            default=['blastn', 'diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
+                            help='Specify which tools to run - "all" will run all tools'
+                                 ' (default: all except blastx as it is very slow)')
 
     query_threshold_group = parser.add_argument_group('Query threshold Parameters')
     query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
@@ -107,10 +114,20 @@ Examples:
     if options.report_fasta == ['None']:
         options.report_fasta = None
 
-    # Check input file exists
-    if not os.path.exists(options.input):
-        print(f"Error: Input file '{options.input}' not found", file=sys.stderr)
-        sys.exit(1)
+    # FASTA/FASTQ handling
+    if options.sequence_type == 'Paired-FASTQ':
+        if any(tool in ('blastn', 'blastx', 'diamond') for tool in (options.tools or [])):
+            FASTQ_to_FASTA(options)
+        else:
+            options.fastq_input = options.input
+            options.fasta_input = None
+    else:
+        # Check input file exists
+        if not os.path.exists(options.input):
+            print(f"Error: Input file '{options.input}' not found", file=sys.stderr)
+            sys.exit(1)
+        options.fasta_input = options.input
+        options.fastq_input = None
 
     # Load database paths from databases.py
     resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
@@ -132,7 +149,10 @@ Examples:
     if not run_dna and not run_protein:
         print("Error: Cannot disable both DNA and protein modes", file=sys.stderr)
         sys.exit(1)
-    #
+
+
+
+    # Tool sensitivity
     tool_sensitivity_params = {}
 
     if hasattr(options, 'sensitivity') and options.sensitivity == 'default':
@@ -145,7 +165,8 @@ Examples:
 
     # Run Workflow
     workflow = AMRWorkflow(
-        input_fasta=options.input,
+        input_fasta=options.fasta_input,
+        input_fastq=options.fastq_input,
         output_dir=options.output,
         resfinder_dbs=resfinder_dbs,
         card_dbs=card_dbs,
@@ -158,6 +179,7 @@ Examples:
         query_min_coverage=options.query_min_coverage,
         run_dna=run_dna,
         run_protein=run_protein,
+        sequence_type=options.sequence_type,
         report_fasta=options.report_fasta,
         no_cleanup=options.no_cleanup,
         verbose=options.verbose

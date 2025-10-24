@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Set, Tuple
-import pysam
+
 
 try:
     from .gene_stats import GeneStats
@@ -17,7 +17,7 @@ except (ModuleNotFoundError, ImportError) as error: #, NameError, TypeError) as 
 class AMRWorkflow:
     """Orchestrates multiple alignment tools for AMR gene detection."""
 
-    def __init__(self, input_fasta: str, output_dir: str,
+    def __init__(self, input_fasta: str, input_fastq: str, output_dir: str,
                  resfinder_dbs: Dict[str, str], card_dbs: Dict[str, str],
                  threads: int = 4, #max_target_seqs: int = 100,
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
@@ -26,10 +26,32 @@ class AMRWorkflow:
                  query_min_coverage: float = 50.0,  # NEW: Query coverage threshold
 
                  run_dna: bool = True, run_protein: bool = True,
+                 sequence_type: str = 'Single-FASTA',
                  report_fasta: str = None,
                  no_cleanup: bool = False,
                  verbose: bool = False):
-        self.input_fasta = Path(input_fasta)
+        ### Handle input FASTA and FASTQ
+        if input_fasta is not None:
+            self.input_fasta = Path(input_fasta)
+        if input_fastq is None:
+            self.input_fastq = None
+            self.input_fastq_is_paired = False
+        elif isinstance(input_fastq, (tuple, list)):
+            if len(input_fastq) != 2:
+                raise ValueError("`input_fastq` tuple/list must contain exactly two paths for paired-end reads")
+            self.input_fastq = (Path(input_fastq[0]), Path(input_fastq[1]))
+            self.input_fastq_is_paired = True
+        elif isinstance(input_fastq, str) and ',' in input_fastq:
+            parts = [p.strip() for p in input_fastq.split(',') if p.strip()]
+            if len(parts) != 2:
+                raise ValueError(
+                    "`input_fastq` comma-separated string must contain exactly two paths for paired-end reads")
+            self.input_fastq = (Path(parts[0]), Path(parts[1]))
+            self.input_fastq_is_paired = True
+        else:
+            self.input_fastq = Path(input_fastq)
+            self.input_fastq_is_paired = False
+        ###
         self.output_dir = Path(output_dir)
         self.resfinder_dbs = resfinder_dbs
         self.card_dbs = card_dbs
@@ -43,6 +65,7 @@ class AMRWorkflow:
 
         self.run_dna = run_dna
         self.run_protein = run_protein
+        self.sequence_type = sequence_type
         self.report_fasta = report_fasta  # 'All', 'Detected', or None
 
         # Create output directory structure
@@ -189,7 +212,9 @@ class AMRWorkflow:
 
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
-        """Run BLAST in DNA (blastn) or protein (blastx) mode."""
+        """Run BLAST in DNA (blastn) or protein (blastx) mode.
+            If input FASTA is gzipped, stream decompressed data to BLAST via stdin
+            (uses `-query -`) to avoid creating a temporary uncompressed file."""
         if not db_path:
             return False, set()
 
@@ -197,43 +222,116 @@ class AMRWorkflow:
         output_file = self.raw_dir / f"{database}_{blast_cmd}_results.tsv"
         tool_name = f"BLAST-{mode.upper()}"
 
+        # Common outfmt used for both modes
+        outfmt_fields = '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen'
+
+        # Determine if input is gzipped
+        fasta_path_str = str(self.input_fasta)
+        gz_input = fasta_path_str.endswith(('.gz', '.gzip'))
+
         if mode == 'dna':
             blast_cmd = 'blastn'
+            query_arg = '-' if gz_input else fasta_path_str
             cmd = [
                 blast_cmd,
-                '-query', str(self.input_fasta),
+                '-query', query_arg,
                 '-db', db_path,
                 '-out', str(output_file),
-                '-outfmt',
-                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen',
-                #'-perc_identity', str(self.detection_min_identity),
-                #'-evalue', str(self.evalue),
-                '-num_threads', str(self.threads)#,
-               # '-max_target_seqs', str(self.max_target_seqs)
+                '-outfmt', outfmt_fields,
+                '-num_threads', str(self.threads)
             ]
         elif mode == 'protein':
             blast_cmd = 'blastx'
+            query_arg = '-' if gz_input else fasta_path_str
             cmd = [
                 blast_cmd,
-                '-query', str(self.input_fasta),
+                '-query', query_arg,
                 '-db', db_path,
                 '-out', str(output_file),
-                '-outfmt',
-                '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen',
-             #   '-evalue', str(self.evalue),
-                '-num_threads', str(self.threads)#,
-              #  '-max_target_seqs', str(self.max_target_seqs)
+                '-outfmt', outfmt_fields,
+                '-num_threads', str(self.threads)
             ]
         else:
             self.logger.error(f"Invalid BLAST'ing' mode: {mode}")
             return False, set()
 
-        success = self.run_command(cmd, f"{database} - {tool_name}")
+        success = False
+        # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
+        if gz_input:
+            self.logger.info(f"Running {tool_name}...")
+            self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
+            self.logger.debug(f"Command: {' '.join(cmd)}")
+            self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
+            try:
+                gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
+                # Run BLAST reading from stdin
+                result = subprocess.run(
+                    cmd,
+                    stdin=gzip_proc.stdout,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                # Close gzip stdout to allow gzip to receive SIGPIPE if BLAST exits early
+                gzip_proc.stdout.close()
+                gzip_proc.wait()
+                success = True
+                if result.stdout:
+                    self.logger.debug(f"{tool_name} stdout: {result.stdout}")
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"{database} - {tool_name} failed with return code {e.returncode}")
+                self.logger.error(f"Error message: {e.stderr}")
+                success = False
+            except FileNotFoundError:
+                self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
+                success = False
+            except Exception as e:
+                self.logger.error(f"Error running {tool_name} with piped input: {e}")
+                success = False
+        else:
+            # Non-gz case: use existing run_command helper
+            success = self.run_command(cmd, f"{database} - {tool_name}")
+
         detected = set()
         if success:
             detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
             self.write_tool_stats(database, tool_name, gene_reads)
         return success, detected
+        # if mode == 'dna':
+        #     blast_cmd = 'blastn'
+        #     cmd = [
+        #         blast_cmd,
+        #         '-query', str(self.input_fasta),
+        #         '-db', db_path,
+        #         '-out', str(output_file),
+        #         '-outfmt', outfmt_fields,
+        #         #'-perc_identity', str(self.detection_min_identity),
+        #         #'-evalue', str(self.evalue),
+        #         '-num_threads', str(self.threads)#,
+        #        # '-max_target_seqs', str(self.max_target_seqs)
+        #     ]
+        # elif mode == 'protein':
+        #     blast_cmd = 'blastx'
+        #     cmd = [
+        #         blast_cmd,
+        #         '-query', str(self.input_fasta),
+        #         '-db', db_path,
+        #         '-out', str(output_file),
+        #         '-outfmt', outfmt_fields,
+        #      #   '-evalue', str(self.evalue),
+        #         '-num_threads', str(self.threads)#,
+        #       #  '-max_target_seqs', str(self.max_target_seqs)
+        #     ]
+        # else:
+        #     self.logger.error(f"Invalid BLAST'ing' mode: {mode}")
+        #     return False, set()
+        #
+        # success = self.run_command(cmd, f"{database} - {tool_name}")
+        # detected = set()
+        # if success:
+        #     detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
+        #     self.write_tool_stats(database, tool_name, gene_reads)
+        # return success, detected
 
     def run_diamond(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
         """Run DIAMOND protein search (blastx for DNA->protein)."""
@@ -282,14 +380,20 @@ class AMRWorkflow:
         summary_file = self.raw_dir / f"{database}_bowtie2_summary.txt"
         tool_name = "Bowtie2"
 
+        if self.sequence_type == 'Single-FASTA':
+            flags = ['-f', '-U', str(self.input_fasta)]
+        elif self.sequence_type == 'Paired-FASTQ':
+            flags = ['-1', str(self.input_fastq[0]), '-2', str(self.input_fastq[1])]
+        else:
+            flags = []
+
         params = self.tool_sensitivity_params.get('bowtie2', None)
         sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
 
         cmd = [
             'bowtie2',
-            '-f',
+              ] + flags + [
             '-x', db_path,
-            '-U', str(self.input_fasta),
             '-S', str(sam_file),
             '-p', str(self.threads),
             '--no-unal',
@@ -335,11 +439,18 @@ class AMRWorkflow:
         sorted_bam = self.raw_dir / f"{database}_bwa_results_sorted.bam"
         tool_name = "BWA"
 
+        if self.sequence_type == 'Single-FASTA':
+            flags = [ str(self.input_fasta)]
+        elif self.sequence_type == 'Paired-FASTQ':
+            flags = [ str(self.input_fastq[0]), str(self.input_fastq[1])]
+        else:
+            flags = []
+
         cmd = [
             'bwa', 'mem',
             '-t', str(self.threads),
             db_path,
-            str(self.input_fasta)
+            ] + flags + [
         ]
 
         # Run BWA and write output to SAM file
@@ -383,13 +494,21 @@ class AMRWorkflow:
         sorted_bam = self.raw_dir / f"{database}_minimap2_results_sorted.bam"
         tool_name = "Minimap2"
 
+
+        if self.sequence_type == 'Single-FASTA':
+            flags = [ str(self.input_fasta)]
+        elif self.sequence_type == 'Paired-FASTQ':
+            flags = [ str(self.input_fastq[0]), str(self.input_fastq[1])]
+        else:
+            flags = []
+
         cmd = [
             'minimap2',
             '-x', preset,
             '-t', str(self.threads),
             '-a',
             db_path,
-            str(self.input_fasta),
+            ] + flags + [
             '-o', str(sam_file)
         ]
 
@@ -470,10 +589,20 @@ class AMRWorkflow:
         if not hasattr(self, 'all_reads'):
             self.all_reads = {}
             try:
-                with open(self.input_fasta, 'r') as fasta_file:
+                import gzip
+                fasta_path = str(self.input_fasta)
+                # Open gzipped or plain FASTA transparently
+                if fasta_path.endswith(('.gz', '.gzip')):
+                    fasta_handle = gzip.open(fasta_path, 'rt')
+                else:
+                    fasta_handle = open(fasta_path, 'r')
+                with fasta_handle as fasta_file:
                     read_name = None
                     seq_lines = []
                     for line in fasta_file:
+                        # If gzip returns bytes unexpectedly, decode
+                        if isinstance(line, bytes):
+                            line = line.decode('utf-8')
                         if line.startswith('>'):
                             if read_name and seq_lines:
                                 self.all_reads[read_name] = ''.join(seq_lines)
@@ -575,123 +704,238 @@ class AMRWorkflow:
             self.logger.error(f"BAM file not found: {bam_file}")
             return detected_genes
 
-        # Open BAM file
-        bamfile = pysam.AlignmentFile(str(bam_file), "rb")
+        # Use samtools to stream and parse the BAM/SAM instead of pysam
+        import re
+        import subprocess
 
-        # Extract reference lengths from header
-        for ref_name, ref_length in zip(bamfile.references, bamfile.lengths):
-            gene_lengths[ref_name] = ref_length
+        # Extract reference lengths and iterate alignments by streaming samtools view -h
+        gene_lengths = {}
+        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})
+        all_reads = {}
 
-        # Store all reads for later FASTA output
-        all_reads = {}  # {read_name: sequence}
-
-        # Process alignments
         try:
-            for read in bamfile.fetch():
-                # Store read sequence for later
-                if read.query_name not in all_reads and read.query_sequence:
-                    all_reads[read.query_name] = read.query_sequence
+            proc = subprocess.Popen(['samtools', 'view', '-h', str(bam_file)],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-                # Skip unmapped reads
-                if read.is_unmapped:
+            cigar_re = re.compile(r'(\d+)([MIDNSHP=X])')
+
+            for line in proc.stdout:
+                if line.startswith('@SQ'):
+                    # @SQ\tSN:ref\tLN:1234
+                    parts = line.strip().split('\t')
+                    sn = None
+                    ln = None
+                    for p in parts:
+                        if p.startswith('SN:'):
+                            sn = p.split(':', 1)[1]
+                        if p.startswith('LN:'):
+                            ln = int(p.split(':', 1)[1])
+                    if sn and ln:
+                        gene_lengths[sn] = ln
+                    continue
+                if line.startswith('@'):
+                    continue  # other headers
+
+                fields = line.rstrip('\n').split('\t')
+                if len(fields) < 11:
                     continue
 
-                gene = read.reference_name
-                gene_len = gene_lengths.get(gene, 0)
+                read_name = fields[0]
+                flag = int(fields[1])
+                # skip unmapped
+                if flag & 0x4:
+                    continue
 
-                # Track this read maps to this gene (before filtering)
-                gene_reads[gene]['all'].append(read.query_name)
-
-                # Get NM tag (edit distance: mismatches + indels)
+                gene = fields[2]
                 try:
-                    nm = read.get_tag('NM')
-                except KeyError:
-                    nm = 0
-                    print("11")
-                    print(read.query_name)
+                    ref_start = int(fields[3]) - 1  # convert to 0-based
+                except ValueError:
+                    ref_start = 0
+                cigar = fields[5]
+                seq = fields[9]
+                # store read sequence if available
+                if read_name not in all_reads and seq and seq != '*':
+                    all_reads[read_name] = seq
 
-                # Parse CIGAR to get actual aligned positions on reference
-                # and calculate alignment length for identity
-                ref_pos = read.reference_start  # 0-based
-                aligned_positions = set()  # Positions on reference that have aligned bases
-                alignment_length = 0  # Total alignment columns (for identity calc)
+                gene_len = gene_lengths.get(gene, 0)
+                gene_reads[gene]['all'].append(read_name)
 
-                    # BAM CIGAR operations:
-                    # 0 = M (match or mismatch) - consumes both query and reference
-                    # 1 = I (insertion to reference) - consumes query only
-                    # 2 = D (deletion from reference) - consumes reference only
-                    # 3 = N (skipped region) - consumes reference only
-                    # 4 = S (soft clip) - consumes query only
-                    # 5 = H (hard clip) - consumes neither
-                    # 6 = P (padding) - consumes neither
-                    # 7 = = (sequence match) - consumes both
-                    # 8 = X (sequence mismatch) - consumes both
+                # try to get NM tag from optional fields
+                nm = 0
+                for opt in fields[11:]:
+                    if opt.startswith('NM:i:'):
+                        try:
+                            nm = int(opt.split(':')[-1])
+                        except ValueError:
+                            nm = 0
+                        break
 
-                for op, length in read.cigartuples:
-                    if op in [0, 7, 8]:  # M, =, X - actual aligned bases
-                        # Add these reference positions to coverage
-                        # for i in range(length):
-                        #     aligned_positions.add(ref_pos + i)
+                # parse CIGAR and compute aligned positions & alignment length
+                ref_pos = ref_start
+                aligned_positions = set()
+                alignment_length = 0
+
+                for count_str, op in cigar_re.findall(cigar):
+                    length = int(count_str)
+                    if op in ('M', '=', 'X'):
                         aligned_positions.update(range(ref_pos, ref_pos + length))
                         ref_pos += length
                         alignment_length += length
-
-                    elif op == 1:  # I - insertion (gap in reference)
-                        # Doesn't consume reference, but counts in alignment length
+                    elif op == 'I':  # insertion to reference
                         alignment_length += length
-
-                    elif op == 2:  # D - deletion from reference
-                        # These positions on reference are NOT covered (no bases aligned)
-                        # But count in alignment length for identity calculation
+                    elif op == 'D':  # deletion from reference
                         ref_pos += length
                         alignment_length += length
-
-                    elif op == 3:  # N (spliced/skipped region)
+                    elif op == 'N':
                         ref_pos += length
-
-                    elif op in [ 4, 5]:  # S, H - soft/hard clips
-                        # Don't consume reference, don't count in alignment
+                    elif op in ('S', 'H'):
+                        # soft/hard clip - do not consume reference (H doesn't appear in SEQ)
                         pass
 
-                # Calculate identity: matches = alignment_length - edit_distance
-                # This matches BLAST/DIAMOND pident calculation
                 if alignment_length == 0:
-                    self.logger.warning(
-                        f"Read {read.query_name} has zero alignment length on gene {gene}. Skipping identity calculation.")
-                    identity = 0
+                    identity = 0.0
                 else:
-                    matches = alignment_length - nm
-                    identity = (matches / alignment_length) * 100
+                    matches = max(0, alignment_length - nm)
+                    identity = (matches / alignment_length) * 100.0
 
-                if not read.has_tag('NM'):
-                    self.logger.warning(f"Read {read.query_name} missing NM tag for gene {gene}. Assuming NM=0.")
+                query_length = len(seq) if seq and seq != '*' else 0
+                query_coverage = (len(aligned_positions) / query_length) * 100.0 if query_length > 0 else 0.0
 
-                if not read.cigartuples:
-                    self.logger.warning(f"Read {read.query_name} has empty or unusual CIGAR string for gene {gene}.")
-
-                # Calculate query coverage
-                query_length = read.query_length
-                query_coverage = (len(aligned_positions) / query_length) * 100 if query_length > 0 else 0
-
-                # Only process sequences meeting identity threshold
-                if (identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage):
-                    # Initialise stats if first hit for this gene
+                if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
                     if gene not in self.gene_stats[database][tool_name]:
                         self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-                    # Add aligned positions using add_positions method (this handles everything)
-                    self.gene_stats[database][tool_name][gene].add_positions(
-                        aligned_positions, identity, gene_len
-                    )
-                    # Track reads that pass thresholds
-                    gene_reads[gene]['passing'].append(read.query_name)
-                else:
-                    if getattr(self, "verbose", True):
-                        self.logger.info(f"Not passing {gene} {identity} {alignment_length} {read.query_name}")
+                    self.gene_stats[database][tool_name][gene].add_positions(aligned_positions, identity, gene_len)
+                    gene_reads[gene]['passing'].append(read_name)
+
+            proc.stdout.close()
+            proc.wait()
+            # optionally capture and log stderr
+            stderr = proc.stderr.read() if proc.stderr else ''
+            if stderr:
+                self.logger.debug(f"samtools stderr: {stderr}")
+            if proc.stderr:
+                proc.stderr.close()
 
         except Exception as e:
-            self.logger.error(f"Error reading BAM file: {e}")
-        finally:
-            bamfile.close()
+            self.logger.error(f"Error reading BAM via samtools: {e}")
+
+        # # Open BAM file
+        # bamfile = pysam.AlignmentFile(str(bam_file), "rb")
+        #
+        # # Extract reference lengths from header
+        # for ref_name, ref_length in zip(bamfile.references, bamfile.lengths):
+        #     gene_lengths[ref_name] = ref_length
+        #
+        # # Store all reads for later FASTA output
+        # all_reads = {}  # {read_name: sequence}
+        #
+        # # Process alignments
+        # try:
+        #     for read in bamfile.fetch():
+        #         # Store read sequence for later
+        #         if read.query_name not in all_reads and read.query_sequence:
+        #             all_reads[read.query_name] = read.query_sequence
+        #
+        #         # Skip unmapped reads
+        #         if read.is_unmapped:
+        #             continue
+        #
+        #         gene = read.reference_name
+        #         gene_len = gene_lengths.get(gene, 0)
+        #
+        #         # Track this read maps to this gene (before filtering)
+        #         gene_reads[gene]['all'].append(read.query_name)
+        #
+        #         # Get NM tag (edit distance: mismatches + indels)
+        #         try:
+        #             nm = read.get_tag('NM')
+        #         except KeyError:
+        #             nm = 0
+        #             print("11")
+        #             print(read.query_name)
+        #
+        #         # Parse CIGAR to get actual aligned positions on reference
+        #         # and calculate alignment length for identity
+        #         ref_pos = read.reference_start  # 0-based
+        #         aligned_positions = set()  # Positions on reference that have aligned bases
+        #         alignment_length = 0  # Total alignment columns (for identity calc)
+        #
+        #             # BAM CIGAR operations:
+        #             # 0 = M (match or mismatch) - consumes both query and reference
+        #             # 1 = I (insertion to reference) - consumes query only
+        #             # 2 = D (deletion from reference) - consumes reference only
+        #             # 3 = N (skipped region) - consumes reference only
+        #             # 4 = S (soft clip) - consumes query only
+        #             # 5 = H (hard clip) - consumes neither
+        #             # 6 = P (padding) - consumes neither
+        #             # 7 = = (sequence match) - consumes both
+        #             # 8 = X (sequence mismatch) - consumes both
+        #
+        #         for op, length in read.cigartuples:
+        #             if op in [0, 7, 8]:  # M, =, X - actual aligned bases
+        #                 # Add these reference positions to coverage
+        #                 # for i in range(length):
+        #                 #     aligned_positions.add(ref_pos + i)
+        #                 aligned_positions.update(range(ref_pos, ref_pos + length))
+        #                 ref_pos += length
+        #                 alignment_length += length
+        #
+        #             elif op == 1:  # I - insertion (gap in reference)
+        #                 # Doesn't consume reference, but counts in alignment length
+        #                 alignment_length += length
+        #
+        #             elif op == 2:  # D - deletion from reference
+        #                 # These positions on reference are NOT covered (no bases aligned)
+        #                 # But count in alignment length for identity calculation
+        #                 ref_pos += length
+        #                 alignment_length += length
+        #
+        #             elif op == 3:  # N (spliced/skipped region)
+        #                 ref_pos += length
+        #
+        #             elif op in [ 4, 5]:  # S, H - soft/hard clips
+        #                 # Don't consume reference, don't count in alignment
+        #                 pass
+        #
+        #         # Calculate identity: matches = alignment_length - edit_distance
+        #         # This matches BLAST/DIAMOND pident calculation
+        #         if alignment_length == 0:
+        #             self.logger.warning(
+        #                 f"Read {read.query_name} has zero alignment length on gene {gene}. Skipping identity calculation.")
+        #             identity = 0
+        #         else:
+        #             matches = alignment_length - nm
+        #             identity = (matches / alignment_length) * 100
+        #
+        #         if not read.has_tag('NM'):
+        #             self.logger.warning(f"Read {read.query_name} missing NM tag for gene {gene}. Assuming NM=0.")
+        #
+        #         if not read.cigartuples:
+        #             self.logger.warning(f"Read {read.query_name} has empty or unusual CIGAR string for gene {gene}.")
+        #
+        #         # Calculate query coverage
+        #         query_length = read.query_length
+        #         query_coverage = (len(aligned_positions) / query_length) * 100 if query_length > 0 else 0
+        #
+        #         # Only process sequences meeting identity threshold
+        #         if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
+        #             # Initialise stats if first hit for this gene
+        #             if gene not in self.gene_stats[database][tool_name]:
+        #                 self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+        #             # Add aligned positions using add_positions method (this handles everything)
+        #             self.gene_stats[database][tool_name][gene].add_positions(
+        #                 aligned_positions, identity, gene_len
+        #             )
+        #             # Track reads that pass thresholds
+        #             gene_reads[gene]['passing'].append(read.query_name)
+        #         else:
+        #             if getattr(self, "verbose", True):
+        #                 self.logger.info(f"Not passing {gene} {identity} {alignment_length} {read.query_name}")
+        #
+        # except Exception as e:
+        #     self.logger.error(f"Error reading BAM file: {e}")
+        # finally:
+        #     bamfile.close()
 
         # Finalise statistics and determine detection based on gene coverage
         for gene in self.gene_stats[database][tool_name]:
@@ -862,7 +1106,21 @@ class AMRWorkflow:
         self.logger.info("=" * 70)
         self.logger.info("AMRfíor - The AMR Gene Detection tool: " + AMRFIOR_VERSION)
         self.logger.info("=" * 70)
-        self.logger.info(f"Input file: {self.input_fasta}")
+        ###
+        # Log input files (handle new FASTA/FASTQ possibilities)
+        if getattr(self, "input_fasta", None):
+            self.logger.info(f"Input FASTA: {self.input_fasta}")
+        else:
+            self.logger.info("Input FASTA: None")
+
+        if getattr(self, "input_fastq", None) is None:
+            self.logger.info("Input FASTQ: None")
+        else:
+            if getattr(self, "input_fastq_is_paired", False):
+                self.logger.info(f"Input FASTQ (paired): {self.input_fastq[0]}, {self.input_fastq[1]}")
+            else:
+                self.logger.info(f"Input FASTQ (single): {self.input_fastq}")
+        ###
         self.logger.info(f"Output directory: {self.output_dir}")
         self.logger.info(f"Threads: {self.threads}")
        # self.logger.info(f"E-value threshold: {self.evalue}")
