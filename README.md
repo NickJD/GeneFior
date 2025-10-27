@@ -5,7 +5,7 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
 ## Menu:
 
 ```commandline
-AMRfíor v0.1.1- The Multi-Tool AMR Gene Detection Workflow.
+AMRfíor v0.2.1- The Multi-Tool AMR Gene Detection Workflow.
 
 options:
   -h, --help            show this help message and exit

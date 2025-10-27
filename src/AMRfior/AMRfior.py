@@ -29,7 +29,7 @@ Examples:
     --tools blastn diamond bowtie2 \
     --report_fasta detected
 
-  # Custom thresholds, paire-fastq input, threads and dna-only mode
+  # Custom thresholds, paired-fastq input, threads and dna-only mode
   AMRfior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
     -t 16 --d-min-cov 90 --d-min-id 85 \
     --dna-only
@@ -42,7 +42,7 @@ Examples:
                         help='Input FASTA/FASTAQ file(s) with sequences to analyse - separate R1 and R2 with a comma for Paired-FASTQ')
     required_group.add_argument('-st', '--sequence-type', required=True,
                         choices=['Single-FASTA', 'Paired-FASTQ'],
-                        help='Specify the input Sequence Type: Single-FASTA or Paired-FASTQ (R1+R2) - Will'
+                        help='Specify the input Sequence Type: Single-FASTA or Paired-FASTQ (R1+R2) - Will '
                              'convert paired-fastq to single fasta for BLAST and DIAMOND analyses')
     required_group.add_argument('-o', '--output', required=True,
                         help='Output directory for results')
@@ -128,6 +128,9 @@ Examples:
             sys.exit(1)
         options.fasta_input = options.input
         options.fastq_input = None
+
+    if options.tools == ['all']:
+        options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  #, 'hmmer_dna','hmmer_protein']
 
     # Load database paths from databases.py
     resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
