@@ -107,8 +107,42 @@ class AMRWorkflow:
             'card': defaultdict(lambda: defaultdict(GeneStats))
         }
 
-    def run_command(self, cmd: List[str], tool_name: str) -> bool:
-        """Run a tool and log the results."""
+    def run_command_gzip(self, cmd: List[str], tool_name: str, fasta_path_str: str) -> bool:
+        # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
+        self.logger.info(f"Running {tool_name}...")
+        self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
+        self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
+        try:
+            gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
+            # Run BLAST reading from stdin
+            result = subprocess.run(
+                cmd,
+                stdin=gzip_proc.stdout,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            self.logger.info(f"{tool_name} completed successfully")
+            # Close gzip stdout to allow gzip to receive SIGPIPE if BLAST exits early
+            gzip_proc.stdout.close()
+            gzip_proc.wait()
+            if result.stdout:
+                self.logger.debug(f"{tool_name} stdout: {result.stdout}")
+            return True
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"{tool_name} failed with return code {e.returncode}")
+            self.logger.error(f"Error message: {e.stderr}")
+            return False
+        except FileNotFoundError:
+            self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error running {tool_name} with piped input: {e}")
+            return False
+
+    def run_command(self, cmd: List[str], tool_name: str, is_gzip: bool) -> bool:
+        # Run a tool and log the results.
         self.logger.info(f"Running {tool_name}...")
         self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
         self.logger.debug(f"Command: {' '.join(cmd)}")
@@ -131,6 +165,7 @@ class AMRWorkflow:
         except FileNotFoundError:
             self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
             return False
+
 
     def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
                              gene_reads: dict, all_reads: dict):
@@ -256,40 +291,12 @@ class AMRWorkflow:
             return False, set()
 
         success = False
-        # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
+
         if gz_input:
-            self.logger.info(f"Running {tool_name}...")
-            self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
-            self.logger.debug(f"Command: {' '.join(cmd)}")
-            self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
-            try:
-                gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
-                # Run BLAST reading from stdin
-                result = subprocess.run(
-                    cmd,
-                    stdin=gzip_proc.stdout,
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                # Close gzip stdout to allow gzip to receive SIGPIPE if BLAST exits early
-                gzip_proc.stdout.close()
-                gzip_proc.wait()
-                success = True
-                if result.stdout:
-                    self.logger.debug(f"{tool_name} stdout: {result.stdout}")
-            except subprocess.CalledProcessError as e:
-                self.logger.error(f"{database} - {tool_name} failed with return code {e.returncode}")
-                self.logger.error(f"Error message: {e.stderr}")
-                success = False
-            except FileNotFoundError:
-                self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
-                success = False
-            except Exception as e:
-                self.logger.error(f"Error running {tool_name} with piped input: {e}")
-                success = False
+            # Gzipped case - stream decompressed FASTA to BLAST stdin
+            success = self.run_command_gzip(cmd, f"{database} - {tool_name}", fasta_path_str)
         else:
-            # Non-gz case: use existing run_command helper
+            # Non-gz case
             success = self.run_command(cmd, f"{database} - {tool_name}")
 
         detected = set()
@@ -297,44 +304,9 @@ class AMRWorkflow:
             detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
             self.write_tool_stats(database, tool_name, gene_reads)
         return success, detected
-        # if mode == 'dna':
-        #     blast_cmd = 'blastn'
-        #     cmd = [
-        #         blast_cmd,
-        #         '-query', str(self.input_fasta),
-        #         '-db', db_path,
-        #         '-out', str(output_file),
-        #         '-outfmt', outfmt_fields,
-        #         #'-perc_identity', str(self.detection_min_identity),
-        #         #'-evalue', str(self.evalue),
-        #         '-num_threads', str(self.threads)#,
-        #        # '-max_target_seqs', str(self.max_target_seqs)
-        #     ]
-        # elif mode == 'protein':
-        #     blast_cmd = 'blastx'
-        #     cmd = [
-        #         blast_cmd,
-        #         '-query', str(self.input_fasta),
-        #         '-db', db_path,
-        #         '-out', str(output_file),
-        #         '-outfmt', outfmt_fields,
-        #      #   '-evalue', str(self.evalue),
-        #         '-num_threads', str(self.threads)#,
-        #       #  '-max_target_seqs', str(self.max_target_seqs)
-        #     ]
-        # else:
-        #     self.logger.error(f"Invalid BLAST'ing' mode: {mode}")
-        #     return False, set()
-        #
-        # success = self.run_command(cmd, f"{database} - {tool_name}")
-        # detected = set()
-        # if success:
-        #     detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
-        #     self.write_tool_stats(database, tool_name, gene_reads)
-        # return success, detected
 
     def run_diamond(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
-        """Run DIAMOND protein search (blastx for DNA->protein)."""
+        # Run DIAMOND protein search (blastx for DNA->protein).
         if not db_path:
             return False, set()
 
@@ -370,7 +342,7 @@ class AMRWorkflow:
 
 
     def run_bowtie2(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
-        """Run Bowtie2 alignment (DNA mode) and output sorted BAM."""
+        # Run Bowtie2 alignment (DNA mode) and output sorted BAM.
         if not db_path:
             return False, set()
 
@@ -430,7 +402,7 @@ class AMRWorkflow:
 
 
     def run_bwa(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
-        """Run BWA alignment (DNA mode) and output sorted BAM."""
+        # Run BWA alignment (DNA mode) and output sorted BAM.
         if not db_path:
             return False, set()
 
@@ -485,7 +457,7 @@ class AMRWorkflow:
 
 
     def run_minimap2(self, db_path: str, database: str, preset: str = 'sr') -> Tuple[bool, Set[str]]:
-        """Run Minimap2 alignment and output sorted BAM."""
+        # Run Minimap2 alignment and output sorted BAM.
         if not db_path:
             return False, set()
 
@@ -545,7 +517,7 @@ class AMRWorkflow:
 
 
     def run_hmmer(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
-        """Run HMMER profile search."""
+        # Run HMMER search.
         if not db_path:
             return False, set()
 
