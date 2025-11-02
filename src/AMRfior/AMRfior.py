@@ -4,20 +4,20 @@ import os
 
 try:
     from .constants import *
-    from .databases import RESFINDER_DATABASES, CARD_DATABASES
+    from .databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from .workflow import AMRWorkflow
     from .gene_stats import GeneStats
     from .utils import *
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
     from constants import *
-    from databases import RESFINDER_DATABASES, CARD_DATABASES
+    from databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from workflow import AMRWorkflow
     from gene_stats import GeneStats
     from utils import *
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMRfíor ' + AMRFIOR_VERSION + ' - The Multi-Tool AMR Gene Detection Workflow.',
+        description='AMRfíor ' + AMRFIOR_VERSION + ' - The Multi-Tool AMR Gene Detection Toolkit.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -66,6 +66,17 @@ Examples:
                             help='Specify which tools to run - "all" will run all tools'
                                  ' (default: all except blastx/n as it is very slow!!)')
 
+    # Database selection
+    db_group = parser.add_argument_group('Database selection')
+    db_group.add_argument('--databases', nargs='+',
+                          choices=['resfinder', 'card', 'ncbi', 'user-provided'],
+                          default=['resfinder', 'card'],
+                          help='Specify which AMR gene databases to use (default: resfinder and card) -If "user-provided" is selected, '
+                               'please ensure the path contains the appropriate databases set up as per the documentation '
+                               'and specify the path with --user-db-path.')
+    db_group.add_argument('--user-db-path', type=str,
+                          help='Path to the directory containing user-provided databases (required if --databases includes "user-provided")')
+
     query_threshold_group = parser.add_argument_group('Query threshold Parameters')
     query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
                                       dest='query_min_coverage',
@@ -78,6 +89,16 @@ Examples:
     gene_detection_group.add_argument('--d-min-id', '--detection-min-identity', type=float, default=80.0,
                               dest='detection_min_identity',
                               help='Minimum identity threshold in percent (default: 80.0)')
+    gene_detection_group.add_argument('--d-min-base-cov', '--detection-min-base-coverage',
+                              type=float, default=0,
+                              dest='detection_min_base_coverage',
+                              help='Minimum average base coverage (depth) for detection '
+                                   '- calculated against regions of the detected gene with at least one read hit (default: 1.0)')
+    gene_detection_group.add_argument('--d-min-reads', '--detection-min-num-reads',
+                              type=int, default=1,
+                              dest='detection_min_num_reads',
+                              help='Minimum number of reads required for detection (default: 1)')
+
     # gene_detection_group.add_argument( '--max_target_seqs', dest='max_target_seqs', type=int, default=100,
     #                           help='Maximum number of "hits" to return per query sequence (default: 100)')
 
@@ -133,12 +154,37 @@ Examples:
     if options.tools == ['all']:
         options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  #, 'hmmer_dna','hmmer_protein']
 
-    # Load database paths from databases.py
-    resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
-    card_dbs = {tool: CARD_DATABASES.get(tool) for tool in options.tools if CARD_DATABASES.get(tool)}
+    # Initialise database variables to avoid UnboundLocalError
+    resfinder_dbs = None
+    card_dbs = None
+    ncbi_dbs = None
+    user_dbs = None
+    # Load database paths from databases
+    logger.info("Database selected: " + ', '.join(options.databases))
+    if 'resfinder' in options.databases:
+        resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
+    if 'card' in options.databases:
+        card_dbs = {tool: CARD_DATABASES.get(tool) for tool in options.tools if CARD_DATABASES.get(tool)}
+    if 'ncbi' in options.databases:
+        ncbi_dbs = {tool: NCBI_DATABASES.get(tool) for tool in options.tools if NCBI_DATABASES.get(tool)}
+    if 'user-provided' in options.databases:
+        if not hasattr(options, 'user_db_path') or not os.path.isdir(options.user_db_path):
+            print("Error: Please provide a valid directory path for user-provided databases using --user-db-path",
+                  file=sys.stderr)
+            sys.exit(1)
+        user_dbs = gather_databases(options.user_db_path, options.tools)
 
-    if not resfinder_dbs and not card_dbs:
-        print("Error: At least one database must be specified in databases.py", file=sys.stderr)
+    databases = {
+        'resfinder': resfinder_dbs,
+        'card': card_dbs,
+        'ncbi': ncbi_dbs,
+        'user-provided-db': user_dbs
+    }
+    # Filter out None values
+    databases = {key: value for key, value in databases.items() if value}
+    if not databases:
+        logger.error("Error: At least one database must be specified in databases.py or provided by the user",
+                     file=sys.stderr)
         sys.exit(1)
 
     # Determine run modes
@@ -172,14 +218,17 @@ Examples:
         input_fasta=options.fasta_input,
         input_fastq=options.fastq_input,
         output_dir=options.output,
-        resfinder_dbs=resfinder_dbs,
-        card_dbs=card_dbs,
+        databases=databases,
+        # resfinder_dbs=resfinder_dbs,
+        # card_dbs=card_dbs,
         threads=options.threads,
         tool_sensitivity_params=tool_sensitivity_params,
         #max_target_seqs=options.max_target_seqs,
         #evalue=options.evalue,
         detection_min_coverage=options.detection_min_coverage,
         detection_min_identity=options.detection_min_identity,
+        detection_min_base_coverage=options.detection_min_base_coverage,
+        detection_min_num_reads=options.detection_min_num_reads,
         query_min_coverage=options.query_min_coverage,
         run_dna=run_dna,
         run_protein=run_protein,

@@ -14,6 +14,7 @@ def FASTQ_to_FASTA(options):
     import shutil
 
     def find_pair(input_spec):
+        # Doesn't currently check if both are teh same R1/R2 files
         if ',' in input_spec:
             r1, r2 = map(str.strip, input_spec.split(',', 1))
             return r1, r2

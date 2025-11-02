@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Set, Tuple
+import re
 
 
 try:
@@ -18,11 +19,13 @@ class AMRWorkflow:
     """Orchestrates multiple alignment tools for AMR gene detection."""
 
     def __init__(self, input_fasta: str, input_fastq: str, output_dir: str,
-                 resfinder_dbs: Dict[str, str], card_dbs: Dict[str, str],
+                 databases: Dict[str, Dict[str, str]],
                  threads: int = 4, #max_target_seqs: int = 100,
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
                  #evalue: float = 1e-10,
                  detection_min_coverage: float = 80.0, detection_min_identity: float = 80.0,
+                 detection_min_base_coverage: float = 1.0,
+                 detection_min_num_reads: int = 1,
                  query_min_coverage: float = 50.0,  # NEW: Query coverage threshold
 
                  run_dna: bool = True, run_protein: bool = True,
@@ -53,14 +56,15 @@ class AMRWorkflow:
             self.input_fastq_is_paired = False
         ###
         self.output_dir = Path(output_dir)
-        self.resfinder_dbs = resfinder_dbs
-        self.card_dbs = card_dbs
+        self.databases = databases
         self.threads = threads
       #  self.max_target_seqs = max_target_seqs
         self.tool_sensitivity_params = tool_sensitivity_params
        # self.evalue = evalue
         self.detection_min_coverage = detection_min_coverage
         self.detection_min_identity = detection_min_identity
+        self.detection_min_base_coverage = detection_min_base_coverage
+        self.detection_min_num_reads = detection_min_num_reads
         self.query_min_coverage = query_min_coverage
 
         self.run_dna = run_dna
@@ -74,7 +78,7 @@ class AMRWorkflow:
         self.raw_dir.mkdir(exist_ok=True)
         self.stats_dir = self.output_dir / "tool_stats"
         self.stats_dir.mkdir(exist_ok=True)
-        if self.report_fasta != None:
+        if self.report_fasta[0] != None:
             self.fasta_dir = self.output_dir / "fasta_outputs"
             self.fasta_dir.mkdir(exist_ok=True)
 
@@ -97,21 +101,23 @@ class AMRWorkflow:
 
         # Store detection results: {database: {gene: {tool: bool}}}
         self.detections = {
-            'resfinder': defaultdict(lambda: defaultdict(bool)),
-            'card': defaultdict(lambda: defaultdict(bool))
+            db_name: defaultdict(lambda: defaultdict(bool))
+            for db_name in self.databases.keys()
         }
 
         # Store detailed statistics: {database: {tool: {gene: GeneStats}}}
         self.gene_stats = {
-            'resfinder': defaultdict(lambda: defaultdict(GeneStats)),
-            'card': defaultdict(lambda: defaultdict(GeneStats))
+            db_name: defaultdict(lambda: defaultdict(GeneStats))
+            for db_name in self.databases.keys()
         }
 
     def run_command_gzip(self, cmd: List[str], tool_name: str, fasta_path_str: str) -> bool:
         # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
-        self.logger.info(f"Running {tool_name}...")
-        self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
-        self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.logger.info(f"Running {tool_name.upper()}...")
+        self.logger.info(f"Parameters for {tool_name.upper()}: {' '.join(str(arg) for arg in cmd)}")
+        #self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
+        #self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.logger.debug(f"Command: {' '.join(str(arg) for arg in cmd)}")
         self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
         try:
             gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
@@ -141,11 +147,13 @@ class AMRWorkflow:
             self.logger.error(f"Error running {tool_name} with piped input: {e}")
             return False
 
-    def run_command(self, cmd: List[str], tool_name: str, is_gzip: bool) -> bool:
+    def run_command(self, cmd: List[str], tool_name: str) -> bool:
         # Run a tool and log the results.
-        self.logger.info(f"Running {tool_name}...")
-        self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
-        self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.logger.info(f"Running {tool_name.upper()}...")
+        self.logger.info(f"Parameters for {tool_name.upper()}: {' '.join(str(arg) for arg in cmd)}")
+        #self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
+        #self.logger.debug(f"Command: {' '.join(cmd)}")
+        self.logger.debug(f"Command: {' '.join(str(arg) for arg in cmd)}")
 
         try:
             result = subprocess.run(
@@ -169,8 +177,7 @@ class AMRWorkflow:
 
     def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
                              gene_reads: dict, all_reads: dict):
-        """Method to write FASTA files for mapped reads."""
-
+        # Method to write FASTA files for mapped reads.
         def sanitise_gene_name(gene: str) -> str:
             safe_gene = gene.replace('|', '_').replace('/', '_').replace(':','_').replace('-','_')
             if not hasattr(self, 'gene_name_changes'):
@@ -250,10 +257,14 @@ class AMRWorkflow:
         """Run BLAST in DNA (blastn) or protein (blastx) mode.
             If input FASTA is gzipped, stream decompressed data to BLAST via stdin
             (uses `-query -`) to avoid creating a temporary uncompressed file."""
-        if not db_path:
-            return False, set()
-
         blast_cmd = 'blastn' if mode == 'dna' else 'blastx'
+        # Extract the path from the dictionary if `database` is a dict
+        if isinstance(database, dict):
+            database = database.get(blast_cmd)
+        # Ensure `db_path` is a string
+        if isinstance(db_path, dict):
+            db_path = db_path.get(blast_cmd)
+
         output_file = self.raw_dir / f"{database}_{blast_cmd}_results.tsv"
         tool_name = f"BLAST-{mode.upper()}"
 
@@ -307,8 +318,15 @@ class AMRWorkflow:
 
     def run_diamond(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
         # Run DIAMOND protein search (blastx for DNA->protein).
-        if not db_path:
-            return False, set()
+        # Extract the path from the dictionary if `database` is a dict
+        if isinstance(database, dict):
+            database = database.get('diamond')
+        # Ensure `db_path` is a string
+        if isinstance(db_path, dict):
+            db_path = db_path.get('diamond')
+
+        if not isinstance(db_path, str):
+            raise ValueError(f"Invalid database path: {db_path}")
 
         output_file = self.raw_dir / f"{database}_diamond_results.tsv"
         tool_name = "DIAMOND"
@@ -343,8 +361,12 @@ class AMRWorkflow:
 
     def run_bowtie2(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
         # Run Bowtie2 alignment (DNA mode) and output sorted BAM.
-        if not db_path:
-            return False, set()
+        # Extract the path from the dictionary if `database` is a dict
+        if isinstance(database, dict):
+            database = database.get('bowtie2')
+        # Ensure `db_path` is a string
+        if isinstance(db_path, dict):
+            db_path = db_path.get('bowtie2')
 
         sam_file = self.raw_dir / f"{database}_bowtie2_results.sam"
         bam_file = self.raw_dir / f"{database}_bowtie2_results.bam"
@@ -403,9 +425,11 @@ class AMRWorkflow:
 
     def run_bwa(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
         # Run BWA alignment (DNA mode) and output sorted BAM.
-        if not db_path:
-            return False, set()
-
+        if isinstance(database, dict):
+            database = database.get('bwa')
+        # Ensure `db_path` is a string
+        if isinstance(db_path, dict):
+            db_path = db_path.get('bwa')
         sam_file = self.raw_dir / f"{database}_bwa_results.sam"
         bam_file = self.raw_dir / f"{database}_bwa_results.bam"
         sorted_bam = self.raw_dir / f"{database}_bwa_results_sorted.bam"
@@ -458,8 +482,11 @@ class AMRWorkflow:
 
     def run_minimap2(self, db_path: str, database: str, preset: str = 'sr') -> Tuple[bool, Set[str]]:
         # Run Minimap2 alignment and output sorted BAM.
-        if not db_path:
-            return False, set()
+        if isinstance(database, dict):
+            database = database.get('minimap2')
+        # Ensure `db_path` is a string
+        if isinstance(db_path, dict):
+            db_path = db_path.get('minimap2')
 
         sam_file = self.raw_dir / f"{database}_minimap2_results.sam"
         bam_file = self.raw_dir / f"{database}_minimap2_results.bam"
@@ -576,6 +603,8 @@ class AMRWorkflow:
                         if isinstance(line, bytes):
                             line = line.decode('utf-8')
                         if line.startswith('>'):
+                            if read_name in self.all_reads:
+                                self.logger.error(f"Warning: Duplicate read name found in FASTA: {read_name}")
                             if read_name and seq_lines:
                                 self.all_reads[read_name] = ''.join(seq_lines)
                             read_name = line[1:].strip()
@@ -587,8 +616,8 @@ class AMRWorkflow:
             except Exception as e:
                 self.logger.error(f"Error reading FASTA file: {e}")
         all_reads = self.all_reads
-        all = 0
-        passing = 0
+        mapped_reads = 0
+        passing_reads = 0
         try:
             with open(output_file, 'r') as f:
                 for line in f:
@@ -620,7 +649,7 @@ class AMRWorkflow:
 
                     # Track all reads mapping to this gene
                     gene_reads[gene]['all'].append(read_name)
-                    all +=1
+                    mapped_reads +=1
 
                     if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
                         # Initialise stats if first hit for this gene
@@ -634,7 +663,7 @@ class AMRWorkflow:
 
                         # Track reads that pass thresholds
                         gene_reads[gene]['passing'].append(read_name)
-                        passing +=1
+                        passing_reads +=1
 
         except Exception as e:
             self.logger.error(f"Error parsing {output_file}: {e}")
@@ -644,12 +673,18 @@ class AMRWorkflow:
             stats = self.gene_stats[database][tool_name][gene]
             stats.finalise()
 
-            # Gene is detected if gene coverage meets threshold
-            if stats.gene_coverage >= self.detection_min_coverage:
+            # Gene is detected if gene meets thresholds
+            if (stats.gene_coverage >= self.detection_min_coverage and
+                    stats.base_coverage_hit >= self.detection_min_base_coverage and
+                    stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
 
-        self.logger.info(f"Detected {len(detected_genes)} genes in {database} using {tool_name}")
+        self.logger.info(f"Total reads processed in {database.upper()} using {tool_name}: {len(all_reads)}")
+        ## Need a fix for this
+        self.logger.info(f"Reads that returned a hit in {database.upper()} using {tool_name}: {mapped_reads}")
+        self.logger.info(f"Reads passing thresholds in {database.upper()} using {tool_name}: {passing_reads}")
+        self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
 
         # Output FASTA files of reads mapping to genes
         if self.report_fasta and detected_genes:
@@ -669,21 +704,14 @@ class AMRWorkflow:
         Coverage tracks only M/=/X operations (actual aligned bases on reference)
         """
         detected_genes = set()
-        gene_lengths = {}  # Store gene lengths from BAM header
-        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
-
         if not bam_file.exists():
             self.logger.error(f"BAM file not found: {bam_file}")
             return detected_genes
-
-        # Use samtools to stream and parse the BAM/SAM instead of pysam
-        import re
-        import subprocess
-
-        # Extract reference lengths and iterate alignments by streaming samtools view -h
-        gene_lengths = {}
-        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})
+        gene_lengths = {}  # Store gene lengths from BAM header
+        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
         all_reads = {}
+        mapped_reads = 0
+        passing_reads = 0
 
         try:
             proc = subprocess.Popen(['samtools', 'view', '-h', str(bam_file)],
@@ -731,6 +759,7 @@ class AMRWorkflow:
 
                 gene_len = gene_lengths.get(gene, 0)
                 gene_reads[gene]['all'].append(read_name)
+                mapped_reads +=1
 
                 # try to get NM tag from optional fields
                 nm = 0
@@ -778,6 +807,7 @@ class AMRWorkflow:
                         self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
                     self.gene_stats[database][tool_name][gene].add_positions(aligned_positions, identity, gene_len)
                     gene_reads[gene]['passing'].append(read_name)
+                    passing_reads +=1
 
             proc.stdout.close()
             proc.wait()
@@ -914,12 +944,18 @@ class AMRWorkflow:
             stats = self.gene_stats[database][tool_name][gene]
             stats.finalise()
 
-            # Gene is detected if gene coverage meets threshold
-            if stats.gene_coverage >= self.detection_min_coverage:
+            # Gene is detected if gene meets thresholds
+            if (stats.gene_coverage >= self.detection_min_coverage and
+                    stats.base_coverage_hit >= self.detection_min_base_coverage and
+                    stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
 
-        self.logger.info(f"Detected {len(detected_genes)} genes in {database} using {tool_name}")
+        #self.logger.info(f"Total reads processed in {database.upper()} using {tool_name}: {len(all_reads)}")
+        ## Need a fix for this
+        self.logger.info(f"Reads that returned a hit in {database.upper()} using {tool_name}: {mapped_reads}")
+        self.logger.info(f"Reads passing thresholds in {database.upper()} using {tool_name}: {passing_reads}")
+        self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
 
         # Output FASTA files of reads mapping to genes
         if self.report_fasta and detected_genes:
@@ -978,9 +1014,12 @@ class AMRWorkflow:
         - Gene: AMR gene name
         - Gene_Length: Length of the gene in the database (bp)
         - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= detection-min-identity
+        - Num_Sequences_Passing_Thresholds: Number of sequences that passed all thresholds (identity, coverage, base_coverage, min_reads etc)
         - Gene_Coverage: Percentage of the gene covered by all qualifying alignments combined (%)
+        - Base_Coverage: Average base coverage across the entire gene (%)
+        - Base_Coverage_Hit: Average base coverage considering only bases with at least one hit (%)
         - Avg_Identity: Average identity across all qualifying sequences (%)
-        - Detected: 1 if gene_coverage >= detection-min-coverage threshold, 0 otherwise
+        - Detected: 1 if gene passes all thresholds, 0 otherwise
         """
         stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
 
@@ -993,7 +1032,9 @@ class AMRWorkflow:
             writer = csv.writer(f, delimiter='\t')
 
             # Header
-            header = ['Gene', 'Gene_Length', 'Num_Sequences_Mapped',  'Num_Sequences_Passing_Thresholds', 'Gene_Coverage', 'Avg_Identity', 'Detected']
+            header = ['Gene', 'Gene_Length', 'Num_Sequences_Mapped',
+                      'Num_Sequences_Passing_Thresholds', 'Gene_Coverage',
+                      'Base_Coverage', 'Base_Coverage_Hit', 'Avg_Identity', 'Detected']
             writer.writerow(header)
 
             # Sort genes alphabetically
@@ -1003,7 +1044,7 @@ class AMRWorkflow:
                 stats = gene_stats[gene]
                 try:
                     detected = self.detections[database][gene][tool_name]
-                except KeyError:
+                except (KeyError, TypeError):
                     detected = False
                 row = [
                     gene,
@@ -1011,6 +1052,8 @@ class AMRWorkflow:
                     len(gene_reads.get(gene, {}).get('all', [])), # 'all' reads mapping to gene
                     len(gene_reads.get(gene, {}).get('passing', [])), # Just those that 'passed' thresholds
                     f"{stats.gene_coverage:.2f}",
+                    f"{stats.base_coverage:.2f}",
+                    f"{stats.base_coverage_hit:.2f}",
                     f"{stats.avg_identity:.2f}",
                     '1' if detected else '0'
                 ]
@@ -1019,7 +1062,7 @@ class AMRWorkflow:
         self.logger.info(f"  Stats file: {stats_file}")
 
     def generate_detection_matrix(self, database: str):
-        """Generate TSV matrix of gene detections across tools."""
+        # Generate TSV matrix of gene detections across tools.
         output_file = self.output_dir / f"{database}_detection_matrix.tsv"
 
         # Get all tools that were run for this database
@@ -1028,7 +1071,7 @@ class AMRWorkflow:
             all_tools.update(gene_detections.keys())
 
         if not all_tools:
-            self.logger.warning(f"No detections found for {database}")
+            self.logger.info(f"No detections found for {database} - No matrix generated.")
             return
 
         all_tools = sorted(all_tools)
@@ -1046,13 +1089,15 @@ class AMRWorkflow:
                 def get_last_segment(gene_name):
                     return gene_name.split('|')[-1] if '|' in gene_name else gene_name
 
-                genes = [gene for gene in sorted(
-                    self.detections[database].keys(),
-                    key=get_last_segment
-                ) if any(self.detections[database][gene][tool] for tool in all_tools)]
+                genes = [
+                    gene for gene in sorted(self.detections[database].keys(), key=get_last_segment)
+                    if any(self.detections[database][gene][tool] for tool in all_tools)
+                ]
             else:
-                genes = [gene for gene in sorted(self.detections[database].keys())
-                         if any(self.detections[database][gene][tool] for tool in all_tools)]
+                genes = [
+                    gene for gene in sorted(self.detections[database].keys())
+                    if any(self.detections[database][gene][tool] for tool in all_tools)
+                ]
 
             for gene in genes:
                 row = [gene]
@@ -1068,6 +1113,7 @@ class AMRWorkflow:
                 writer.writerow(row)
 
         self.logger.info(f"Generated detection matrix: {output_file}")
+
         self.logger.info(f"  Total genes detected: {len(genes)}")
         self.logger.info(f"  Tools used: {len(all_tools)}")
 
@@ -1076,7 +1122,7 @@ class AMRWorkflow:
 
         """Run all configured tools on both databases."""
         self.logger.info("=" * 70)
-        self.logger.info("AMRfíor - The AMR Gene Detection tool: " + AMRFIOR_VERSION)
+        self.logger.info("AMRfíor - The AMR Gene Detection toolkit: " + AMRFIOR_VERSION)
         self.logger.info("=" * 70)
         ###
         # Log input files (handle new FASTA/FASTQ possibilities)
@@ -1095,6 +1141,12 @@ class AMRWorkflow:
         ###
         self.logger.info(f"Output directory: {self.output_dir}")
         self.logger.info(f"Threads: {self.threads}")
+        self.logger.info(f"Database chosen:")
+        self.logger.info(f"  ResFinder: {'Yes' if 'resfinder_dbs'  or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  CARD: {'Yes' if 'card_dbs' in self.databases or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  NCBI: {'Yes' if 'ncbi_dbs' in self.databases  or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  User-Provided: {'Yes' if 'user_dbs' in self.databases else 'No'}")
+
        # self.logger.info(f"E-value threshold: {self.evalue}")
         self.logger.info(f"Min query coverage: {self.query_min_coverage}%")
         self.logger.info(f"Min detection coverage: {self.detection_min_coverage}%")
@@ -1106,50 +1158,53 @@ class AMRWorkflow:
         ) if self.tool_sensitivity_params else "None"
         self.logger.info(f"Sensitivity parameters: {options.sensitivity} - {params_str}")
         self.logger.info("=" * 70)
-        results = {'resfinder': {}, 'card': {}}
 
-        # Process ResFinder database
-        if self.resfinder_dbs:
-            self.logger.info("\n### Processing ResFinder Database ###")
+        results = {}
 
-            if self.run_dna and self.resfinder_dbs.get('blastn'):
-                results['resfinder']['BLASTn-DNA'] = self.run_blast(
-                    self.resfinder_dbs['blastn'], 'resfinder', 'dna')
+        # Iterate over each database in the provided `databases` dictionary
+        for db_name, db_paths in self.databases.items():
+            results[db_name] = {}
+            self.logger.info(f"\n### Processing {db_name.capitalize()} Database ###")
 
-            if self.run_protein and self.resfinder_dbs.get('blastx'):
-                results['resfinder']['BLASTx-AA'] = self.run_blast(
-                    self.resfinder_dbs['blastx'], 'resfinder', 'protein')
+            if self.run_dna and db_paths.get('blastn'):
+                results[db_name]['BLASTn-DNA'] = self.run_blast(
+                    db_paths['blastn'], db_name, 'dna')
 
-            if self.run_protein and self.resfinder_dbs.get('diamond'):
-                results['resfinder']['DIAMOND-AA'] = self.run_diamond(
-                    self.resfinder_dbs['diamond'], 'resfinder')
+            if self.run_protein and db_paths.get('blastx'):
+                results[db_name]['BLASTx-AA'] = self.run_blast(
+                    db_paths['blastx'], db_name, 'protein')
 
-            if self.run_dna and self.resfinder_dbs.get('bowtie2'):
-                results['resfinder']['Bowtie2-DNA'] = self.run_bowtie2(
-                    self.resfinder_dbs['bowtie2'], 'resfinder')
+            if self.run_protein and db_paths.get('diamond'):
+                results[db_name]['DIAMOND-AA'] = self.run_diamond(
+                    db_paths['diamond'], db_name)
 
-            if self.run_dna and self.resfinder_dbs.get('bwa'):
-                results['resfinder']['BWA-DNA'] = self.run_bwa(
-                    self.resfinder_dbs['bwa'], 'resfinder')
+            if self.run_dna and db_paths.get('bowtie2'):
+                results[db_name]['Bowtie2-DNA'] = self.run_bowtie2(
+                    db_paths['bowtie2'], db_name)
 
-            if self.resfinder_dbs.get('minimap2'):
-                results['resfinder']['Minimap2-DNA'] = self.run_minimap2(
-                    self.resfinder_dbs['minimap2'], 'resfinder', options.minimap2_preset)
+            if self.run_dna and db_paths.get('bwa'):
+                results[db_name]['BWA-DNA'] = self.run_bwa(
+                    db_paths['bwa'], db_name)
 
-            # if self.run_dna and self.resfinder_dbs.get('hmmer_dna'):
-            #     results['resfinder']['HMMER-DNA'] = self.run_hmmer(
-            #         self.resfinder_dbs['hmmer_dna'], 'resfinder', 'dna')
+            if db_paths.get('minimap2'):
+                results[db_name]['Minimap2-DNA'] = self.run_minimap2(
+                    db_paths['minimap2'], db_name, options.minimap2_preset)
+
+            # Uncomment the following lines if HMMER support is added
+            # if self.run_dna and db_paths.get('hmmer_dna'):
+            #     results[db_name]['HMMER-DNA'] = self.run_hmmer(
+            #         db_paths['hmmer_dna'], db_name, 'dna')
             #
-            # if self.run_protein and self.resfinder_dbs.get('hmmer_protein'):
-            #     results['resfinder']['HMMER-PROTEIN'] = self.run_hmmer(
-            #         self.resfinder_dbs['hmmer_protein'], 'resfinder', 'protein')
+            # if self.run_protein and db_paths.get('hmmer_protein'):
+            #     results[db_name]['HMMER-PROTEIN'] = self.run_hmmer(
+            #         db_paths['hmmer_protein'], db_name, 'protein')
 
-            self.generate_detection_matrix('resfinder')
+            self.generate_detection_matrix(db_name)
 
             if options.report_fasta != None:
                 # Write gene name changes to TSV if any changes were made
                 if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
-                    changes_file = self.fasta_dir / f"resfinder_gene_name_changes.tsv"
+                    changes_file = self.fasta_dir / f"{db_name}_gene_name_changes.tsv"
                     with open(changes_file, "w", newline='') as f:
                         writer = csv.writer(f, delimiter='\t')
                         writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
@@ -1157,60 +1212,111 @@ class AMRWorkflow:
                     self.logger.info(f"  Gene name changes file: {changes_file}")
                     self.gene_name_changes.clear()
 
-        # Process CARD database
-        if self.card_dbs:
-            self.logger.info("\n### Processing CARD Database ###")
-
-            if self.run_dna and self.card_dbs.get('blastn'):
-                results['card']['BLASTn-DNA'] = self.run_blast(
-                    self.card_dbs['blastn'], 'card', 'dna')
-
-            if self.run_protein and self.card_dbs.get('blastx'):
-                results['card']['BLASTx-AA'] = self.run_blast(
-                    self.card_dbs['blastx'], 'card', 'protein')
-
-            if self.run_protein and self.card_dbs.get('diamond'):
-                results['card']['DIAMOND-AA'] = self.run_diamond(
-                    self.card_dbs['diamond'], 'card')
-
-            if self.run_dna and self.card_dbs.get('bowtie2'):
-                results['card']['Bowtie2-DNA'] = self.run_bowtie2(
-                    self.card_dbs['bowtie2'], 'card')
-
-            if self.run_dna and self.card_dbs.get('bwa'):
-                results['card']['BWA-DNA'] = self.run_bwa(
-                    self.card_dbs['bwa'], 'card')
-
-            if self.card_dbs.get('minimap2'):
-                results['card']['Minimap2-DNA'] = self.run_minimap2(
-                    self.card_dbs['minimap2'], 'card', options.minimap2_preset)
-
-            # if self.run_dna and self.card_dbs.get('hmmer_dna'):
-            #     results['card']['HMMER-DNA'] = self.run_hmmer(
-            #         self.card_dbs['hmmer_dna'], 'card', 'dna')
-            #
-            # if self.run_protein and self.card_dbs.get('hmmer_protein'):
-            #     results['card']['HMMER-PROTEIN'] = self.run_hmmer(
-            #         self.card_dbs['hmmer_protein'], 'card', 'protein')
-
-            self.generate_detection_matrix('card')
-            if options.report_fasta != None:
-                # Write gene name changes to TSV if any changes were made
-                if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
-                    changes_file = self.fasta_dir / f"card_gene_name_changes.tsv"
-                    with open(changes_file, "w", newline='') as f:
-                        writer = csv.writer(f, delimiter='\t')
-                        writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
-                        writer.writerows(self.gene_name_changes)
-                    self.logger.info(f"  Gene name changes file: {changes_file}")
-                    self.gene_name_changes.clear()
+        # results = {'resfinder': {}, 'card': {}}
+        #
+        # # Process ResFinder database
+        # if self.resfinder_dbs:
+        #     self.logger.info("\n### Processing ResFinder Database ###")
+        #
+        #     if self.run_dna and self.resfinder_dbs.get('blastn'):
+        #         results['resfinder']['BLASTn-DNA'] = self.run_blast(
+        #             self.resfinder_dbs['blastn'], 'resfinder', 'dna')
+        #
+        #     if self.run_protein and self.resfinder_dbs.get('blastx'):
+        #         results['resfinder']['BLASTx-AA'] = self.run_blast(
+        #             self.resfinder_dbs['blastx'], 'resfinder', 'protein')
+        #
+        #     if self.run_protein and self.resfinder_dbs.get('diamond'):
+        #         results['resfinder']['DIAMOND-AA'] = self.run_diamond(
+        #             self.resfinder_dbs['diamond'], 'resfinder')
+        #
+        #     if self.run_dna and self.resfinder_dbs.get('bowtie2'):
+        #         results['resfinder']['Bowtie2-DNA'] = self.run_bowtie2(
+        #             self.resfinder_dbs['bowtie2'], 'resfinder')
+        #
+        #     if self.run_dna and self.resfinder_dbs.get('bwa'):
+        #         results['resfinder']['BWA-DNA'] = self.run_bwa(
+        #             self.resfinder_dbs['bwa'], 'resfinder')
+        #
+        #     if self.resfinder_dbs.get('minimap2'):
+        #         results['resfinder']['Minimap2-DNA'] = self.run_minimap2(
+        #             self.resfinder_dbs['minimap2'], 'resfinder', options.minimap2_preset)
+        #
+        #     # if self.run_dna and self.resfinder_dbs.get('hmmer_dna'):
+        #     #     results['resfinder']['HMMER-DNA'] = self.run_hmmer(
+        #     #         self.resfinder_dbs['hmmer_dna'], 'resfinder', 'dna')
+        #     #
+        #     # if self.run_protein and self.resfinder_dbs.get('hmmer_protein'):
+        #     #     results['resfinder']['HMMER-PROTEIN'] = self.run_hmmer(
+        #     #         self.resfinder_dbs['hmmer_protein'], 'resfinder', 'protein')
+        #
+        #     self.generate_detection_matrix('resfinder')
+        #
+        #     if options.report_fasta != None:
+        #         # Write gene name changes to TSV if any changes were made
+        #         if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
+        #             changes_file = self.fasta_dir / f"resfinder_gene_name_changes.tsv"
+        #             with open(changes_file, "w", newline='') as f:
+        #                 writer = csv.writer(f, delimiter='\t')
+        #                 writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
+        #                 writer.writerows(self.gene_name_changes)
+        #             self.logger.info(f"  Gene name changes file: {changes_file}")
+        #             self.gene_name_changes.clear()
+        #
+        # # Process CARD database
+        # if self.card_dbs:
+        #     self.logger.info("\n### Processing CARD Database ###")
+        #
+        #     if self.run_dna and self.card_dbs.get('blastn'):
+        #         results['card']['BLASTn-DNA'] = self.run_blast(
+        #             self.card_dbs['blastn'], 'card', 'dna')
+        #
+        #     if self.run_protein and self.card_dbs.get('blastx'):
+        #         results['card']['BLASTx-AA'] = self.run_blast(
+        #             self.card_dbs['blastx'], 'card', 'protein')
+        #
+        #     if self.run_protein and self.card_dbs.get('diamond'):
+        #         results['card']['DIAMOND-AA'] = self.run_diamond(
+        #             self.card_dbs['diamond'], 'card')
+        #
+        #     if self.run_dna and self.card_dbs.get('bowtie2'):
+        #         results['card']['Bowtie2-DNA'] = self.run_bowtie2(
+        #             self.card_dbs['bowtie2'], 'card')
+        #
+        #     if self.run_dna and self.card_dbs.get('bwa'):
+        #         results['card']['BWA-DNA'] = self.run_bwa(
+        #             self.card_dbs['bwa'], 'card')
+        #
+        #     if self.card_dbs.get('minimap2'):
+        #         results['card']['Minimap2-DNA'] = self.run_minimap2(
+        #             self.card_dbs['minimap2'], 'card', options.minimap2_preset)
+        #
+        #     # if self.run_dna and self.card_dbs.get('hmmer_dna'):
+        #     #     results['card']['HMMER-DNA'] = self.run_hmmer(
+        #     #         self.card_dbs['hmmer_dna'], 'card', 'dna')
+        #     #
+        #     # if self.run_protein and self.card_dbs.get('hmmer_protein'):
+        #     #     results['card']['HMMER-PROTEIN'] = self.run_hmmer(
+        #     #         self.card_dbs['hmmer_protein'], 'card', 'protein')
+        #
+        #     self.generate_detection_matrix('card')
+        #     if options.report_fasta != None:
+        #         # Write gene name changes to TSV if any changes were made
+        #         if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
+        #             changes_file = self.fasta_dir / f"card_gene_name_changes.tsv"
+        #             with open(changes_file, "w", newline='') as f:
+        #                 writer = csv.writer(f, delimiter='\t')
+        #                 writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
+        #                 writer.writerows(self.gene_name_changes)
+        #             self.logger.info(f"  Gene name changes file: {changes_file}")
+        #             self.gene_name_changes.clear()
 
         # Final summary
         self.logger.info("\n" + "=" * 70)
         self.logger.info("PIPELINE SUMMARY")
         self.logger.info("=" * 70)
 
-        for db_name in ['resfinder', 'card']:
+        for db_name in self.databases.keys():
             if results[db_name]:
                 self.logger.info(f"\n{db_name.upper()}:")
                 for tool, (success, genes) in results[db_name].items():
@@ -1222,6 +1328,8 @@ class AMRWorkflow:
         self.logger.info(f"Detection matrices saved to: {self.output_dir}")
         self.logger.info(f"Tool statistics saved to: {self.stats_dir}")
         self.logger.info(f"Raw outputs saved to: {self.raw_dir}")
+        if self.report_fasta[0] != None:
+            self.logger.info(f"FASTA reports saved to: {self.fasta_dir}")
         self.logger.info("=" * 70)
 
         return results

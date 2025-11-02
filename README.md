@@ -14,27 +14,50 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
 ## Menu:
 
 ```commandline
-AMRfíor v0.2.3 - The Multi-Tool AMR Gene Detection Workflow.
+AMRfíor v0.3.0 - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
 
 Required selection:
   -i INPUT, --input INPUT
-                        Input FASTA/FASTAQ file(s) with sequences to analyse - Separate FASTQ R1 and R2 with a comma for Paired-FASTQ or single file path for Single-FASTA - .gz files accepted
+                        Input FASTA/FASTAQ file(s) with sequences to analyse -
+                        Separate FASTQ R1 and R2 with a comma for Paired-FASTQ
+                        or single file path for Single-FASTA - .gz files
+                        accepted
   -st {Single-FASTA,Paired-FASTQ}, --sequence-type {Single-FASTA,Paired-FASTQ}
-                        Specify the input Sequence Type: Single-FASTA or Paired-FASTQ (R1+R2) - Will convert Paired-FASTQ to single combined FASTA for BLAST and DIAMOND analyses (SLOW)
+                        Specify the input Sequence Type: Single-FASTA or
+                        Paired-FASTQ (R1+R2) - Will convert Paired-FASTQ to
+                        single combined FASTA for BLAST and DIAMOND analyses
+                        (SLOW)
   -o OUTPUT, --output OUTPUT
                         Output directory for results
 
 Output selection:
   --report_fasta {None,all,detected,detected-all}
-                        Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for each
-                        detected gene."detected-all" will report all reads for each detected gene. (default: None)
+                        Specify whether to output sequences that "mapped" to
+                        genes."all" should only be used for deep
+                        investigation/debugging."detected" will report the
+                        reads that passed detection thresholds for each
+                        detected gene."detected-all" will report all reads for
+                        each detected gene. (default: None)
 
 Tool selection:
   --tools {blastn,blastx,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,diamond,bowtie2,bwa,minimap2,all} ...]
-                        Specify which tools to run - "all" will run all tools (default: all except blastx/n as it is very slow!!)
+                        Specify which tools to run - "all" will run all tools
+                        (default: all except blastx/n as it is very slow!!)
+
+Database selection:
+  --databases {resfinder,card,ncbi,user-provided} [{resfinder,card,ncbi,user-provided} ...]
+                        Specify which AMR gene databases to use (default:
+                        resfinder and card) -If "user-provided" is selected,
+                        please ensure the path contains the appropriate
+                        databases set up as per the documentation and specify
+                        the path with --user-db-path.
+  --user-db-path USER_DB_PATH
+                        Path to the directory containing user-provided
+                        databases (required if --databases includes "user-
+                        provided")
 
 Query threshold Parameters:
   --q-min-cov QUERY_MIN_COVERAGE, --query-min-coverage QUERY_MIN_COVERAGE
@@ -45,16 +68,28 @@ Gene Detection Parameters:
                         Minimum coverage threshold in percent (default: 80.0)
   --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
                         Minimum identity threshold in percent (default: 80.0)
+  --d-min-base-cov DETECTION_MIN_BASE_COVERAGE, --detection-min-base-coverage DETECTION_MIN_BASE_COVERAGE
+                        Minimum average base coverage (depth) for detection -
+                        calculated against regions of the detected gene with
+                        at least one read hit (default: 1.0)
+  --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
+                        Minimum number of reads required for detection
+                        (default: 1)
 
 Mode Selection:
   --dna-only            Run only DNA-based tools
   --protein-only        Run only protein-based tools
   --sensitivity {default,conservative,sensitive,very-sensitive}
-                        Preset sensitivity levels - default means each tool uses its own default settings and very-sensitive applies DIAMONDs --ultra-sensitive and Bowtie2s --very-sensitive-local presets
+                        Preset sensitivity levels - default means each tool
+                        uses its own default settings and very-sensitive
+                        applies DIAMONDs --ultra-sensitive and Bowtie2s
+                        --very-sensitive-local presets
 
 Tool-Specific Parameters:
   --minimap2-preset {sr,map-ont,map-pb,map-hifi}
-                        Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)
+                        Minimap2 preset: sr=short reads, map-ont=Oxford
+                        Nanopore, map-pb=PacBio, map-hifi=PacBio HiFi
+                        (default: sr)
 
 Runtime Parameters:
   -t THREADS, --threads THREADS
@@ -71,6 +106,5 @@ Examples:
 
   # Custom thresholds, paired-fastq input, threads and dna-only mode
   AMRfior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/     -t 16 --d-min-cov 90 --d-min-id 85     --dna-only
-        
 
 ```
