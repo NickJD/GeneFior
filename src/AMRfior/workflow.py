@@ -24,7 +24,7 @@ class AMRWorkflow:
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
                  #evalue: float = 1e-10,
                  detection_min_coverage: float = 80.0, detection_min_identity: float = 80.0,
-                 detection_min_base_coverage: float = 1.0,
+                 detection_min_base_depth: float = 1.0,
                  detection_min_num_reads: int = 1,
                  query_min_coverage: float = 50.0,  # NEW: Query coverage threshold
 
@@ -63,7 +63,7 @@ class AMRWorkflow:
        # self.evalue = evalue
         self.detection_min_coverage = detection_min_coverage
         self.detection_min_identity = detection_min_identity
-        self.detection_min_base_coverage = detection_min_base_coverage
+        self.detection_min_base_depth = detection_min_base_depth
         self.detection_min_num_reads = detection_min_num_reads
         self.query_min_coverage = query_min_coverage
 
@@ -675,7 +675,7 @@ class AMRWorkflow:
 
             # Gene is detected if gene meets thresholds
             if (stats.gene_coverage >= self.detection_min_coverage and
-                    stats.base_coverage_hit >= self.detection_min_base_coverage and
+                    stats.base_depth_hit >= self.detection_min_base_depth and
                     stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
@@ -946,7 +946,7 @@ class AMRWorkflow:
 
             # Gene is detected if gene meets thresholds
             if (stats.gene_coverage >= self.detection_min_coverage and
-                    stats.base_coverage_hit >= self.detection_min_base_coverage and
+                    stats.base_depth_hit >= self.detection_min_base_depth and
                     stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
@@ -1052,8 +1052,8 @@ class AMRWorkflow:
                     len(gene_reads.get(gene, {}).get('all', [])), # 'all' reads mapping to gene
                     len(gene_reads.get(gene, {}).get('passing', [])), # Just those that 'passed' thresholds
                     f"{stats.gene_coverage:.2f}",
-                    f"{stats.base_coverage:.2f}",
-                    f"{stats.base_coverage_hit:.2f}",
+                    f"{stats.base_depth:.2f}",
+                    f"{stats.base_depth_hit:.2f}",
                     f"{stats.avg_identity:.2f}",
                     '1' if detected else '0'
                 ]

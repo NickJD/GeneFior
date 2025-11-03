@@ -14,7 +14,7 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
 ## Menu:
 
 ```commandline
-AMRfíor v0.3.0 - The Multi-Tool AMR Gene Detection Toolkit.
+AMRfíor v0.3.1 - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -68,8 +68,8 @@ Gene Detection Parameters:
                         Minimum coverage threshold in percent (default: 80.0)
   --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
                         Minimum identity threshold in percent (default: 80.0)
-  --d-min-base-cov DETECTION_MIN_BASE_COVERAGE, --detection-min-base-coverage DETECTION_MIN_BASE_COVERAGE
-                        Minimum average base coverage (depth) for detection -
+  --d-min-base-depth DETECTION_MIN_BASE_DEPTH, --detection-min-base-depth DETECTION_MIN_BASE_DEPTH
+                        Minimum average base depth for detection -
                         calculated against regions of the detected gene with
                         at least one read hit (default: 1.0)
   --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS

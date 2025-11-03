@@ -10,7 +10,10 @@ class GeneStats:
     Only sequences meeting thresholds are counted.
     - gene_coverage: Percentage of the gene/subject sequence covered by all alignments combined
     - avg_identity: Average identity across all qualifying sequences for this gene
-    - base_coverage: Average depth coverage across the gene (including uncovered positions as 0)
+    - base_depth: Average depth across the gene (including uncovered positions as 0)
+    - base_depth_hit: Average depth across covered positions only
+    0-based positions are used throughout.
+    - gene_length: Length of the gene in the database
     - num_sequences: Number of sequences passing the identity threshold
     - identities: List of individual sequence identities
     - covered_positions: Set of all positions covered on the gene (0-based)
@@ -20,8 +23,8 @@ class GeneStats:
     gene_length: int = 0  # Length of the gene in the database
     num_sequences: int = 0  # Number of sequences passing min_identity
     gene_coverage: float = 0.0  # Percentage of gene covered by all alignments
-    base_coverage: float = 0.0 # Average 'depth' coverage across the gene
-    base_coverage_hit: float = 0.0 # Average 'depth' coverage across covered positions only
+    base_depth: float = 0.0 # Average 'depth' across the gene
+    base_depth_hit: float = 0.0 # Average 'depth' across covered positions only
     avg_identity: float = 0.0 # Average identity across all qualifying sequences
     identities: List[float] = field(default_factory=list) # List of individual sequence identities
     covered_positions: Set[int] = field(default_factory=set)  # All positions covered on the gene
@@ -66,12 +69,12 @@ class GeneStats:
         # Calculate gene coverage as percentage of gene length covered
         if self.gene_length > 0:
             self.gene_coverage = (len(self.covered_positions) / self.gene_length) * 100
-            # Calculate base coverage (average depth across covered positions)
+            # Calculate base depth (average depth across covered positions)
             if self.position_depths:
                 total_depth = sum(self.position_depths.values())
                 # Average depth across ALL gene positions (including uncovered = 0)
-                self.base_coverage = total_depth / self.gene_length
+                self.base_depth = total_depth / self.gene_length
                 # Average depth across positions with at least one read mapped
                 covered_depth = sum(depth for pos, depth in self.position_depths.items() if depth > 0)
-                self.base_coverage_hit = covered_depth / len(self.position_depths)
+                self.base_depth_hit = covered_depth / len(self.position_depths)
 

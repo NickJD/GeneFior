@@ -89,10 +89,10 @@ Examples:
     gene_detection_group.add_argument('--d-min-id', '--detection-min-identity', type=float, default=80.0,
                               dest='detection_min_identity',
                               help='Minimum identity threshold in percent (default: 80.0)')
-    gene_detection_group.add_argument('--d-min-base-cov', '--detection-min-base-coverage',
-                              type=float, default=0,
-                              dest='detection_min_base_coverage',
-                              help='Minimum average base coverage (depth) for detection '
+    gene_detection_group.add_argument('--d-min-base-depth', '--detection-min-base-depth',
+                              type=float, default=1.0,
+                              dest='detection_min_base_depth',
+                              help='Minimum average base depth for detection '
                                    '- calculated against regions of the detected gene with at least one read hit (default: 1.0)')
     gene_detection_group.add_argument('--d-min-reads', '--detection-min-num-reads',
                               type=int, default=1,
@@ -227,7 +227,7 @@ Examples:
         #evalue=options.evalue,
         detection_min_coverage=options.detection_min_coverage,
         detection_min_identity=options.detection_min_identity,
-        detection_min_base_coverage=options.detection_min_base_coverage,
+        detection_min_base_depth=options.detection_min_base_depth,
         detection_min_num_reads=options.detection_min_num_reads,
         query_min_coverage=options.query_min_coverage,
         run_dna=run_dna,
