@@ -238,20 +238,54 @@ Examples:
         verbose=options.verbose
     )
 
+    ###
     results = workflow.run_workflow(options)
 
-    # Exit with error code if all tools failed
+    failed_tools = []
     all_failed = True
-    for db_results in results.values():
-        for success, _ in db_results.values():
-            if success:
+
+    for db_name, db_results in results.items():
+        for tool, val in db_results.items():
+            # Normalise possible shapes to (success, genes)
+            if isinstance(val, tuple) and len(val) == 2:
+                success, genes = val
+            elif isinstance(val, bool):
+                success, genes = val, set()
+            elif isinstance(val, set):
+                success, genes = True, val
+            else:
+                success, genes = bool(val), set()
+
+            if not success:
+                failed_tools.append((db_name, tool, genes))
+            else:
                 all_failed = False
-                break
-        if not all_failed:
-            break
+
+    # Print specific statements for each failed tool
+    if failed_tools:
+        for db_name, tool, genes in failed_tools:
+            gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
+            logger.info(f"Tool failure - {tool} (database: {db_name}): detected {gene_count} genes")
+            logger.warning(f"  -> {tool} failed for {db_name}")
 
     if all_failed:
+        logger.error("All tools failed - Something went catastrophically wrong. Exiting with error code.")
         sys.exit(1)
+
+    # results = workflow.run_workflow(options)
+    #
+    # # Exit with error code if all tools failed
+    # all_failed = True
+    # for db_results in results.values():
+    #     for success, _ in db_results.values():
+    #         if success:
+    #             all_failed = False
+    #             break
+    #     if not all_failed:
+    #         break
+    #
+    # if all_failed:
+    #     sys.exit(1)
 
 
 if __name__ == "__main__":

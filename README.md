@@ -14,7 +14,7 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
 ## Menu:
 
 ```commandline
-AMRfíor v0.3.1 - The Multi-Tool AMR Gene Detection Toolkit.
+AMRfíor v0.3.2 - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit

@@ -111,6 +111,33 @@ class AMRWorkflow:
             for db_name in self.databases.keys()
         }
 
+    def check_gzip(self,fasta_path_str):
+        self.logger.info(f"Checking if input FASTA ` {self.input_fasta} ` is gzipped and not broken...")
+        # Check gzip integrity before attempting to stream; prefer `gzip -t` then fall back to Python check
+        gz_ok = True
+        if str(fasta_path_str).endswith(('.gz', '.gzip')):
+            try:
+                # Use system gzip test if available (faster for large files)
+                res = subprocess.run(['gzip', '-t', fasta_path_str], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if res.returncode != 0:
+                    gz_ok = False
+            except FileNotFoundError:
+                # Fallback: try opening a byte to ensure file is a valid gzip
+                try:
+                    import gzip as _gzip
+                    with _gzip.open(fasta_path_str, 'rb') as fh:
+                        fh.read(1)
+                except (OSError, EOFError):
+                    gz_ok = False
+        else:
+            gz_ok = False
+
+        if not gz_ok:
+            self.logger.error(f"Input FASTA ` {fasta_path_str} ` appears to be a broken or invalid gzip file.")
+            return False
+        else:
+            return True
+
     def run_command_gzip(self, cmd: List[str], tool_name: str, fasta_path_str: str) -> bool:
         # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
         self.logger.info(f"Running {tool_name.upper()}...")
@@ -118,34 +145,39 @@ class AMRWorkflow:
         #self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
         #self.logger.debug(f"Command: {' '.join(cmd)}")
         self.logger.debug(f"Command: {' '.join(str(arg) for arg in cmd)}")
-        self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
-        try:
-            gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
-            # Run BLAST reading from stdin
-            result = subprocess.run(
-                cmd,
-                stdin=gzip_proc.stdout,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            self.logger.info(f"{tool_name} completed successfully")
-            # Close gzip stdout to allow gzip to receive SIGPIPE if BLAST exits early
-            gzip_proc.stdout.close()
-            gzip_proc.wait()
-            if result.stdout:
-                self.logger.debug(f"{tool_name} stdout: {result.stdout}")
-            return True
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"{tool_name} failed with return code {e.returncode}")
-            self.logger.error(f"Error message: {e.stderr}")
+        is_gzip_valid = self.check_gzip(fasta_path_str)
+        if not is_gzip_valid:
             return False
-        except FileNotFoundError:
-            self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
-            return False
-        except Exception as e:
-            self.logger.error(f"Error running {tool_name} with piped input: {e}")
-            return False
+        elif is_gzip_valid:
+
+            self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
+            try:
+                gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
+                # Run BLAST reading from stdin
+                result = subprocess.run(
+                    cmd,
+                    stdin=gzip_proc.stdout,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                self.logger.info(f"{tool_name} completed successfully")
+                # Close gzip stdout to allow gzip to receive SIGPIPE if BLAST exits early
+                gzip_proc.stdout.close()
+                gzip_proc.wait()
+                if result.stdout:
+                    self.logger.debug(f"{tool_name} stdout: {result.stdout}")
+                return True
+            except subprocess.CalledProcessError as e:
+                self.logger.error(f"{tool_name} failed with return code {e.returncode}")
+                self.logger.error(f"Error message: {e.stderr}")
+                return False
+            except FileNotFoundError:
+                self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
+                return False
+            except Exception as e:
+                self.logger.error(f"Error running {tool_name} with piped input: {e}")
+                return False
 
     def run_command(self, cmd: List[str], tool_name: str) -> bool:
         # Run a tool and log the results.
@@ -330,33 +362,36 @@ class AMRWorkflow:
 
         output_file = self.raw_dir / f"{database}_diamond_results.tsv"
         tool_name = "DIAMOND"
+        is_gzip_valid = self.check_gzip(self.input_fasta)
+        if not is_gzip_valid:
+            return False
+        elif is_gzip_valid:
 
-        params = self.tool_sensitivity_params.get('diamond', None)
-        sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
+            params = self.tool_sensitivity_params.get('diamond', None)
+            sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
 
+            cmd = [
+                'diamond', 'blastx',
+                '-q', str(self.input_fasta),
+                '-d', db_path,
+                '-o', str(output_file),
+                '-f', '6', 'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
+                'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'qlen', 'slen',
+                '--header',
+                #'--id', str(self.min_identity),
+                #'-e', str(self.evalue),
+                '-p', str(self.threads)#,
+                #'-k', '10'
+            ]
+            if sensitivity and sensitivity != 'default':
+                cmd.append(sensitivity)
 
-        cmd = [
-            'diamond', 'blastx',
-            '-q', str(self.input_fasta),
-            '-d', db_path,
-            '-o', str(output_file),
-            '-f', '6', 'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-            'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'qlen', 'slen',
-            '--header',
-            #'--id', str(self.min_identity),
-            #'-e', str(self.evalue),
-            '-p', str(self.threads)#,
-            #'-k', '10'
-        ]
-        if sensitivity and sensitivity != 'default':
-            cmd.append(sensitivity)
-
-        success = self.run_command(cmd, f"{database} - {tool_name}")
-        detected = set()
-        if success:
-            detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
-            self.write_tool_stats(database, tool_name, gene_reads)
-        return success, detected
+            success = self.run_command(cmd, f"{database} - {tool_name}")
+            detected = set()
+            if success:
+                detected, gene_reads = self.parse_blast_results(output_file, database, tool_name)
+                self.write_tool_stats(database, tool_name, gene_reads)
+            return success, detected
 
 
     def run_bowtie2(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
@@ -1141,11 +1176,11 @@ class AMRWorkflow:
         ###
         self.logger.info(f"Output directory: {self.output_dir}")
         self.logger.info(f"Threads: {self.threads}")
-        self.logger.info(f"Database chosen:")
-        self.logger.info(f"  ResFinder: {'Yes' if 'resfinder_dbs'  or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  CARD: {'Yes' if 'card_dbs' in self.databases or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  NCBI: {'Yes' if 'ncbi_dbs' in self.databases  or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  User-Provided: {'Yes' if 'user_dbs' in self.databases else 'No'}")
+        self.logger.info(f"Database(s) chosen:")
+        self.logger.info(f"  ResFinder: {'Yes' if 'resfinder'  or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  CARD: {'Yes' if 'card' in self.databases or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  NCBI: {'Yes' if 'ncbi' in self.databases  or 'all' in self.databases else 'No'}")
+        self.logger.info(f"  User-Provided: {'Yes' if 'user_provided' in self.databases else 'No'}")
 
        # self.logger.info(f"E-value threshold: {self.evalue}")
         self.logger.info(f"Min query coverage: {self.query_min_coverage}%")
@@ -1319,16 +1354,32 @@ class AMRWorkflow:
         for db_name in self.databases.keys():
             if results[db_name]:
                 self.logger.info(f"\n{db_name.upper()}:")
-                for tool, (success, genes) in results[db_name].items():
+                for tool, val in results[db_name].items():
+                    if isinstance(val, tuple) and len(val) == 2:
+                        success, genes = val
+                    elif isinstance(val, bool):
+                        success, genes = val, set()
+                    elif isinstance(val, set):
+                        success, genes = True, val
+                    else:
+                        success, genes = bool(val), set()
+
                     status = "✓" if success else "✗"
-                    gene_count = len(genes) if success else 0
+                    gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
                     self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected")
+        # for db_name in self.databases.keys():
+        #     if results[db_name]:
+        #         self.logger.info(f"\n{db_name.upper()}:")
+        #         for tool, (success, genes) in results[db_name].items():
+        #             status = "✓" if success else "✗"
+        #             gene_count = len(genes) if success else 0
+        #             self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected")
 
         self.logger.info("=" * 70)
         self.logger.info(f"Detection matrices saved to: {self.output_dir}")
         self.logger.info(f"Tool statistics saved to: {self.stats_dir}")
         self.logger.info(f"Raw outputs saved to: {self.raw_dir}")
-        if self.report_fasta[0] != None:
+        if self.report_fasta != None:
             self.logger.info(f"FASTA reports saved to: {self.fasta_dir}")
         self.logger.info("=" * 70)
 
