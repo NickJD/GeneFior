@@ -11,7 +11,7 @@ import re
 try:
     from .gene_stats import GeneStats
     from .constants import *
-except (ModuleNotFoundError, ImportError) as error: #, NameError, TypeError) as error:
+except (ModuleNotFoundError, ImportError) as error:
     from gene_stats import GeneStats
     from constants import *
 
@@ -140,8 +140,8 @@ class AMRWorkflow:
 
     def run_command_gzip(self, cmd: List[str], tool_name: str, fasta_path_str: str) -> bool:
         # If gzipped, stream decompressed FASTA into BLAST stdin to avoid writing a temp file
-        self.logger.info(f"Running {tool_name.upper()}...")
-        self.logger.info(f"Parameters for {tool_name.upper()}: {' '.join(str(arg) for arg in cmd)}")
+        self.logger.info(f"Running {tool_name}...")
+        self.logger.info(f"Parameters for {tool_name}: {' '.join(str(arg) for arg in cmd)}")
         #self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
         #self.logger.debug(f"Command: {' '.join(cmd)}")
         self.logger.debug(f"Command: {' '.join(str(arg) for arg in cmd)}")
@@ -181,8 +181,8 @@ class AMRWorkflow:
 
     def run_command(self, cmd: List[str], tool_name: str) -> bool:
         # Run a tool and log the results.
-        self.logger.info(f"Running {tool_name.upper()}...")
-        self.logger.info(f"Parameters for {tool_name.upper()}: {' '.join(str(arg) for arg in cmd)}")
+        self.logger.info(f"Running {tool_name}...")
+        self.logger.info(f"Parameters for {tool_name}: {' '.join(str(arg) for arg in cmd)}")
         #self.logger.info(f"Parameters for {tool_name}: {' '.join(cmd)}")
         #self.logger.debug(f"Command: {' '.join(cmd)}")
         self.logger.debug(f"Command: {' '.join(str(arg) for arg in cmd)}")
@@ -290,6 +290,7 @@ class AMRWorkflow:
             If input FASTA is gzipped, stream decompressed data to BLAST via stdin
             (uses `-query -`) to avoid creating a temporary uncompressed file."""
         blast_cmd = 'blastn' if mode == 'dna' else 'blastx'
+        tool_name = 'BLASTn' if mode == 'dna' else 'BLASTx'
         # Extract the path from the dictionary if `database` is a dict
         if isinstance(database, dict):
             database = database.get(blast_cmd)
@@ -298,7 +299,7 @@ class AMRWorkflow:
             db_path = db_path.get(blast_cmd)
 
         output_file = self.raw_dir / f"{database}_{blast_cmd}_results.tsv"
-        tool_name = f"BLAST-{mode.upper()}"
+        #tool_name = f"BLAST-{mode.upper()}"
 
         # Common outfmt used for both modes
         outfmt_fields = '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen'
@@ -362,11 +363,12 @@ class AMRWorkflow:
 
         output_file = self.raw_dir / f"{database}_diamond_results.tsv"
         tool_name = "DIAMOND"
-        is_gzip_valid = self.check_gzip(self.input_fasta)
-        if not is_gzip_valid:
-            return False
-        elif is_gzip_valid:
 
+        fasta_path_str = str(self.input_fasta)
+        gz_input = fasta_path_str.endswith(('.gz', '.gzip'))
+        if gz_input and not self.check_gzip(fasta_path_str): # If input is gzipped, check integrity first
+            return False
+        else: # Run DIAMOND normally
             params = self.tool_sensitivity_params.get('diamond', None)
             sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
 
@@ -1001,7 +1003,7 @@ class AMRWorkflow:
 
 
     def parse_hmmer_results(self, tbl_file: Path, database: str, tool_name: str) -> Set[str]:
-        """Parse HMMER table output and extract genes meeting thresholds."""
+        # Parse HMMER table output and extract genes meeting thresholds.
         detected_genes = set()
         if not tbl_file.exists():
             return detected_genes
@@ -1181,6 +1183,13 @@ class AMRWorkflow:
         self.logger.info(f"  CARD: {'Yes' if 'card' in self.databases or 'all' in self.databases else 'No'}")
         self.logger.info(f"  NCBI: {'Yes' if 'ncbi' in self.databases  or 'all' in self.databases else 'No'}")
         self.logger.info(f"  User-Provided: {'Yes' if 'user_provided' in self.databases else 'No'}")
+        self.logger.info(f" Tool(s) chosen:")
+        self.logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
+        self.logger.info(f"  BLASTx: {'Yes' if 'blastx' in options.tools else 'No'}")
+        self.logger.info(f"  DIAMOND: {'Yes' if 'diamond' in options.tools else 'No'}")
+        self.logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
+        self.logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
+        self.logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
 
        # self.logger.info(f"E-value threshold: {self.evalue}")
         self.logger.info(f"Min query coverage: {self.query_min_coverage}%")

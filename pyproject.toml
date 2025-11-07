@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "AMRfior"
-version = "0.3.2"
+version = "0.4.0"
 authors = [
     {name = "Nicholas Dimonaco", email = "nicholas@dimonaco.co.uk"}
 ]
@@ -29,6 +29,8 @@ Homepage = "https://github.com/NickJD/AMRfior"
 [project.scripts]
 AMRfior = "AMRfior.AMRfior:main"
 amrfior = "AMRfior.AMRfior:main"
+AMRfior-Recompute = "AMRfior.AMRfior_Recompute:main"
+amrfior-recompute = "AMRfior.AMRfior_Recompute:main"
 
 [tool.setuptools]
 include-package-data = true
