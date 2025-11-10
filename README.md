@@ -14,7 +14,7 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
 ## Menu for AMRfíor (AMRfíor or amrfíor):
 
 ```commandline
-AMRfíor v0.4.0 - The Multi-Tool AMR Gene Detection Toolkit.
+AMRfíor v0.4.1 - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -115,7 +115,7 @@ Examples:
 ###AMRfíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-AMRfíor v0.4.0: AMRfíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+AMRfíor v0.4.1: AMRfíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit

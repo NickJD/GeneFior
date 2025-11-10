@@ -482,13 +482,14 @@ class AMRWorkflow:
         cmd = [
             'bwa', 'mem',
             '-t', str(self.threads),
+            '-o', str(sam_file),
             db_path,
             ] + flags + [
         ]
 
         # Run BWA and write output to SAM file
         try:
-            success = self.run_command(cmd + ['-o', str(sam_file)], f"{database} - {tool_name}")
+            success = self.run_command(cmd, f"{database} - {tool_name}")
         except Exception as e:
             self.logger.error(f"Error running BWA: {e}")
             return False, set()
