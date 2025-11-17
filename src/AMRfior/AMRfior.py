@@ -1,19 +1,22 @@
 import argparse
-import sys
-import os
+import sys, os
+import logging
+from datetime import datetime
 
 try:
     from .constants import *
     from .databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from .workflow import AMRWorkflow
     from .gene_stats import GeneStats
-    from .utils import *
+    from .utils import handle_all_input_files, cleanup_all_temp_files
+
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
     from constants import *
     from databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from workflow import AMRWorkflow
     from gene_stats import GeneStats
-    from utils import *
+    from utils import handle_all_input_files, cleanup_all_temp_files
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -50,9 +53,10 @@ Examples:
 
     # Output selection
     output_group = parser.add_argument_group('Output selection')
-    output_group.add_argument('--report_fasta',
+    output_group.add_argument('--report-fasta',
                             choices=['None', 'all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
                             default=[None], #, 'hmmer_dna','hmmer_protein'],
+                            dest='report_fasta',
                             help='Specify whether to output sequences that "mapped" to genes.'
                                  '"all" should only be used for deep investigation/debugging.'
                                  '"detected" will report the reads that passed detection thresholds for each detected gene.'
@@ -128,164 +132,228 @@ Examples:
     runtime_group = parser.add_argument_group('Runtime Parameters')
     runtime_group.add_argument('-t', '--threads', type=int, default=4,
                               help='Number of threads to use (default: 4)')
+    runtime_group.add_argument('-tmp', '--temp-directory', type=str, default=None,
+                               help='Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - '
+                                    'Path will also be used for all temporary files (default: system temp directory)')
     runtime_group.add_argument('--no_cleanup',  action='store_true',)
-    runtime_group.add_argument('-v', '--verbose', action='store_true',)
+    runtime_group.add_argument( '--verbose', action='store_true',)
+
+    misc_group = parser.add_argument_group('Miscellaneous Parameters')
+    misc_group.add_argument('-v','--version', action='version',
+                            version='AMRfíor ' + AMRFIOR_VERSION,
+                            help='Show program version and exit')
 
     options = parser.parse_args()
 
-    if options.report_fasta == ['None']:
+    ## Setup logging
+    start_time = datetime.now()
+    from pathlib import Path
+    log_file = Path(options.output) / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    logger = logging.getLogger('AMRfíor')
+    logger.setLevel(logging.INFO)
+
+    # Create stream handler for console output
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(stream_handler)
+
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    # Create file handler explicitly (use string path) and prepare formatter
+    try:
+        file_handler = logging.FileHandler(str(log_file), mode='a')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(file_handler)
+    except Exception as _err:
+        file_handler = None  # fallback to console-only if file cannot be opened
+    ################
+
+    if options.report_fasta[0] == None or options.report_fasta[0] == 'None':
         options.report_fasta = None
 
-    # FASTA/FASTQ handling
-    if options.sequence_type == 'Paired-FASTQ':
-        if any(tool in ('blastn', 'blastx', 'diamond', 'all') for tool in (options.tools or [])):
-            FASTQ_to_FASTA(options)
-        else:
-            options.fastq_input = options.input
-            options.fasta_input = None
-    else:
-        # Check input file exists
-        if not os.path.exists(options.input):
-            print(f"Error: Input file '{options.input}' not found", file=sys.stderr)
+
+    try:
+       # Tool selection
+        if options.tools == ['all']:
+            options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  #, 'hmmer_dna','hmmer_protein']
+
+        # Initialise database variables to avoid UnboundLocalError
+        resfinder_dbs = None
+        card_dbs = None
+        ncbi_dbs = None
+        user_dbs = None
+        # Load database paths from databases
+        #logger.info("Database selected: " + ', '.join(options.databases))
+        if 'resfinder' in options.databases:
+            resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
+        if 'card' in options.databases:
+            card_dbs = {tool: CARD_DATABASES.get(tool) for tool in options.tools if CARD_DATABASES.get(tool)}
+        if 'ncbi' in options.databases:
+            ncbi_dbs = {tool: NCBI_DATABASES.get(tool) for tool in options.tools if NCBI_DATABASES.get(tool)}
+        if 'user-provided' in options.databases:
+            if not hasattr(options, 'user_db_path') or not os.path.isdir(options.user_db_path):
+                print("Error: Please provide a valid directory path for user-provided databases using --user-db-path",
+                      file=sys.stderr)
+                sys.exit(1)
+            user_dbs = gather_databases(options.user_db_path, options.tools)
+
+        databases = {
+            'resfinder': resfinder_dbs,
+            'card': card_dbs,
+            'ncbi': ncbi_dbs,
+            'user-provided-db': user_dbs
+        }
+        # Filter out None values
+        databases = {key: value for key, value in databases.items() if value}
+        if not databases:
+            logger.error("Error: At least one database must be specified in databases.py or provided by the user",
+                         file=sys.stderr)
             sys.exit(1)
-        options.fasta_input = options.input
-        options.fastq_input = None
 
-    if options.tools == ['all']:
-        options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  #, 'hmmer_dna','hmmer_protein']
+        # Determine run modes
+        run_dna = True
+        run_protein = True
 
-    # Initialise database variables to avoid UnboundLocalError
-    resfinder_dbs = None
-    card_dbs = None
-    ncbi_dbs = None
-    user_dbs = None
-    # Load database paths from databases
-    logger.info("Database selected: " + ', '.join(options.databases))
-    if 'resfinder' in options.databases:
-        resfinder_dbs = {tool: RESFINDER_DATABASES.get(tool) for tool in options.tools if RESFINDER_DATABASES.get(tool)}
-    if 'card' in options.databases:
-        card_dbs = {tool: CARD_DATABASES.get(tool) for tool in options.tools if CARD_DATABASES.get(tool)}
-    if 'ncbi' in options.databases:
-        ncbi_dbs = {tool: NCBI_DATABASES.get(tool) for tool in options.tools if NCBI_DATABASES.get(tool)}
-    if 'user-provided' in options.databases:
-        if not hasattr(options, 'user_db_path') or not os.path.isdir(options.user_db_path):
-            print("Error: Please provide a valid directory path for user-provided databases using --user-db-path",
-                  file=sys.stderr)
+        if options.dna_only:
+            run_protein = False
+        if options.protein_only:
+            run_dna = False
+
+        if not run_dna and not run_protein:
+            print("Error: Cannot disable both DNA and protein modes", file=sys.stderr)
             sys.exit(1)
-        user_dbs = gather_databases(options.user_db_path, options.tools)
-
-    databases = {
-        'resfinder': resfinder_dbs,
-        'card': card_dbs,
-        'ncbi': ncbi_dbs,
-        'user-provided-db': user_dbs
-    }
-    # Filter out None values
-    databases = {key: value for key, value in databases.items() if value}
-    if not databases:
-        logger.error("Error: At least one database must be specified in databases.py or provided by the user",
-                     file=sys.stderr)
-        sys.exit(1)
-
-    # Determine run modes
-    run_dna = True
-    run_protein = True
-
-    if options.dna_only:
-        run_protein = False
-    if options.protein_only:
-        run_dna = False
-
-    if not run_dna and not run_protein:
-        print("Error: Cannot disable both DNA and protein modes", file=sys.stderr)
-        sys.exit(1)
 
 
 
-    # Tool sensitivity
-    tool_sensitivity_params = {}
+        # Tool sensitivity
+        tool_sensitivity_params = {}
 
-    if hasattr(options, 'sensitivity') and options.sensitivity == 'default':
-        # Use each tool's default sensitivity settings
-        pass
-    elif hasattr(options, 'sensitivity') and options.sensitivity == 'very-sensitive':
-        # Example: set sensitivity for supported tools
-        tool_sensitivity_params['bowtie2'] = {'sensitivity': '--very-sensitive-local'}
-        tool_sensitivity_params['diamond'] = {'sensitivity': '--ultra-sensitive'}
+        if hasattr(options, 'sensitivity') and options.sensitivity == 'default':
+            # Use each tool's default sensitivity settings
+            pass
+        elif hasattr(options, 'sensitivity') and options.sensitivity == 'very-sensitive':
+            # Example: set sensitivity for supported tools
+            tool_sensitivity_params['bowtie2'] = {'sensitivity': '--very-sensitive-local'}
+            tool_sensitivity_params['diamond'] = {'sensitivity': '--ultra-sensitive'}
+        
+        ################################ Opening Text File for Logging ###############################
+        logger.info("=" * 70)
+        logger.info("AMRfíor - The AMR Gene Detection toolkit: " + AMRFIOR_VERSION)
+        logger.info("=" * 70)
+        ###
+        # Log input files (handle new FASTA/FASTQ possibilities)
+        # if getattr(options, "input_fasta", None):
+        #     logger.info(f"Input FASTA: {options.input_fasta}")
+        # else:
+        #     logger.info("Input FASTA: None")
+        #
+        # if getattr(options, "input_fastq", None) is None:
+        #     logger.info("Input FASTQ: None")
+        # else:
+        #     if getattr(options, "input_fastq_is_paired", False):
+        #         logger.info(f"Input FASTQ (paired): {options.input_fastq[0]}, {options.input_fastq[1]}")
+        #     else:
+        #         logger.info(f"Input FASTQ (single): {options.input_fastq}")
+        ###
+        ###
 
-    # Run Workflow
-    workflow = AMRWorkflow(
-        input_fasta=options.fasta_input,
-        input_fastq=options.fastq_input,
-        output_dir=options.output,
-        databases=databases,
-        # resfinder_dbs=resfinder_dbs,
-        # card_dbs=card_dbs,
-        threads=options.threads,
-        tool_sensitivity_params=tool_sensitivity_params,
-        #max_target_seqs=options.max_target_seqs,
-        #evalue=options.evalue,
-        detection_min_coverage=options.detection_min_coverage,
-        detection_min_identity=options.detection_min_identity,
-        detection_min_base_depth=options.detection_min_base_depth,
-        detection_min_num_reads=options.detection_min_num_reads,
-        query_min_coverage=options.query_min_coverage,
-        run_dna=run_dna,
-        run_protein=run_protein,
-        sequence_type=options.sequence_type,
-        report_fasta=options.report_fasta,
-        no_cleanup=options.no_cleanup,
-        verbose=options.verbose
-    )
+        logger.info(f"Threads: {options.threads}")
+        logger.info(f"Database(s) chosen:")
+        logger.info(f"  ResFinder: {'Yes' if 'resfinder' in databases or 'all' in databases else 'No'}")
+        logger.info(f"  CARD: {'Yes' if 'card' in databases or 'all' in databases else 'No'}")
+        logger.info(f"  NCBI: {'Yes' if 'ncbi' in databases or 'all' in databases else 'No'}")
+        logger.info(f"  User-Provided: {'Yes' if 'user-user-provided-db' in databases else 'No'}")
+        logger.info(f" Tool(s) chosen:")
+        logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
+        logger.info(f"  BLASTx: {'Yes' if 'blastx' in options.tools else 'No'}")
+        logger.info(f"  DIAMOND: {'Yes' if 'diamond' in options.tools else 'No'}")
+        logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
+        logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
+        logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
+    
+        # logger.info(f"E-value threshold: {evalue}")
+        logger.info(f"Min query coverage: {options.query_min_coverage}%")
+        logger.info(f"Min detection coverage: {options.detection_min_coverage}%")
+        logger.info(f"Min detection identity: {options.detection_min_identity}%")
+        logger.info(f"Run DNA mode: {run_dna}")
+        logger.info(f"Run Protein mode: {run_protein}")
+        params_str = ", ".join(
+            f"{tool}: {params}" for tool, params in tool_sensitivity_params.items()
+        ) if tool_sensitivity_params else "None"
+        logger.info(f"Sensitivity parameters: {options.sensitivity} - {params_str}")
+        #logger.info("=" * 70)
+        
+        #Input handling
+        handle_all_input_files(options, logger)
 
-    ###
-    results = workflow.run_workflow(options)
+        # Run Workflow
+        workflow = AMRWorkflow(
+            input_fasta=options.input_fasta,
+            input_fastq=options.input_fastq,
+            output_dir=options.output,
+            databases=databases,
+            # resfinder_dbs=resfinder_dbs,
+            # card_dbs=card_dbs,
+            threads=options.threads,
+            tool_sensitivity_params=tool_sensitivity_params,
+            #max_target_seqs=options.max_target_seqs,
+            #evalue=options.evalue,
+            detection_min_coverage=options.detection_min_coverage,
+            detection_min_identity=options.detection_min_identity,
+            detection_min_base_depth=options.detection_min_base_depth,
+            detection_min_num_reads=options.detection_min_num_reads,
+            query_min_coverage=options.query_min_coverage,
+            run_dna=run_dna,
+            run_protein=run_protein,
+            sequence_type=options.sequence_type,
+            report_fasta=options.report_fasta,
+            no_cleanup=options.no_cleanup,
+            verbose=options.verbose,
+            logger=logger
+        )
 
-    failed_tools = []
-    all_failed = True
+        ###
+        results = workflow.run_workflow(options)
 
-    for db_name, db_results in results.items():
-        for tool, val in db_results.items():
-            # Normalise possible shapes to (success, genes)
-            if isinstance(val, tuple) and len(val) == 2:
-                success, genes = val
-            elif isinstance(val, bool):
-                success, genes = val, set()
-            elif isinstance(val, set):
-                success, genes = True, val
-            else:
-                success, genes = bool(val), set()
+        failed_tools = []
+        all_failed = True
 
-            if not success:
-                failed_tools.append((db_name, tool, genes))
-            else:
-                all_failed = False
+        for db_name, db_results in results.items():
+            for tool, val in db_results.items():
+                # Normalise possible shapes to (success, genes)
+                if isinstance(val, tuple) and len(val) == 2:
+                    success, genes = val
+                elif isinstance(val, bool):
+                    success, genes = val, set()
+                elif isinstance(val, set):
+                    success, genes = True, val
+                else:
+                    success, genes = bool(val), set()
 
-    # Print specific statements for each failed tool
-    if failed_tools:
-        for db_name, tool, genes in failed_tools:
-            gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
-            logger.info(f"Tool failure - {tool} (database: {db_name}): detected {gene_count} genes")
-            logger.warning(f"  -> {tool} failed for {db_name}")
+                if not success:
+                    failed_tools.append((db_name, tool, genes))
+                else:
+                    all_failed = False
 
-    if all_failed:
-        logger.error("All tools failed - Something went catastrophically wrong. Exiting with error code.")
-        sys.exit(1)
+        # Print specific statements for each failed tool
+        if failed_tools:
+            for db_name, tool, genes in failed_tools:
+                gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
+                logger.info(f"Tool failure - {tool} (database: {db_name}): detected {gene_count} genes")
+                logger.warning(f"  -> {tool} failed for {db_name}")
 
-    # results = workflow.run_workflow(options)
-    #
-    # # Exit with error code if all tools failed
-    # all_failed = True
-    # for db_results in results.values():
-    #     for success, _ in db_results.values():
-    #         if success:
-    #             all_failed = False
-    #             break
-    #     if not all_failed:
-    #         break
-    #
-    # if all_failed:
-    #     sys.exit(1)
+        if all_failed:
+            logger.error("All tools failed - Something went catastrophically wrong. Exiting with error code.")
+            sys.exit(1)
+
+
+    finally:
+        # Cleanup temp files
+        cleanup_all_temp_files(options, logger)
+        end_time = datetime.now()
+        elapsed = end_time - start_time
+        logger.info(f"AMRfíor completed in {elapsed}.")
 
 
 if __name__ == "__main__":

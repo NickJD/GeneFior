@@ -262,39 +262,39 @@ mkdir -p ${DB_NAME}/{blast_aa,blast_dna,bowtie2,bwa,diamond,minimap2}
 
 # Copy and compress source files
 echo "Copying source files..."
-gzip -c $DNA_FASTA > ${DB_NAME}/sequence_dna.fasta.gz
-gzip -c $AA_FASTA > ${DB_NAME}/sequence_aa.fasta.gz
+gzip -c $DNA_FASTA > ${DB_NAME}/$(basename "$DNA_FASTA").fasta.gz
+gzip -c $AA_FASTA > ${DB_NAME}/$(basename "$DNA_FASTA").fasta.gz
 
 # Build BLAST DNA database
 echo "Building BLAST DNA database..."
 makeblastdb -in $DNA_FASTA -dbtype nucl \
-    -out ${DB_NAME}/blast_dna/sequence_dna_blastdb \
+    -out ${DB_NAME}/blast_dna/$(basename "$DNA_FASTA")_blastdb \
     -parse_seqids
 
 # Build BLAST AA database
 echo "Building BLAST AA database..."
 makeblastdb -in $AA_FASTA -dbtype prot \
-    -out ${DB_NAME}/blast_aa/sequence_aa_blastdb \
+    -out ${DB_NAME}/blast_aa/$(basename "$DNA_FASTA")_blastdb \
     -parse_seqids
 
 # Build DIAMOND database
 echo "Building DIAMOND database..."
 diamond makedb --in $AA_FASTA \
-    --db ${DB_NAME}/diamond/sequence_aa_diamonddb \
+    --db ${DB_NAME}/diamond/$(basename "$DNA_FASTA")_diamonddb \
     --threads $THREADS
 
 # Build Bowtie2 index
 echo "Building Bowtie2 index..."
 bowtie2-build --threads $THREADS $DNA_FASTA \
-    ${DB_NAME}/bowtie2/sequence_dna_bowtie2db
+    ${DB_NAME}/bowtie2/$(basename "$DNA_FASTA")_bowtie2db
 
 # Build BWA index
 echo "Building BWA index..."
-bwa index -p ${DB_NAME}/bwa/sequence_dna_bwadb $DNA_FASTA
+bwa index -p ${DB_NAME}/bwa/$(basename "$DNA_FASTA")_bwadb $DNA_FASTA
 
 # Build Minimap2 index
 echo "Building Minimap2 index..."
-minimap2 -d ${DB_NAME}/minimap2/sequence_dna_minimap2db $DNA_FASTA
+minimap2 -d ${DB_NAME}/minimap2/$(basename "$DNA_FASTA")_minimap2db $DNA_FASTA
 
 echo ""
 echo "Database build complete!"

@@ -1,9 +1,8 @@
-import subprocess, sys
+import subprocess
 import csv
 from collections import defaultdict
 from pathlib import Path
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Set, Tuple
 import re
 
@@ -16,11 +15,11 @@ except (ModuleNotFoundError, ImportError) as error:
     from constants import *
 
 class AMRWorkflow:
-    """Orchestrates multiple alignment tools for AMR gene detection."""
+    # Orchestrates multiple alignment tools for AMR gene detection.
 
     def __init__(self, input_fasta: str, input_fastq: str, output_dir: str,
                  databases: Dict[str, Dict[str, str]],
-                 threads: int = 4, #max_target_seqs: int = 100,
+                 threads: int = 4,  #max_target_seqs: int = 100,
                  tool_sensitivity_params: Dict[str, Dict[str, Any]] = None,
                  #evalue: float = 1e-10,
                  detection_min_coverage: float = 80.0, detection_min_identity: float = 80.0,
@@ -32,7 +31,8 @@ class AMRWorkflow:
                  sequence_type: str = 'Single-FASTA',
                  report_fasta: str = None,
                  no_cleanup: bool = False,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 logger: logging.Logger | None = None):
         ### Handle input FASTA and FASTQ
         if input_fasta is not None:
             self.input_fasta = Path(input_fasta)
@@ -78,26 +78,15 @@ class AMRWorkflow:
         self.raw_dir.mkdir(exist_ok=True)
         self.stats_dir = self.output_dir / "tool_stats"
         self.stats_dir.mkdir(exist_ok=True)
-        if self.report_fasta[0] != None:
+        if self.report_fasta != None:
             self.fasta_dir = self.output_dir / "fasta_outputs"
             self.fasta_dir.mkdir(exist_ok=True)
 
         # misc
         self.no_cleanup = no_cleanup
         self.verbose = verbose
+        self.logger = logger
 
-
-        # Setup logging
-        log_file = self.output_dir / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
 
         # Store detection results: {database: {gene: {tool: bool}}}
         self.detections = {
@@ -136,6 +125,7 @@ class AMRWorkflow:
             self.logger.error(f"Input FASTA ` {fasta_path_str} ` appears to be a broken or invalid gzip file.")
             return False
         else:
+            self.logger.info(f"Input FASTA ` {fasta_path_str} ` appears to be a valid gzip file.")
             return True
 
     def run_command_gzip(self, cmd: List[str], tool_name: str, fasta_path_str: str) -> bool:
@@ -150,7 +140,7 @@ class AMRWorkflow:
             return False
         elif is_gzip_valid:
 
-            self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name}) to avoid disk IO")
+            self.logger.info(f"Piping decompressed ` {self.input_fasta} ` to BLAST ({tool_name})")
             try:
                 gzip_proc = subprocess.Popen(['gzip', '-dc', fasta_path_str], stdout=subprocess.PIPE)
                 # Run BLAST reading from stdin
@@ -217,6 +207,20 @@ class AMRWorkflow:
             self.gene_name_changes.append((gene, safe_gene))
             return safe_gene
 
+        def determine_read_type(read_name: str) -> str:
+            # Determine if read is R1 or R2 based on suffix
+            if read_name.endswith('_R1') or '/1' in read_name:
+                return ' [R1]'
+            elif read_name.endswith('_R2') or '/2' in read_name:
+                return ' [R2]'
+            return ''
+
+        def count_read_types(read_names: set) -> tuple:
+            # Count R1 and R2 reads in a set
+            r1_count = sum(1 for rn in read_names if rn.endswith('_R1') or '/1' in rn)
+            r2_count = sum(1 for rn in read_names if rn.endswith('_R2') or '/2' in rn)
+            return r1_count, r2_count
+
 
         if self.report_fasta == 'all':
             if getattr(self, "verbose", True):
@@ -234,10 +238,13 @@ class AMRWorkflow:
                     for read_name in read_names:
                         if read_name in all_reads:
                             seq = all_reads[read_name]
-                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            read_type = determine_read_type(read_name)
+                            fasta_out.write(f">{read_name}{read_type}\n{seq}\n")
                             count += 1
                 if getattr(self, "verbose", True):
-                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+                    r1_count, r2_count = count_read_types(read_names)
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
+
 
         elif self.report_fasta == 'detected':
             if getattr(self, "verbose", True):
@@ -256,10 +263,13 @@ class AMRWorkflow:
                     for read_name in read_names:
                         if read_name in all_reads:
                             seq = all_reads[read_name]
-                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            read_type = determine_read_type(read_name)
+                            fasta_out.write(f">{read_name}{read_type}\n{seq}\n")
                             count += 1
                 if getattr(self, "verbose", True):
-                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
+                    r1_count, r2_count = count_read_types(read_names)
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
+
 
         elif self.report_fasta == 'detected-all':
             if getattr(self, "verbose", True):
@@ -277,13 +287,13 @@ class AMRWorkflow:
                     for read_name in read_names:
                         if read_name in all_reads:
                             seq = all_reads[read_name]
-                            fasta_out.write(f">{read_name}\n{seq}\n")
+                            read_type = determine_read_type(read_name)
+                            fasta_out.write(f">{read_name}{read_type}\n{seq}\n")
                             count += 1
+
                 if getattr(self, "verbose", True):
-                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads)")
-
-
-
+                    r1_count, r2_count = count_read_types(read_names)
+                    self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
         """Run BLAST in DNA (blastn) or protein (blastx) mode.
@@ -619,6 +629,13 @@ class AMRWorkflow:
         gene_lengths = {}  # Store gene lengths
         gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
 
+        # Ensure structure exists for this database and tool (do not reset entire gene_stats)
+        if database not in self.gene_stats:
+            self.gene_stats[database] = defaultdict(lambda: defaultdict(GeneStats))
+            self.detections.setdefault(database, defaultdict(lambda: defaultdict(bool)))
+        elif self.gene_stats[database].get(tool_name) is None:
+            self.gene_stats[database][tool_name] = defaultdict(GeneStats)
+
         if not output_file.exists():
             return detected_genes
 
@@ -645,14 +662,14 @@ class AMRWorkflow:
                                 self.logger.error(f"Warning: Duplicate read name found in FASTA: {read_name}")
                             if read_name and seq_lines:
                                 self.all_reads[read_name] = ''.join(seq_lines)
-                            read_name = line[1:].strip()
+                            read_name = line[1:].split(' ')[0].replace('\n','') # DIAMOND/BLAST read names split at space
                             seq_lines = []
                         else:
                             seq_lines.append(line.strip())
                     if read_name and seq_lines:
                         self.all_reads[read_name] = ''.join(seq_lines)
             except Exception as e:
-                self.logger.error(f"Error reading FASTA file: {e}")
+                self.logger.error(f"Error reading FASTA file - Ignore if running AMRfíor-Recompute without sequences")
         all_reads = self.all_reads
         mapped_reads = 0
         passing_reads = 0
@@ -702,7 +719,8 @@ class AMRWorkflow:
                         # Track reads that pass thresholds
                         gene_reads[gene]['passing'].append(read_name)
                         passing_reads +=1
-
+        except KeyError:
+            raise
         except Exception as e:
             self.logger.error(f"Error parsing {output_file}: {e}")
 
@@ -725,7 +743,7 @@ class AMRWorkflow:
         self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
 
         # Output FASTA files of reads mapping to genes
-        if self.report_fasta and detected_genes:
+        if self.report_fasta:
             self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
 
         return detected_genes, gene_reads
@@ -745,11 +763,20 @@ class AMRWorkflow:
         if not bam_file.exists():
             self.logger.error(f"BAM file not found: {bam_file}")
             return detected_genes
+
+        # Ensure structure exists for this database and tool (do not reset entire gene_stats)
+        if database not in self.gene_stats:
+            self.gene_stats[database] = defaultdict(lambda: defaultdict(GeneStats))
+            self.detections.setdefault(database, defaultdict(lambda: defaultdict(bool)))
+        elif self.gene_stats[database].get(tool_name) is None:
+            self.gene_stats[database][tool_name] = defaultdict(GeneStats)
+
         gene_lengths = {}  # Store gene lengths from BAM header
-        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
+        gene_reads = defaultdict(lambda: {'passing': [], 'all': [], 'passing_r1': [], 'passing_r2': []})
         all_reads = {}
         mapped_reads = 0
         passing_reads = 0
+
 
         try:
             proc = subprocess.Popen(['samtools', 'view', '-h', str(bam_file)],
@@ -783,6 +810,12 @@ class AMRWorkflow:
                 # skip unmapped
                 if flag & 0x4:
                     continue
+
+                # Add /1 or /2 to read name based on SAM flag
+                if flag & 0x40:
+                    read_name += '/1'
+                elif flag & 0x80:
+                    read_name += '/2'
 
                 gene = fields[2]
                 try:
@@ -845,6 +878,13 @@ class AMRWorkflow:
                         self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
                     self.gene_stats[database][tool_name][gene].add_positions(aligned_positions, identity, gene_len)
                     gene_reads[gene]['passing'].append(read_name)
+
+                    # Track R1/R2 separately based on read name suffix
+                    if read_name.endswith('_R1') or '/1' in read_name:
+                        gene_reads[gene]['passing_r1'].append(read_name)
+                    elif read_name.endswith('_R2') or '/2' in read_name:
+                        gene_reads[gene]['passing_r2'].append(read_name)
+
                     passing_reads +=1
 
             proc.stdout.close()
@@ -859,123 +899,7 @@ class AMRWorkflow:
         except Exception as e:
             self.logger.error(f"Error reading BAM via samtools: {e}")
 
-        # # Open BAM file
-        # bamfile = pysam.AlignmentFile(str(bam_file), "rb")
-        #
-        # # Extract reference lengths from header
-        # for ref_name, ref_length in zip(bamfile.references, bamfile.lengths):
-        #     gene_lengths[ref_name] = ref_length
-        #
-        # # Store all reads for later FASTA output
-        # all_reads = {}  # {read_name: sequence}
-        #
-        # # Process alignments
-        # try:
-        #     for read in bamfile.fetch():
-        #         # Store read sequence for later
-        #         if read.query_name not in all_reads and read.query_sequence:
-        #             all_reads[read.query_name] = read.query_sequence
-        #
-        #         # Skip unmapped reads
-        #         if read.is_unmapped:
-        #             continue
-        #
-        #         gene = read.reference_name
-        #         gene_len = gene_lengths.get(gene, 0)
-        #
-        #         # Track this read maps to this gene (before filtering)
-        #         gene_reads[gene]['all'].append(read.query_name)
-        #
-        #         # Get NM tag (edit distance: mismatches + indels)
-        #         try:
-        #             nm = read.get_tag('NM')
-        #         except KeyError:
-        #             nm = 0
-        #             print("11")
-        #             print(read.query_name)
-        #
-        #         # Parse CIGAR to get actual aligned positions on reference
-        #         # and calculate alignment length for identity
-        #         ref_pos = read.reference_start  # 0-based
-        #         aligned_positions = set()  # Positions on reference that have aligned bases
-        #         alignment_length = 0  # Total alignment columns (for identity calc)
-        #
-        #             # BAM CIGAR operations:
-        #             # 0 = M (match or mismatch) - consumes both query and reference
-        #             # 1 = I (insertion to reference) - consumes query only
-        #             # 2 = D (deletion from reference) - consumes reference only
-        #             # 3 = N (skipped region) - consumes reference only
-        #             # 4 = S (soft clip) - consumes query only
-        #             # 5 = H (hard clip) - consumes neither
-        #             # 6 = P (padding) - consumes neither
-        #             # 7 = = (sequence match) - consumes both
-        #             # 8 = X (sequence mismatch) - consumes both
-        #
-        #         for op, length in read.cigartuples:
-        #             if op in [0, 7, 8]:  # M, =, X - actual aligned bases
-        #                 # Add these reference positions to coverage
-        #                 # for i in range(length):
-        #                 #     aligned_positions.add(ref_pos + i)
-        #                 aligned_positions.update(range(ref_pos, ref_pos + length))
-        #                 ref_pos += length
-        #                 alignment_length += length
-        #
-        #             elif op == 1:  # I - insertion (gap in reference)
-        #                 # Doesn't consume reference, but counts in alignment length
-        #                 alignment_length += length
-        #
-        #             elif op == 2:  # D - deletion from reference
-        #                 # These positions on reference are NOT covered (no bases aligned)
-        #                 # But count in alignment length for identity calculation
-        #                 ref_pos += length
-        #                 alignment_length += length
-        #
-        #             elif op == 3:  # N (spliced/skipped region)
-        #                 ref_pos += length
-        #
-        #             elif op in [ 4, 5]:  # S, H - soft/hard clips
-        #                 # Don't consume reference, don't count in alignment
-        #                 pass
-        #
-        #         # Calculate identity: matches = alignment_length - edit_distance
-        #         # This matches BLAST/DIAMOND pident calculation
-        #         if alignment_length == 0:
-        #             self.logger.warning(
-        #                 f"Read {read.query_name} has zero alignment length on gene {gene}. Skipping identity calculation.")
-        #             identity = 0
-        #         else:
-        #             matches = alignment_length - nm
-        #             identity = (matches / alignment_length) * 100
-        #
-        #         if not read.has_tag('NM'):
-        #             self.logger.warning(f"Read {read.query_name} missing NM tag for gene {gene}. Assuming NM=0.")
-        #
-        #         if not read.cigartuples:
-        #             self.logger.warning(f"Read {read.query_name} has empty or unusual CIGAR string for gene {gene}.")
-        #
-        #         # Calculate query coverage
-        #         query_length = read.query_length
-        #         query_coverage = (len(aligned_positions) / query_length) * 100 if query_length > 0 else 0
-        #
-        #         # Only process sequences meeting identity threshold
-        #         if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
-        #             # Initialise stats if first hit for this gene
-        #             if gene not in self.gene_stats[database][tool_name]:
-        #                 self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-        #             # Add aligned positions using add_positions method (this handles everything)
-        #             self.gene_stats[database][tool_name][gene].add_positions(
-        #                 aligned_positions, identity, gene_len
-        #             )
-        #             # Track reads that pass thresholds
-        #             gene_reads[gene]['passing'].append(read.query_name)
-        #         else:
-        #             if getattr(self, "verbose", True):
-        #                 self.logger.info(f"Not passing {gene} {identity} {alignment_length} {read.query_name}")
-        #
-        # except Exception as e:
-        #     self.logger.error(f"Error reading BAM file: {e}")
-        # finally:
-        #     bamfile.close()
+
 
         # Finalise statistics and determine detection based on gene coverage
         for gene in self.gene_stats[database][tool_name]:
@@ -996,7 +920,7 @@ class AMRWorkflow:
         self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
 
         # Output FASTA files of reads mapping to genes
-        if self.report_fasta and detected_genes:
+        if self.report_fasta:
             self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
 
 
@@ -1157,53 +1081,6 @@ class AMRWorkflow:
 
 
     def run_workflow(self,options):
-
-        """Run all configured tools on both databases."""
-        self.logger.info("=" * 70)
-        self.logger.info("AMRfíor - The AMR Gene Detection toolkit: " + AMRFIOR_VERSION)
-        self.logger.info("=" * 70)
-        ###
-        # Log input files (handle new FASTA/FASTQ possibilities)
-        if getattr(self, "input_fasta", None):
-            self.logger.info(f"Input FASTA: {self.input_fasta}")
-        else:
-            self.logger.info("Input FASTA: None")
-
-        if getattr(self, "input_fastq", None) is None:
-            self.logger.info("Input FASTQ: None")
-        else:
-            if getattr(self, "input_fastq_is_paired", False):
-                self.logger.info(f"Input FASTQ (paired): {self.input_fastq[0]}, {self.input_fastq[1]}")
-            else:
-                self.logger.info(f"Input FASTQ (single): {self.input_fastq}")
-        ###
-        self.logger.info(f"Output directory: {self.output_dir}")
-        self.logger.info(f"Threads: {self.threads}")
-        self.logger.info(f"Database(s) chosen:")
-        self.logger.info(f"  ResFinder: {'Yes' if 'resfinder'  or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  CARD: {'Yes' if 'card' in self.databases or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  NCBI: {'Yes' if 'ncbi' in self.databases  or 'all' in self.databases else 'No'}")
-        self.logger.info(f"  User-Provided: {'Yes' if 'user_provided' in self.databases else 'No'}")
-        self.logger.info(f" Tool(s) chosen:")
-        self.logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
-        self.logger.info(f"  BLASTx: {'Yes' if 'blastx' in options.tools else 'No'}")
-        self.logger.info(f"  DIAMOND: {'Yes' if 'diamond' in options.tools else 'No'}")
-        self.logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
-        self.logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
-        self.logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
-
-       # self.logger.info(f"E-value threshold: {self.evalue}")
-        self.logger.info(f"Min query coverage: {self.query_min_coverage}%")
-        self.logger.info(f"Min detection coverage: {self.detection_min_coverage}%")
-        self.logger.info(f"Min detection identity: {self.detection_min_identity}%")
-        self.logger.info(f"Run DNA mode: {self.run_dna}")
-        self.logger.info(f"Run Protein mode: {self.run_protein}")
-        params_str = ", ".join(
-            f"{tool}: {params}" for tool, params in self.tool_sensitivity_params.items()
-        ) if self.tool_sensitivity_params else "None"
-        self.logger.info(f"Sensitivity parameters: {options.sensitivity} - {params_str}")
-        self.logger.info("=" * 70)
-
         results = {}
 
         # Iterate over each database in the provided `databases` dictionary
