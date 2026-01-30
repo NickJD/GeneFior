@@ -1,5 +1,5 @@
-# AMRfíor (pronounced AMR "feer", sounds like beer)
-This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against AMR databases (DNA and AA) such as CARD/RGI and ResFinder.
+# GeneFíor (pronounced Gene "feer", sounds like beer)
+This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against DNA and AA sequence databases - Databases including CARD/RGI and ResFinder are preloaded.
 
 ## Requirements: 
     - python >=3.10
@@ -11,27 +11,99 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
     - minimap2 >=2.30
     - seqtk >=1.4
 ### Installation:
-AMRfíor is available via bioconda. To install, use the following command:
+GeneFíor is available via bioconda. To install, use the following command:
 ```commandline
-conda install -c bioconda amrfior
+conda install -c bioconda genefior
 ``` 
-AMRfíor is also available via pip, but bioconda is recommended to ensure all dependencies are correctly installed.
+GeneFíor is also available via pip, but bioconda is recommended to ensure all dependencies are correctly installed.
 ```commandline
-pip install amrfior
+pip install genefior
 ```
 
-## Menu for AMRfíor (AMRfíor or amrfíor):
+## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
+```commandline
+GeneFíorv0.6.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+
+Required selection:
+  -i INPUT, --input INPUT
+                        Input FASTA/FASTAQ file(s) with sequences to analyse - Separate FASTQ R1 and R2 with a comma for Paired-FASTQ or single file path for Single-FASTA - .gz files
+                        accepted
+  -st {Single-FASTA,Paired-FASTQ}, --sequence-type {Single-FASTA,Paired-FASTQ}
+                        Specify the input Sequence Type: Single-FASTA or Paired-FASTQ (R1+R2) - Will convert Paired-FASTQ to single combined FASTA for BLAST and DIAMOND analyses (SLOW)
+  -o OUTPUT, --output OUTPUT
+                        Output directory for results
+
+Output selection:
+  --report-fasta {None,all,detected,detected-all}
+                        Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed
+                        detection thresholds for each detected gene."detected-all" will report all reads for each detected gene. (default: None)
+
+Tool selection:
+  --tools {blastn,blastx,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,diamond,bowtie2,bwa,minimap2,all} ...]
+                        Specify which tools to run - "all" will run all tools (default: all except blastx/n as it is very slow!!)
+
+Database selection:
+  --db-path USER_DB_PATH
+                        Path to the directory containing user-provided databases in correct format (see build_databases.sh) (can supply multiple paths separated by commas)
+
+Query threshold Parameters:
+  --q-min-cov QUERY_MIN_COVERAGE, --query-min-coverage QUERY_MIN_COVERAGE
+                        Minimum coverage threshold in percent (default: 40.0)
+
+Gene Detection Parameters:
+  --d-min-cov DETECTION_MIN_COVERAGE, --detection-min-coverage DETECTION_MIN_COVERAGE
+                        Minimum coverage threshold in percent (default: 80.0)
+  --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
+                        Minimum identity threshold in percent (default: 80.0)
+  --d-min-base-depth DETECTION_MIN_BASE_DEPTH, --detection-min-base-depth DETECTION_MIN_BASE_DEPTH
+                        Minimum average base depth for detection - calculated against regions of the detected gene with at least one read hit (default: 1.0)
+  --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
+                        Minimum number of reads required for detection (default: 1)
+
+Mode Selection:
+  --dna-only            Run only DNA-based tools
+  --protein-only        Run only protein-based tools
+  --sensitivity {default,conservative,sensitive,very-sensitive}
+                        Preset sensitivity levels - default means each tool uses its own default settings and very-sensitive applies DIAMONDs --ultra-sensitive and Bowtie2s --very-
+                        sensitive-local presets
+
+Tool-Specific Parameters:
+  --minimap2-preset {sr,map-ont,map-pb,map-hifi}
+                        Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)
+
+Runtime Parameters:
+  -t THREADS, --threads THREADS
+                        Number of threads to use (default: 4)
+  -tmp TEMP_DIRECTORY, --temp-directory TEMP_DIRECTORY
+                        Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - Path will also be used for all temporary files (default: system temp directory)
+  --no_cleanup
+  --verbose
+
+Miscellaneous Parameters:
+  -v, --version         Show program version and exit
+
+Examples:
+  # Basic usage with default tools (runs DNA & protein tools)
+  genefior -i reads.fasta -st Single-FASTA --db-path ~/my-db-dir -o results/
+
+  # Select specific tools and output detected FASTA sequences
+  genefior -i reads.fasta -st Single-FASTA --db-path ~/my-db-dir -o results/     --tools diamond bowtie2     --report_fasta detected
+
+  # Custom thresholds, paired-fastq input, threads and dna-only mode
+  genefior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ --db-path ~/my-db-dir -o results/     -t 16 --d-min-cov 90 --d-min-id 85     --dna-only
+```
+# AMRFíor has been absorbed into GeneFíor but is still available as a separate command for backwards compatibility with the same functionality and AMR databases.
+## Menu for AMRfíor:
 CARD and resfinder databases are used by default, but user-provided databases can also be specified.
 The NCBI AMR database is also available as an option.
 All 3 databases are prepackaged and formatted as part of the bioconda installation of AMRfíor.
 
+## Menu for AMRfíor (AMRfíor or AMRfíor):
+BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
+
 ```commandline
-AMRfíor v0.5.0 - The Multi-Tool AMR Gene Detection Toolkit.
-
-options:
-  -h, --help            show this help message and exit
-
+GeneFíorv0.6.0 AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 Required selection:
   -i INPUT, --input INPUT
                         Input FASTA/FASTAQ file(s) with sequences to analyse - Separate FASTQ R1 and R2 with a comma for Paired-FASTQ or single file path for Single-FASTA - .gz files
@@ -106,17 +178,17 @@ Examples:
 ```
 
 
-## Menu for AMRfíor-Recompute (AMRfíor-Recompute or amrfíor-recompute):
+## Menu for Genefíor-Recompute (Genefíor-Recompute or genefíor-recompute):
 
-### AMRfíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
+### Genefíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-AMRfíor v0.5.0 - AMRfíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+eneFíor v0.6.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
-                        Input directory containing AMRfíor results (with
+                        Input directory containing Genefíor results (with
                         raw_outputs/ subdirectory)
   -o OUTPUT, --output OUTPUT
                         Output directory for recomputed results
@@ -159,25 +231,25 @@ Miscellaneous Parameters:
 
 Examples:
   # Recompute with different thresholds
-  AMRfior-recompute -i original_results/ -o recomputed_90_90/ \
+  Genefior-recompute -i original_results/ -o recomputed_90_90/ \
     --d-min-cov 90 --d-min-id 90
 
   # More stringent depth requirement
-  AMRfior-recompute -i original_results/ -o high_depth/ \
+  Genefior-recompute -i original_results/ -o high_depth/ \
     --d-min-base-depth 5.0 --d-min-reads 10
 
 ```
-## Menu for AMRfíor-Gene-Stats (AMRfíor-Gene-Stats or amrfíor-gene-stats):
+## Menu for Genefíor-Gene-Stats (Genefíor-Gene-Stats or genefíor-gene-stats):
 
-### AMRfíor-Gene-Stats is used to generate summary statistics and visualizations from AMRfíor results.
+### Genefíor-Gene-Stats is used to generate summary statistics and visualizations from Genefíor results.
 
 ```commandline
-AMRfíor v0.5.0 - AMRfíor-Gene-Stats: Generate detailed coverage visualisations for AMR genes
+Genefíor v0.6.0 - Genefíor-Gene-Stats: Generate detailed coverage visualisations for Gene genes
 
 options:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
-                        Input directory containing AMRfíor results
+                        Input directory containing Genefíor results
   -o OUTPUT, --output OUTPUT
                         Output directory for visualisation reports
   -g GENES, --genes GENES
@@ -193,18 +265,18 @@ options:
 
 Examples:
   # Visualise specific genes (FULL NAMES) from all tools
-  AMRfior-gene-stats -i results/ -o vis/ \
+  Genefior-gene-stats -i results/ -o vis/ \
     -g "sul1_2_U12338,tet(W)|ARO:3000194" \
     --databases resfinder card \
     --tools diamond bowtie2 bwa
 
   # Visualise from gene (FULL NAMES) list file with reference
-  AMRfior-gene-stats -i results/ -o vis/ \
+  Genefior-gene-stats -i results/ -o vis/ \
     -g genes_of_interest.txt \
     --databases resfinder \
     --tools blastn diamond 
 
 ```
 
-## Database Setup: See /src/AMRfior/databases/ for details on setting up user-provided databases.
-### AMRfíor includes an automated script in the Databases directory to automate the setup of user-provided databases.
+## Database Setup: See /src/Genefior/databases/ for details on setting up user-provided databases.
+### Genefíor includes an automated script in the Databases directory to automate the setup of user-provided databases.

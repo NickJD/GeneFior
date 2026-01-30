@@ -23,7 +23,7 @@ def prepare_fastq_for_alignment(r1_path, r2_path, temp_dir, logger):
     if temp_dir:
         work_dir = temp_dir
     else:
-        work_dir = tempfile.mkdtemp(prefix='amrfior_fastq_')
+        work_dir = tempfile.mkdtemp(prefix='genefior_fastq_')
 
     os.makedirs(work_dir, exist_ok=True)
 
@@ -330,7 +330,7 @@ def validate_paired_fastq(options, logger):
 def handle_all_input_files(options, logger):
     # Process input files based on sequence type and tool requirements
     logger.info("=" * 70)
-    logger.info("AMRfíor I/O processing...")
+    logger.info("GeneFíor I/O processing...")
     logger.info("=" * 70)
 
     # Initialise cleanup tracking

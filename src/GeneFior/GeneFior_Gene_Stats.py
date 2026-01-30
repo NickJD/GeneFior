@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import logging
 from datetime import datetime
-from typing import Dict, List, Set, Tuple
+from typing import List
 from collections import defaultdict
 import subprocess
 import re
@@ -12,7 +12,6 @@ import re
 try:
     from .constants import *
 except (ModuleNotFoundError, ImportError):
-    sys.path.insert(0, str(Path(__file__).parent))
     from constants import *
 
 
@@ -154,8 +153,8 @@ class GeneCoverage:
         }
 
 
-class AMRVisualiser:
-    # Generate coverage visualisations for AMR genes.
+class GeneVisualiser:
+    # Generate coverage visualisations for searched genes.
 
     def __init__(self, input_dir: str, output_dir: str, genes: List[str],
                  databases: List[str], tools: List[str], ref_fasta: str = None,
@@ -482,7 +481,7 @@ class AMRVisualiser:
 
         with open(report_file, 'w') as f:
             f.write("=" * 80 + "\n")
-            f.write(f"AMRfíor Coverage Report\n")
+            f.write(f"GeneFíor Coverage Report\n")
             f.write(f"Gene: {gene}\n")
             f.write(f"Database: {database}\n")
             f.write(f"Tool: {tool}\n")
@@ -601,7 +600,7 @@ class AMRVisualiser:
 
         with open(report_file, 'w') as f:
             f.write("=" * 80 + "\n")
-            f.write(f"AMRfíor Multi-Tool Comparison\n")
+            f.write(f"GeneFíor Multi-Tool Comparison\n")
             f.write(f"Gene: {gene}\n")
             f.write(f"Database: {database}\n")
             f.write("=" * 80 + "\n\n")
@@ -685,7 +684,7 @@ class AMRVisualiser:
     def run(self):
         # Main execution.
         self.logger.info("=" * 70)
-        self.logger.info(f"AMRfíor-Gene-Report {AMRFIOR_VERSION}")
+        self.logger.info(f"GeneFíor-Gene-Report {GENEFIOR_VERSION}")
         self.logger.info("=" * 70)
         self.logger.info(f"Input directory: {self.input_dir}")
         self.logger.info(f"Output directory: {self.output_dir}")
@@ -753,18 +752,18 @@ class AMRVisualiser:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMRfíor ' + AMRFIOR_VERSION + ' - AMRfíor-Gene-Stats: Generate detailed coverage visualisations for AMR genes',
+        description='GeneFíor ' + GENEFIOR_VERSION + ' - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Visualise specific genes (FULL NAMES) from all tools
-  AMRfior-gene-stats -i results/ -o vis/ \\
+  GeneFior-gene-stats -i results/ -o vis/ \\
     -g "sul1_2_U12338,tet(W)|ARO:3000194" \\
     --databases resfinder card \\
     --tools diamond bowtie2 bwa
 
   # Visualise from gene (FULL NAMES) list file with reference
-  AMRfior-gene-stats -i results/ -o vis/ \\
+  GeneFior-gene-stats -i results/ -o vis/ \\
     -g genes_of_interest.txt \\
     --databases resfinder \\
     --tools blastn diamond 
@@ -773,7 +772,7 @@ Examples:
     )
 
     parser.add_argument('-i', '--input', required=True,
-                        help='Input directory containing AMRfíor results')
+                        help='Input directory containing GeneFíor results')
     parser.add_argument('-o', '--output', required=True,
                         help='Output directory for visualisation reports')
     parser.add_argument('-g', '--genes', required=False,
@@ -814,7 +813,7 @@ Examples:
             genes = [g.strip() for g in options.genes.split(',') if g.strip()]
 
     # Run visualiser
-    visualiser = AMRVisualiser(
+    visualiser = GeneVisualiser(
         input_dir=options.input,
         output_dir=options.output,
         genes=genes,

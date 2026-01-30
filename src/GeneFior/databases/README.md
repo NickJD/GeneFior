@@ -1,11 +1,11 @@
 
-# AMRfíor Custom Database Setup Guide
+# GeneFíor Custom Database Setup Guide
 
-This guide explains how to prepare your own antimicrobial resistance gene (or any gene-collection) database for use with AMRfíor.
+This guide explains how to prepare your own antimicrobial resistance gene (or any gene-collection) database for use with GeneFíor.
 
 ## Directory Structure Overview
 
-AMRfíor expects databases to follow a specific directory structure. Each database should be organised as follows:
+GeneFíor expects databases to follow a specific directory structure. Each database should be organised as follows:
 
 ```
 your_database_name/
@@ -39,7 +39,7 @@ Ensure the following tools are installed and accessible in your PATH:
 
 ### 1. Prepare Your Source Sequences
 
-Create two FASTA files containing your AMR gene sequences:
+Create two FASTA files containing your gene sequences:
 
 - **sequence_dna.fasta** - Nucleotide sequences
 - **sequence_aa.fasta** - Amino acid sequences (translated ORFs)
@@ -169,14 +169,14 @@ ls -R your_database_name/
 
 Ensure all expected files are present in their respective directories.
 
-## 5. Using Your Custom Database with AMRfíor
+## 5. Using Your Custom Database with GeneFíor
 
 ### Option A (Receommended!!): Use with `--user-db-path`
 
 Keep your database anywhere and specify the path at runtime:
 
 ```bash
-AMRfior \
+GeneFior \
     -i reads.fasta \
     -st Single-FASTA \
     -o results/ \
@@ -184,12 +184,12 @@ AMRfior \
     --user-db-path /path/to/your_database_name
 ```
 
-### Option B: Install in AMRfíor Package Directory
+### Option B: Install in GeneFíor Package Directory
 
-Copy your database to AMRfíor's database directory:
+Copy your database to GeneFíor's database directory:
 
 ```bash
-cp -r your_database_name /path/to/AMRfíor/databases/
+cp -r your_database_name /path/to/GeneFíor/databases/
 ```
 
 Then update `databases.py` to register your database (see "Registering Custom Databases" below).
@@ -198,7 +198,7 @@ Then update `databases.py` to register your database (see "Registering Custom Da
 
 ## Registering Custom Databases (Option B)
 
-If you want your database permanently available, edit `src/AMRfíor/databases.py`:
+If you want your database permanently available, edit `src/GeneFíor/databases.py`:
 
 ```python
 YOUR_DATABASE_NAME = {
@@ -213,12 +213,12 @@ YOUR_DATABASE_NAME = {
 
 Then use it:
 ```bash
-AMRfior -i reads.fasta -st Single-FASTA -o results/ --databases your_database_name
+GeneFior -i reads.fasta -st Single-FASTA -o results/ --databases your_database_name
 ```
 
 ## Naming Conventions (IMPORTANT!!!)
 
-AMRfíor expects specific naming patterns. **Prefix is YOUR DNA/AA filename - SUFFIX IS NON-NEGOTIABLE - Do not change!:**
+GeneFíor expects specific naming patterns. **Prefix is YOUR DNA/AA filename - SUFFIX IS NON-NEGOTIABLE - Do not change!:**
 
 | Tool | Prefix | Suffix |
 |------|--------|--------|
@@ -231,13 +231,13 @@ AMRfíor expects specific naming patterns. **Prefix is YOUR DNA/AA filename - SU
 
 ### Complete Automation Script - 'Should' work
 
-Save this as `build_amrfior_database.sh`:
+Save this as `build_GeneFior_database.sh`:
 
 ```bash
 #!/bin/bash
 
-# AMRfíor Database Builder
-# Usage: ./build_amrfior_database.sh database_name dna.fasta aa.fasta threads
+# GeneFíor Database Builder
+# Usage: ./build_database.sh database_name dna.fasta aa.fasta threads
 
 set -e
 
@@ -251,7 +251,7 @@ if [ -z "$DB_NAME" ] || [ -z "$DNA_FASTA" ] || [ -z "$AA_FASTA" ]; then
     exit 1
 fi
 
-echo "Building AMRfíor database: $DB_NAME"
+echo "Building GeneFíor database: $DB_NAME"
 echo "DNA sequences: $DNA_FASTA"
 echo "AA sequences: $AA_FASTA"
 echo "Threads: $THREADS"
@@ -300,20 +300,20 @@ echo ""
 echo "Database build complete!"
 echo "Database location: $DB_NAME"
 echo ""
-echo "To use with AMRfíor:"
-echo "AMRfior -i reads.fasta -st Single-FASTA -o results/ \\"
+echo "To use with GeneFíor:"
+echo "GeneFior -i reads.fasta -st Single-FASTA -o results/ \\"
 echo "  --databases user-provided \\"
 echo "  --user-db-path $(pwd)/$DB_NAME"
 ```
 
 Make it executable:
 ```bash
-chmod +x build_amrfior_database.sh
+chmod +x build_database.sh
 ```
 
 Run it:
 ```bash
-./build_amrfior_database.sh my_custom_db genes_dna.fasta genes_aa.fasta 8
+./build_database.sh my_custom_db genes_dna.fasta genes_aa.fasta 8
 ```
 
 ## Troubleshooting
@@ -343,4 +343,4 @@ Run it:
 
 ---
 
-For questions or issues, please open an issue on the AMRfíor GitHub repository.
+For questions or issues, please open an issue on the GeneFíor GitHub repository.

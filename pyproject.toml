@@ -3,12 +3,12 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "AMRfior"
+name = "GeneFior"
 version = "0.5.0"
 authors = [
     {name = "Nicholas Dimonaco", email = "nicholas@dimonaco.co.uk"}
 ]
-description = "AMRfior: A toolkit that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against AMR databases (DNA and AA) such as CARD/RGI and ResFinder."
+description = "GeneFior: A toolkit that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against DNA and AA sequence databases."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -23,28 +23,29 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/NickJD/AMRfior"
-"Bug Tracker" = "https://github.com/NickJD/AMRfior/issues"
+Homepage = "https://github.com/NickJD/GeneFior"
+"Bug Tracker" = "https://github.com/NickJD/GeneFior/issues"
 
 [project.scripts]
+AMRFior = "AMRfior.AMRfior:main"
 AMRfior = "AMRfior.AMRfior:main"
 amrfior = "AMRfior.AMRfior:main"
-AMRfior-Recompute = "AMRfior.AMRfior_Recompute:main"
-AMRfior-recompute = "AMRfior.AMRfior_Recompute:main"
-amrfior-recompute = "AMRfior.AMRfior_Recompute:main"
-AMRfior-Gene-Stats = "AMRfior.AMRfior_Gene_Stats:main"
-AMRfior-gene-stats = "AMRfior.AMRfior_Gene_Stats:main"
-amrfior-gene-stats = "AMRfior.AMRfior_Gene_Stats:main"
+GeneFior-Recompute = "GeneFior.GeneFior_Recompute:main"
+GeneFior-recompute = "GeneFior.GeneFior_Recompute:main"
+genefior-recompute = "GeneFior.GeneFior_Recompute:main"
+GeneFior-Gene-Stats = "GeneFior.GeneFior_Gene_Stats:main"
+GeneFior-gene-stats = "GeneFior.GeneFior_Gene_Stats:main"
+genefior-gene-stats = "GeneFior.GeneFior_Gene_Stats:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["AMRfior*"]
+include = ["GeneFior*"]
 
 [tool.setuptools.package-data]
-AMRfior = [
+GeneFior = [
     # card
     "databases/card/diamond/*",
     "databases/card/bwa/*",

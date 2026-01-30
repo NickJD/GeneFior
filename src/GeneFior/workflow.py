@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 from typing import Any, Dict, List, Set, Tuple
 import re
+from typing import Optional
 
 
 try:
@@ -14,8 +15,8 @@ except (ModuleNotFoundError, ImportError) as error:
     from gene_stats import GeneStats
     from constants import *
 
-class AMRWorkflow:
-    # Orchestrates multiple alignment tools for AMR gene detection.
+class Workflow:
+    # Orchestrates multiple alignment tools for gene detection.
 
     def __init__(self, input_fasta: str, input_fastq: str, output_dir: str,
                  databases: Dict[str, Dict[str, str]],
@@ -32,7 +33,7 @@ class AMRWorkflow:
                  report_fasta: str = None,
                  no_cleanup: bool = False,
                  verbose: bool = False,
-                 logger: logging.Logger | None = None):
+                 logger: Optional[logging.Logger] = None):
         ### Handle input FASTA and FASTQ
         if input_fasta is not None:
             self.input_fasta = Path(input_fasta)
@@ -669,7 +670,7 @@ class AMRWorkflow:
                     if read_name and seq_lines:
                         self.all_reads[read_name] = ''.join(seq_lines)
             except Exception as e:
-                self.logger.error(f"Error reading FASTA file - Ignore if running AMRfíor-Recompute without sequences")
+                self.logger.error(f"Error reading FASTA file - Ignore if running Genefíor-Recompute without sequences")
         all_reads = self.all_reads
         mapped_reads = 0
         passing_reads = 0
@@ -973,7 +974,7 @@ class AMRWorkflow:
         """Write detailed statistics for a specific tool to TSV.
 
         Output columns:
-        - Gene: AMR gene name
+        - Gene: Gene name
         - Gene_Length: Length of the gene in the database (bp)
         - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= detection-min-identity
         - Num_Sequences_Passing_Thresholds: Number of sequences that passed all thresholds (identity, coverage, base_coverage, min_reads etc)
@@ -1271,3 +1272,4 @@ class AMRWorkflow:
         self.logger.info("=" * 70)
 
         return results
+

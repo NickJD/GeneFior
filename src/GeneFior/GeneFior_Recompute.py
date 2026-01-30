@@ -4,18 +4,16 @@ import os
 from pathlib import Path
 import logging
 from datetime import datetime
-import shutil
 from collections import defaultdict
 
 try:
     from .gene_stats import GeneStats
-    from .constants import AMRFIOR_VERSION
-    from .workflow import AMRWorkflow
+    from .constants import GENEFIOR_VERSION
+    from .workflow import Workflow
 except (ModuleNotFoundError, ImportError):
-    #sys.path.insert(0, str(Path(__file__).parent))
     from gene_stats import GeneStats
-    from constants import AMRFIOR_VERSION
-    from workflow import AMRWorkflow
+    from constants import GENEFIOR_VERSION
+    from workflow import Workflow
 
 
 
@@ -366,7 +364,7 @@ def run(options, workflow, logger):
     tools_found = defaultdict(set)
 
     logger.info("=" * 70)
-    logger.info(f"AMRfíor-Recompute {AMRFIOR_VERSION}")
+    logger.info(f"Genefíor-Recompute {GENEFIOR_VERSION}")
     logger.info("=" * 70)
     logger.info(f"Input directory: {options.input}")
     logger.info(f"Output directory: {options.output}")
@@ -418,23 +416,23 @@ def run(options, workflow, logger):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMRfíor ' + AMRFIOR_VERSION + ' - AMRfíor-Recompute: Recalculate detection statistics from existing sequence search outputs',
+        description='GeneFíor ' + GENEFIOR_VERSION + ' - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Recompute with different thresholds
-  AMRfior-recompute -i original_results/ -o recomputed_90_90/ \\
+  GeneFior-recompute -i original_results/ -o recomputed_90_90/ \\
     --d-min-cov 90 --d-min-id 90
 
   # More stringent depth requirement
-  AMRfior-recompute -i original_results/ -o high_depth/ \\
+  GeneFior-recompute -i original_results/ -o high_depth/ \\
     --d-min-base-depth 5.0 --d-min-reads 10
 
         """
     )
 
     parser.add_argument('-i', '--input', required=True,
-                        help='Input directory containing AMRfíor results (with raw_outputs/ subdirectory)')
+                        help='Input directory containing Genefíor results (with raw_outputs/ subdirectory)')
     parser.add_argument('-o', '--output', required=True,
                         help='Output directory for recomputed results')
     parser.add_argument('--tools', nargs='+',
@@ -480,7 +478,7 @@ Examples:
 
     misc_group = parser.add_argument_group('Miscellaneous Parameters')
     misc_group.add_argument('-v','--version', action='version',
-                            version='AMRfíor ' + AMRFIOR_VERSION,
+                            version='GeneFíor ' + GENEFIOR_VERSION,
                             help='Show program version and exit')
 
     options = parser.parse_args()
@@ -489,7 +487,7 @@ Examples:
     start_time = datetime.now()
     from pathlib import Path
     log_file = Path(options.output) / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-    logger = logging.getLogger('AMRfíor-Recompute')
+    logger = logging.getLogger('GeneFíor-Recompute')
     logger.setLevel(logging.INFO)
 
     # Create stream handler for console output
@@ -527,7 +525,7 @@ Examples:
     # stats_dir = options.output / "recomputed_stats"
     # stats_dir.mkdir(exist_ok=True)
 
-    workflow = AMRWorkflow(
+    workflow = Workflow(
         input_fasta=options.query_fasta,
         input_fastq=None,
         output_dir=options.output,
@@ -562,7 +560,7 @@ Examples:
 
     end_time = datetime.now()
     elapsed = end_time - start_time
-    logger.info(f"AMRfíor-Recompute completed in {elapsed}.")
+    logger.info(f"GeneFíor-Recompute completed in {elapsed}.")
 
 
 

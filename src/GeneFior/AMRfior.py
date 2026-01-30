@@ -6,34 +6,34 @@ from datetime import datetime
 try:
     from .constants import *
     from .databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
-    from .workflow import AMRWorkflow
+    from .workflow import Workflow
     from .gene_stats import GeneStats
     from .utils import handle_all_input_files, cleanup_all_temp_files
 
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
     from constants import *
     from databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
-    from workflow import AMRWorkflow
+    from workflow import Workflow
     from gene_stats import GeneStats
     from utils import handle_all_input_files, cleanup_all_temp_files
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='AMRfíor ' + AMRFIOR_VERSION + ' - The Multi-Tool AMR Gene Detection Toolkit.',
+        description='GeneFíor' + GENEFIOR_VERSION + ' AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Basic usage with default tools (runs DNA & protein tools)
-  AMRfior -i reads.fasta -st Single-FASTA -o results/
+  GeneFior -i reads.fasta -st Single-FASTA -o results/
 
   # Select specific tools and output detected FASTA sequences
-  AMRfior -i reads.fasta -st Single-FASTA -o results/ \
+  GeneFior -i reads.fasta -st Single-FASTA -o results/ \
     --tools diamond bowtie2 \
     --report_fasta detected
 
   # Custom thresholds, paired-fastq input, threads and dna-only mode
-  AMRfior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
+  GeneFior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
     -t 16 --d-min-cov 90 --d-min-id 85 \
     --dna-only
         """
@@ -140,7 +140,7 @@ Examples:
 
     misc_group = parser.add_argument_group('Miscellaneous Parameters')
     misc_group.add_argument('-v','--version', action='version',
-                            version='AMRfíor ' + AMRFIOR_VERSION,
+                            version='AMRfíor ' + GENEFIOR_VERSION,
                             help='Show program version and exit')
 
     options = parser.parse_args()
@@ -239,7 +239,8 @@ Examples:
         
         ################################ Opening Text File for Logging ###############################
         logger.info("=" * 70)
-        logger.info("AMRfíor - The AMR Gene Detection toolkit: " + AMRFIOR_VERSION)
+        logger.info("Genefíor - The Gene Detection toolkit: " + GENEFIOR_VERSION + " with the AMRfíor Module")
+        logger.info("Started at: " + start_time.strftime("%Y-%m-%d %H:%M:%S"))
         logger.info("=" * 70)
         ###
         # Log input files (handle new FASTA/FASTQ possibilities)
@@ -288,7 +289,7 @@ Examples:
         handle_all_input_files(options, logger)
 
         # Run Workflow
-        workflow = AMRWorkflow(
+        workflow = Workflow(
             input_fasta=options.input_fasta,
             input_fastq=options.input_fastq,
             output_dir=options.output,

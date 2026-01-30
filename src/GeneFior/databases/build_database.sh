@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# AMRfíor Database Builder
-# Usage: ./build_amrfior_database.sh database_name dna.fasta aa.fasta threads
+# Genefíor Database Builder
+# Usage: ./build_database.sh database_name dna.fasta aa.fasta threads
 
 set -e
 
@@ -15,7 +15,7 @@ if [ -z "$DB_NAME" ] || [ -z "$DNA_FASTA" ] || [ -z "$AA_FASTA" ]; then
     exit 1
 fi
 
-echo "Building AMRfíor database: $DB_NAME"
+echo "Building Genefíor database: $DB_NAME"
 echo "DNA sequences: $DNA_FASTA"
 echo "AA sequences: $AA_FASTA"
 echo "Threads: $THREADS"
@@ -64,7 +64,7 @@ echo ""
 echo "Database build complete!"
 echo "Database location: $DB_NAME"
 echo ""
-echo "To use with AMRfíor:"
-echo "AMRfior -i reads.fasta -st Single-FASTA -o results/ \\"
+echo "To use with Genefíor:"
+echo "Genefior -i reads.fasta -st Single-FASTA -o results/ \\"
 echo "  --databases user-provided \\"
 echo "  --user-db-path $(pwd)/$DB_NAME"
