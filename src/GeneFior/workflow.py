@@ -845,8 +845,9 @@ class Workflow:
 
                 # parse CIGAR and compute aligned positions & alignment length
                 ref_pos = ref_start
-                aligned_positions = set()
-                alignment_length = 0
+                aligned_positions = set()  # reference positions — feeds into gene coverage
+                query_aligned_bases = 0  # query bases aligned — feeds into query coverage
+                alignment_length = 0  # for identity calculation
 
                 for count_str, op in cigar_re.findall(cigar):
                     length = int(count_str)
@@ -854,11 +855,16 @@ class Workflow:
                         aligned_positions.update(range(ref_pos, ref_pos + length))
                         ref_pos += length
                         alignment_length += length
+                        query_aligned_bases += length  # these bases exist in both the read AND the gene
                     elif op == 'I':  # insertion to reference
                         alignment_length += length
+                        # consumes query bases, but they have no reference counterpart
+                        # — do NOT count toward query_aligned_bases
                     elif op == 'D':  # deletion from reference
                         ref_pos += length
                         alignment_length += length
+                        # consumes reference positions but no query bases
+                        # — do NOT count toward query_aligned_bases
                     elif op == 'N':
                         ref_pos += length
                     elif op in ('S', 'H'):
@@ -872,7 +878,9 @@ class Workflow:
                     identity = (matches / alignment_length) * 100.0
 
                 query_length = len(seq) if seq and seq != '*' else 0
-                query_coverage = (len(aligned_positions) / query_length) * 100.0 if query_length > 0 else 0.0
+                #query_coverage = (len(aligned_positions) / query_length) * 100.0 if query_length > 0 else 0.0
+                # Per-read query coverage — what proportion of this read overlaps the gene
+                query_coverage = (query_aligned_bases / query_length) * 100.0 if query_length > 0 else 0.0
 
                 if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
                     if gene not in self.gene_stats[database][tool_name]:

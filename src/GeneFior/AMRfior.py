@@ -134,7 +134,7 @@ Examples:
                               help='Number of threads to use (default: 4)')
     runtime_group.add_argument('-tmp', '--temp-directory', type=str, default=None,
                                help='Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - '
-                                    'Path will also be used for all temporary files (default: system temp directory)')
+                                    'Path will also be used for all temporary files (default: output directory)')
     runtime_group.add_argument('--no_cleanup',  action='store_true',)
     runtime_group.add_argument( '--verbose', action='store_true',)
 
@@ -144,6 +144,14 @@ Examples:
                             help='Show program version and exit')
 
     options = parser.parse_args()
+
+    # Ensure a temporary directory is defined. If the user did not supply
+    # --temp-directory, default to the output directory (behaviour documented
+    # in menu). This makes options.temp_directory available to
+    # downstream code (e.g. utils.handle_all_input_files) without needing
+    # checks everywhere.
+    if getattr(options, 'temp_directory', None) is None:
+        options.temp_directory = options.output
 
     ## Setup logging
     start_time = datetime.now()
