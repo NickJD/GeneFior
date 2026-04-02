@@ -180,8 +180,16 @@ GeneFior \
     -i reads.fasta \
     -st Single-FASTA \
     -o results/ \
+    --db-path <path-to-db>
+```
+
+```bash
+AMRFior \
+    -i reads.fasta \
+    -st Single-FASTA \
+    -o results/ \
     --databases user-provided \
-    --user-db-path /path/to/your_database_name
+    --db-path <path-to-db>
 ```
 
 ### Option B: Install in GeneFíor Package Directory

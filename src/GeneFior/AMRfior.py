@@ -20,20 +20,20 @@ except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='GeneFíor' + GENEFIOR_VERSION + ' AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.',
+        description='GeneFíor ' + GENEFIOR_VERSION + ' AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Basic usage with default tools (runs DNA & protein tools)
-  GeneFior -i reads.fasta -st Single-FASTA -o results/
+  AMRfíor -i reads.fasta -st Single-FASTA -o results
 
   # Select specific tools and output detected FASTA sequences
-  GeneFior -i reads.fasta -st Single-FASTA -o results/ \
+  AMRfíor -i reads.fasta -st Single-FASTA -o results \
     --tools diamond bowtie2 \
     --report_fasta detected
 
   # Custom thresholds, paired-fastq input, threads and dna-only mode
-  GeneFior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
+  AMRfíor -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/ \
     -t 16 --d-min-cov 90 --d-min-id 85 \
     --dna-only
         """
@@ -54,8 +54,8 @@ Examples:
     # Output selection
     output_group = parser.add_argument_group('Output selection')
     output_group.add_argument('--report-fasta',
-                            choices=['None', 'all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=[None], #, 'hmmer_dna','hmmer_protein'],
+                            choices=['all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
+                            default=None,
                             dest='report_fasta',
                             help='Specify whether to output sequences that "mapped" to genes.'
                                  '"all" should only be used for deep investigation/debugging.'
@@ -84,7 +84,10 @@ Examples:
     query_threshold_group = parser.add_argument_group('Query threshold Parameters')
     query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
                                       dest='query_min_coverage',
-                                      help='Minimum coverage threshold in percent (default: 40.0)')
+                                      help='Minimum coverage threshold in percent (HSP for blastx/n) (default: 40.0)')
+    query_threshold_group.add_argument('--q-min-id', '--query-min-identity', type=float, default=80.0,
+                                      dest='query_min_identity',
+                                      help='Minimum identity threshold in percent (HSP for blast/diamond) (default: 80.0)')
 
     gene_detection_group = parser.add_argument_group('Gene Detection Parameters')
     gene_detection_group.add_argument('--d-min-cov', '--detection-min-coverage', type=float, default=80.0,
@@ -125,6 +128,9 @@ Examples:
                                    choices=['sr', 'map-ont', 'map-pb', 'map-hifi'],
                                    help='Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, '
                                         'map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)')
+    tool_params_group.add_argument('--blastx-task', default='blastx-fast',
+                                   choices=['blastx', 'blastx-fast'], dest='blastx_task',
+                                   help='Run blastx with task blastx-fast (default: blastx-fast)')
     # tool_params_group.add_argument('-e', '--evalue', type=float, default=1e-10,
     #                                help='E-value threshold (default: 1e-10)')
 
@@ -132,11 +138,22 @@ Examples:
     runtime_group = parser.add_argument_group('Runtime Parameters')
     runtime_group.add_argument('-t', '--threads', type=int, default=4,
                               help='Number of threads to use (default: 4)')
+    runtime_group.add_argument('--chunk-jobs', type=int, default=None,
+                               help='Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1')
+    runtime_group.add_argument('--chunk-threads-per-job', type=int, default=None,
+                               help='If set, reserve this many threads per chunk job; otherwise total threads are divided evenly across concurrent chunk jobs')
+    runtime_group.add_argument('--preserve-chunks', action='store_true', default=False,
+                               help='Keep chunk files and per-chunk outputs after concatenation (useful for debugging)')
+    runtime_group.add_argument('--max-fasta-chunk-mb', type=float, default=200.0,
+                               help='Max FASTA chunk size in MiB (default: 200.0). Inputs larger than this will be chunked for per-chunk BLAST runs')
     runtime_group.add_argument('-tmp', '--temp-directory', type=str, default=None,
                                help='Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - '
                                     'Path will also be used for all temporary files (default: output directory)')
+    runtime_group.add_argument('--force-modify-fastq', action='store_true',
+                               help='Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique')
     runtime_group.add_argument('--no_cleanup',  action='store_true',)
     runtime_group.add_argument( '--verbose', action='store_true',)
+
 
     misc_group = parser.add_argument_group('Miscellaneous Parameters')
     misc_group.add_argument('-v','--version', action='version',
@@ -158,13 +175,15 @@ Examples:
     from pathlib import Path
     log_file = Path(options.output) / f"pipeline_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     logger = logging.getLogger('AMRfíor')
-    logger.setLevel(logging.INFO)
-
-    # Create stream handler for console output
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    logger.addHandler(stream_handler)
+    # Only configure handlers if none exist to avoid duplicate logs when reimported
+    if not getattr(logger, 'handlers', None):
+        logger.setLevel(logging.INFO)
+        # Create stream handler for console output
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(logging.INFO)
+        stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(stream_handler)
+        logger.propagate = False
 
     log_file.parent.mkdir(parents=True, exist_ok=True)
     # Create file handler explicitly (use string path) and prepare formatter
@@ -177,7 +196,8 @@ Examples:
         file_handler = None  # fallback to console-only if file cannot be opened
     ################
 
-    if options.report_fasta[0] == None or options.report_fasta[0] == 'None':
+    # Normalize report_fasta: allow None or explicit string values
+    if options.report_fasta in (None, 'None'):
         options.report_fasta = None
 
 
@@ -283,6 +303,7 @@ Examples:
     
         # logger.info(f"E-value threshold: {evalue}")
         logger.info(f"Min query coverage: {options.query_min_coverage}%")
+        logger.info(f"Min query identity: {options.query_min_identity}%")
         logger.info(f"Min detection coverage: {options.detection_min_coverage}%")
         logger.info(f"Min detection identity: {options.detection_min_identity}%")
         logger.info(f"Run DNA mode: {run_dna}")
@@ -297,6 +318,14 @@ Examples:
         handle_all_input_files(options, logger)
 
         # Run Workflow
+        # Convert user-specified chunk size (MiB) into bytes and log it
+        try:
+            max_fasta_chunk_bytes = int(float(options.max_fasta_chunk_mb) * 1024.0 * 1024.0)
+        except Exception:
+            max_fasta_chunk_bytes = 200 * 1024 * 1024
+        logger.info(
+            f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 200.0)} MiB ({max_fasta_chunk_bytes} bytes)")
+
         workflow = Workflow(
             input_fasta=options.input_fasta,
             input_fastq=options.input_fastq,
@@ -306,20 +335,27 @@ Examples:
             # card_dbs=card_dbs,
             threads=options.threads,
             tool_sensitivity_params=tool_sensitivity_params,
+            blastx_task=options.blastx_task,
             #max_target_seqs=options.max_target_seqs,
             #evalue=options.evalue,
+            query_min_coverage=options.query_min_coverage,
+            query_min_identity=options.query_min_identity,
             detection_min_coverage=options.detection_min_coverage,
             detection_min_identity=options.detection_min_identity,
             detection_min_base_depth=options.detection_min_base_depth,
             detection_min_num_reads=options.detection_min_num_reads,
-            query_min_coverage=options.query_min_coverage,
             run_dna=run_dna,
             run_protein=run_protein,
             sequence_type=options.sequence_type,
             report_fasta=options.report_fasta,
             no_cleanup=options.no_cleanup,
             verbose=options.verbose,
-            logger=logger
+            logger=logger,
+            temp_directory=options.temp_directory,
+            chunk_jobs=options.chunk_jobs,
+            chunk_threads_per_job=options.chunk_threads_per_job,
+            preserve_chunks=options.preserve_chunks,
+            max_fasta_chunk_bytes=max_fasta_chunk_bytes
         )
 
         ###

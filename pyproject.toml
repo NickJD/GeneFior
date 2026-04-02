@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "GeneFior"
-version = "0.5.0"
+version = "0.7.0"
 authors = [
     {name = "Nicholas Dimonaco", email = "nicholas@dimonaco.co.uk"}
 ]
-description = "GeneFior: A toolkit that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA and protein sequences against DNA and AA sequence databases."
+description = "GeneFior: A toolkit that uses BLAST, BWA, Bowtie2, DIAMOND, and Minimap2 to search DNA sequences against DNA and AA sequence databases."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}

@@ -1,40 +1,114 @@
 import os, sys
 import gzip
 import shutil
+import json
+import shlex
+import time
+import tempfile
 import subprocess
 
-
-def prepare_fastq_for_alignment(r1_path, r2_path, temp_dir, logger):
+def prepare_fastq_for_alignment(r1_path, r2_path, temp_dir, logger, force: bool = False):
     # Check if FASTQ read IDs need suffixes and create temporary modified files if needed.
-
-    import tempfile
 
     # Check if suffixes are needed
     needs_suffix = check_read_id_uniqueness(r1_path, r2_path, logger, sample_size=10000)
 
-    if not needs_suffix:
+    if not needs_suffix and not force:
         logger.info("FASTQ read IDs are already unique, no modification needed")
         return r1_path, r2_path, False
+    if not needs_suffix and force:
+        logger.info("FASTQ read IDs appear unique but forced modification requested — creating modified FASTQ files with /1 and /2 suffixes")
 
     logger.warning(
-        "FASTQ read IDs are not unique after first space. Creating modified FASTQ files with /1 and /2 suffixes...")
+        "FASTQ read IDs are not unique after first space. Creating/modifying FASTQ files with /1 and /2 suffixes...")
 
-    # Create temp directory if needed
+    # Decide where to place (or look for) modified files. If a temp_dir is provided, prefer it so the caller
+    # can control lifecycle. Otherwise place modified files alongside the originals so they can be reused
+    # across runs.
     if temp_dir:
         work_dir = temp_dir
     else:
-        work_dir = tempfile.mkdtemp(prefix='genefior_fastq_')
+        work_dir = os.path.dirname(os.path.abspath(r1_path))
 
     os.makedirs(work_dir, exist_ok=True)
 
-    # Create output paths
-    r1_modified = os.path.join(work_dir,
-                               f"{os.path.basename(r1_path).replace('.fastq', '').replace('.fq', '')}_R1_modified.fastq.gz")
-    r2_modified = os.path.join(work_dir,
-                               f"{os.path.basename(r2_path).replace('.fastq', '').replace('.fq', '')}_R2_modified.fastq.gz")
+    # Create expected output paths (consistent naming so they can be detected later)
+    # Normalise basename and strip common suffixes (including gzipped extensions)
+    def _strip_fastq_suffix(fn):
+        bn = os.path.basename(fn)
+        for ext in ('.fastq.gz', '.fq.gz', '.fastq', '.fq', '.gz'):
+            if bn.endswith(ext):
+                bn = bn[:-len(ext)]
+                break
+        return bn
+
+    base_r1 = _strip_fastq_suffix(r1_path)
+    base_r2 = _strip_fastq_suffix(r2_path)
+    r1_modified = os.path.join(work_dir, f"{base_r1}_R1_modified.fastq.gz")
+    r2_modified = os.path.join(work_dir, f"{base_r2}_R2_modified.fastq.gz")
+
+    def _file_looks_modified(path, expected_suffix):
+        # Quick validation: open the file and inspect the first header line to ensure the expected suffix exists
+        if not os.path.isfile(path) or os.path.getsize(path) == 0:
+            return False
+        opener = gzip.open if path.endswith('.gz') else open
+        mode = 'rt' if path.endswith('.gz') else 'r'
+        try:
+            with opener(path, mode) as fh:
+                # Read until first header line
+                for i in range(4):
+                    line = fh.readline()
+                    if not line:
+                        break
+                    if line.startswith('@'):
+                        read_id = line[1:].strip().split()[0]
+                        # Accept suffix appended (e.g. ID/1 or ID/2) or suffix present anywhere in the base id
+                        if read_id.endswith(expected_suffix) or expected_suffix in read_id:
+                            return True
+                        return False
+        except Exception:
+            return False
+        return False
+
+    # If candidate modified files already exist and look valid, reuse them
+    if _file_looks_modified(r1_modified, '/1') and _file_looks_modified(r2_modified, '/2'):
+        logger.info(f"Found existing modified FASTQ files, reusing: {r1_modified}, {r2_modified}")
+        return r1_modified, r2_modified, False
+
+    # Otherwise create them in the chosen work_dir
+    logger.info(f"Creating modified FASTQ files: {r1_path} -> {r1_modified} ; {r2_path} -> {r2_modified}")
 
     def modify_fastq_ids(input_path, output_path, suffix):
-        # dd suffix to FASTQ read IDs
+        # Add suffix to FASTQ read IDs
+        # Try an optimised shell pipeline using awk + pigz when available. This
+        # avoids Python-level per-line processing for very large files.
+        pigz_path = shutil.which('pigz')
+        gzip_path = shutil.which('gzip')
+        compressor = pigz_path or gzip_path
+        decompressor = 'gzip -dc' if input_path.endswith('.gz') else 'cat'
+        # AWK program: for every header line (NR%4==1) strip leading @, split at
+        # first space, append suffix to id and reprint, otherwise print as-is.
+        awk_prog = (
+            "{\n"
+            " if (NR%4==1) {\n"
+            "   line=substr($0,2); split(line,a,\" \"); id=a[1]; rest=\"\"; pos=index($0,\" \");\n"
+            "   if (pos>0) rest=substr($0,pos);\n"
+            "   printf(\"@%s%s%s\\n\", id, suffix, rest);\n"
+            " } else { print $0 }\n"
+            "}\n"
+        )
+
+        if compressor:
+            # Build shell command and run it. Use -v to pass suffix safely to awk.
+            cmd = f"{decompressor} {shlex.quote(input_path)} | awk -v suffix='{suffix}' '{awk_prog}' | {shlex.quote(compressor)} -c > {shlex.quote(output_path)}"
+            try:
+                subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
+                return
+            except Exception:
+                # Fall back to Python implementation on any failure
+                pass
+
+        # Fallback Python implementation (safe, portable)
         opener = gzip.open if input_path.endswith('.gz') else open
         input_mode = 'rt' if input_path.endswith('.gz') else 'r'
 
@@ -55,49 +129,76 @@ def prepare_fastq_for_alignment(r1_path, r2_path, temp_dir, logger):
                     outfile.write(line)
 
     # Modify both files
-    logger.info(f"Modifying R1: {r1_path} -> {r1_modified}")
-    modify_fastq_ids(r1_path, r1_modified, '/1')
-
-    logger.info(f"Modifying R2: {r2_path} -> {r2_modified}")
-    modify_fastq_ids(r2_path, r2_modified, '/2')
+    try:
+        modify_fastq_ids(r1_path, r1_modified, '/1')
+        modify_fastq_ids(r2_path, r2_modified, '/2')
+    except Exception as e:
+        logger.error(f"Failed to create modified FASTQ files: {e}")
+        raise
 
     return r1_modified, r2_modified, True
 
 def check_read_id_uniqueness(r1_path, r2_path, logger, sample_size=10000):
-    # Check if read IDs remain unique after truncation at first space.
-    from collections import defaultdict
+    """
+    Check if read IDs remain unique after truncation at first space.
 
-    seen_ids = defaultdict(int)
-
-    for fastq_path in [r1_path, r2_path]:
-        cmd = ['seqtk', 'seq', '-A', fastq_path]
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
+    Returns True if suffixes are required (i.e. some base IDs collide), False
+    otherwise.
+    """
+    # More robust: collect a sample of base IDs from R1 and R2 separately and
+    # check whether any base ID appears in both files. This directly tests the
+    # paired-read collision case which requires /1 and /2 suffixes.
+    def _iter_base_ids(path, limit):
+        opener = gzip.open if path.endswith(('.gz', '.gzip')) else open
+        mode = 'rt' if path.endswith(('.gz', '.gzip')) else 'r'
         count = 0
-        for line in proc.stdout:
-            if line.startswith(b'>'):
-                # Get base ID (portion before first space)
-                read_id = line[1:].decode('utf-8', errors='ignore').strip()
-                base_id = read_id.split()[0] if ' ' in read_id else read_id
-                seen_ids[base_id] += 1
-                count += 1
-                if count >= sample_size:
-                    break
+        try:
+            with opener(path, mode) as fh:
+                for line in fh:
+                    if not line:
+                        break
+                    if line.startswith('@'):
+                        header = line[1:].strip()
+                        base = header.split()[0] if ' ' in header else header
+                        yield base
+                        count += 1
+                        if limit and count >= limit:
+                            break
+        except Exception as e:
+            logger.debug(f"Failed to read headers from {path}: {e}")
+            return
 
-        proc.kill()
-        proc.wait()
+    # Read up to sample_size headers from each file (split evenly if possible)
+    half = max(1, sample_size // 2)
+    r1_ids = set()
+    r2_ids = set()
+    try:
+        for i, bid in enumerate(_iter_base_ids(r1_path, half)):
+            if not bid:
+                continue
+            r1_ids.add(bid)
+    except Exception:
+        logger.debug("Error sampling R1 headers for uniqueness check")
 
-    # If any ID appears more than once, we need suffixes
-    needs_suffix = any(count > 1 for count in seen_ids.values())
+    try:
+        for i, bid in enumerate(_iter_base_ids(r2_path, sample_size - half)):
+            if not bid:
+                continue
+            r2_ids.add(bid)
+    except Exception:
+        logger.debug("Error sampling R2 headers for uniqueness check")
 
+    # If there's any intersection between sets, we need suffixes
+    needs_suffix = len(r1_ids & r2_ids) > 0
+    logger.debug(f"check_read_id_uniqueness: sampled {len(r1_ids)} R1 ids and {len(r2_ids)} R2 ids; intersection={len(r1_ids & r2_ids)}")
     return needs_suffix
 
 def requires_fasta_conversion(tools):
     return any(tool in ('blastn', 'blastx', 'diamond', 'all') for tool in (tools or []))
 
 def FASTQ_to_FASTA(options, logger):
-    # If Paired-FASTQ, convert R1/R2 FASTQ -> FASTA and set options.input to the combined FASTA
-    logger.info("FASTQ_to_FASTA: using seqtk to convert paired FASTQ -> combined FASTA")
+    # Convert paired FASTQ -> single combined FASTA when needed.
+    # Prefers seqtk + compressor (pigz/gzip) for speed; falls back to the Python streamer.
 
     def find_pair(input_spec):
         if ',' in input_spec:
@@ -129,83 +230,47 @@ def FASTQ_to_FASTA(options, logger):
     conv_dir = os.path.join(options.output, 'paired_fastq_fasta')
     os.makedirs(conv_dir, exist_ok=True)
     combined_fasta = os.path.join(conv_dir, 'fastq_to_fasta_combined.fasta.gz') # Could need to modify in future
-    if os.path.isfile(combined_fasta) and os.path.getsize(combined_fasta) > 0:
-        logger.info(f"Found existing combined FASTA at `{combined_fasta}`; using it (skipping conversion)")
-        options.input_fasta = combined_fasta
-        options.input_fastq = (r1_path, r2_path)
-        return
+    # Do not automatically reuse a combined FASTA just because it exists; prefer
+    # to validate using metadata (later) so we don't silently reuse an outdated
+    # combined FASTA created from different inputs or settings.
 
-    # ensure seqtk is available
-    if shutil.which('seqtk') is None:
-        logger.error("`seqtk` not found in PATH. Install seqtk or provide a FASTA input.")
-        sys.exit(1)
-
-    def seqtk_fastq_to_fasta_stream(fastq_path, out_handle, suffix=None):
-        cmd = ['seqtk', 'seq', '-A', fastq_path]
-        logger.info(f"Running: {' '.join(cmd)}")
+    # Prefer seqtk + compressor when available (fast C tools). Python streamer
+    # is used only as a fallback or when external tools fail.
+    def fastq_to_fasta_py(fastq_path, out_handle, suffix=None):
+        opener = gzip.open if fastq_path.endswith(('.gz', '.gzip')) else open
+        mode = 'rt' if fastq_path.endswith(('.gz', '.gzip')) else 'r'
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except Exception as e:
-            logger.error(f"Failed to start seqtk: {e}")
-            sys.exit(1)
-
-        if proc.stdout is None:
-            logger.error("Failed to start seqtk process")
-            sys.exit(1)
-        try:
-            if suffix is None:
-                # No modification needed, stream directly
-                for chunk in iter(lambda: proc.stdout.read(8192), b''):
-                    if not chunk:
+            with opener(fastq_path, mode) as fh:
+                while True:
+                    header = fh.readline()
+                    if not header:
                         break
-                    out_handle.write(chunk)
-            else:
-                # Need to modify headers, process line by line
-                buffer = b''
-                for chunk in iter(lambda: proc.stdout.read(8192), b''):
-                    if not chunk:
+                    seq = fh.readline()
+                    plus = fh.readline()
+                    qual = fh.readline()
+                    if not seq:
                         break
-
-                    buffer += chunk
-                    lines = buffer.split(b'\n')
-                    buffer = lines[-1]  # Keep incomplete line in buffer
-
-                    for line in lines[:-1]:
-                        if line.startswith(b'>'):
-                            # Modify header: insert suffix after base ID (before first space)
-                            read_id = line[1:].decode('utf-8', errors='ignore').rstrip()
-                            if ' ' in read_id:
-                                parts = read_id.split(' ', 1)
-                                modified_id = f">{parts[0]}{suffix} {parts[1]}\n"
-                            else:
-                                modified_id = f">{read_id}{suffix}\n"
-                            out_handle.write(modified_id.encode('utf-8'))
-                        else:
-                            # Sequence line, write as-is
-                            out_handle.write(line + b'\n')
-
-                # Write any remaining buffer
-                if buffer:
-                    if buffer.startswith(b'>'):
-                        read_id = buffer[1:].decode('utf-8', errors='ignore').rstrip()
+                    # Normalise
+                    header = header.rstrip('\n')
+                    seq = seq.rstrip('\n')
+                    read_id = header[1:].strip() if header.startswith('@') else header.strip()
+                    if suffix:
                         if ' ' in read_id:
                             parts = read_id.split(' ', 1)
-                            modified_id = f">{parts[0]}{suffix} {parts[1]}\n"
+                            out_header = f">{parts[0]}{suffix} {parts[1]}\n"
                         else:
-                            modified_id = f">{read_id}{suffix}\n"
-                        out_handle.write(modified_id.encode('utf-8'))
+                            out_header = f">{read_id}{suffix}\n"
                     else:
-                        out_handle.write(buffer + b'\n')
-        finally:
-            try:
-                proc.stdout.close()
-            except Exception:
-                pass
-            _, stderr = proc.communicate()
-            if proc.returncode != 0:
-                stderr_text = stderr.decode(errors='ignore') if stderr else ''
-                logger.error(f"seqtk failed: {stderr_text}")
-                sys.exit(1)
+                        if ' ' in read_id:
+                            parts = read_id.split(' ', 1)
+                            out_header = f">{parts[0]} {parts[1]}\n"
+                        else:
+                            out_header = f">{read_id}\n"
+                    out_handle.write(out_header.encode('utf-8'))
+                    out_handle.write((seq + '\n').encode('utf-8'))
+        except Exception as e:
+            logger.error(f"FASTQ->FASTA conversion failed for {fastq_path}: {e}")
+            raise
 
     # Check if we need suffixes
     needs_suffix = check_read_id_uniqueness(r1_path, r2_path, logger)
@@ -218,10 +283,184 @@ def FASTQ_to_FASTA(options, logger):
         logger.warning(
             f"Read IDs are not unique after first space. Appending {r1_suffix} and {r2_suffix} to read names.")
 
-    # Convert both FASTQ files and append into a single FASTA
-    with gzip.open(combined_fasta, 'wb') as out:
-        seqtk_fastq_to_fasta_stream(r1_path, out, suffix=r1_suffix)
-        seqtk_fastq_to_fasta_stream(r2_path, out, suffix=r2_suffix)
+    # If combined FASTA already exists, validate it using a small metadata file
+    meta_path = combined_fasta + '.meta.json'
+    force_regen = bool(getattr(options, 'force_regenerate_fasta', False))
+    def _file_meta_matches(meta_file, r1, r2, r1_suf, r2_suf):
+        try:
+            if not os.path.isfile(meta_file):
+                return False
+            with open(meta_file, 'r') as mh:
+                meta = json.load(mh)
+            # Compare paths, sizes and mtimes
+            if meta.get('r1_path') != os.path.abspath(r1):
+                return False
+            if meta.get('r2_path') != os.path.abspath(r2):
+                return False
+            if meta.get('r1_size') != os.path.getsize(r1):
+                return False
+            if meta.get('r2_size') != os.path.getsize(r2):
+                return False
+            if meta.get('r1_mtime') != os.path.getmtime(r1):
+                return False
+            if meta.get('r2_mtime') != os.path.getmtime(r2):
+                return False
+            if meta.get('r1_suffix') != r1_suf or meta.get('r2_suffix') != r2_suf:
+                return False
+            return True
+        except Exception:
+            return False
+
+    # If metadata matches, reuse. If metadata is missing but the combined FASTA exists
+    # and is newer than the input FASTQ files, assume it was created from these inputs
+    # and reuse it (write metadata so future runs are explicit). This avoids
+    # unnecessary re-conversion when users re-run the pipeline in the same folder.
+    if os.path.isfile(combined_fasta) and os.path.getsize(combined_fasta) > 0:
+        if not force_regen and _file_meta_matches(meta_path, r1_path, r2_path, r1_suffix, r2_suffix):
+            logger.info(f"Found existing validated combined FASTA at `{combined_fasta}`; using it (skipping conversion)")
+            options.input_fasta = combined_fasta
+            options.input_fastq = (r1_path, r2_path)
+            return
+        # metadata missing or doesn't match; attempt a conservative heuristic:
+        try:
+            combined_mtime = os.path.getmtime(combined_fasta)
+            r1_mtime = os.path.getmtime(r1_path) if os.path.exists(r1_path) else 0
+            r2_mtime = os.path.getmtime(r2_path) if os.path.exists(r2_path) else 0
+            # If the combined FASTA is newer than both FASTQ inputs, assume it was produced
+            # from them and reuse it. This is a pragmatic heuristic to avoid unnecessary work.
+            if not force_regen and combined_mtime >= max(r1_mtime, r2_mtime):
+                logger.info(f"Found existing combined FASTA `{combined_fasta}` newer than inputs; reusing it and writing metadata")
+                # attempt to write metadata for future runs
+                try:
+                    meta = {
+                        'r1_path': os.path.abspath(r1_path),
+                        'r2_path': os.path.abspath(r2_path),
+                        'r1_size': os.path.getsize(r1_path) if os.path.exists(r1_path) else None,
+                        'r2_size': os.path.getsize(r2_path) if os.path.exists(r2_path) else None,
+                        'r1_mtime': r1_mtime,
+                        'r2_mtime': r2_mtime,
+                        'r1_suffix': r1_suffix,
+                        'r2_suffix': r2_suffix,
+                        'created': time.time()
+                    }
+                    with open(meta_path, 'w') as mh:
+                        json.dump(meta, mh)
+                except Exception:
+                    logger.debug("Failed to write metadata for existing combined FASTA; continuing to reuse without metadata")
+                options.input_fasta = combined_fasta
+                options.input_fastq = (r1_path, r2_path)
+                return
+        except Exception:
+            # If any check fails, fall through to conversion logic
+            pass
+    if force_regen:
+        logger.info("Force regeneration of combined FASTA requested (options.force_regenerate_fasta=True)")
+
+    # Try optimised path: prefer seqtk + pigz when available (fast C tools).
+    # If not available or an error occurs, fall back to the native Python streamer.
+    seqtk_path = shutil.which('seqtk')
+    pigz_path = shutil.which('pigz')
+    gzip_path = shutil.which('gzip')
+    logger.info(f"seqtk found: {bool(seqtk_path)} ({seqtk_path}) ; pigz found: {bool(pigz_path)} ({pigz_path}) ; gzip found: {bool(gzip_path)} ({gzip_path})")
+    used_optimised = False
+    # Prefer seqtk + pigz, but fall back to seqtk + gzip if pigz is not available
+    compressor = pigz_path or gzip_path
+    if seqtk_path and compressor:
+        logger.info("Attempting optimised seqtk+pigz FASTQ->FASTA conversion")
+        try:
+            # If no header suffix modification needed we can run a simple shell pipeline
+            if not r1_suffix and not r2_suffix:
+                cmd = f"(seqtk seq -A {shlex.quote(r1_path)}; seqtk seq -A {shlex.quote(r2_path)}) | {shlex.quote(compressor)} -c > {shlex.quote(combined_fasta)}"
+                subprocess.run(cmd, shell=True, check=True)
+                used_optimised = True
+                logger.info(f"Optimised seqtk+{os.path.basename(compressor)} conversion succeeded (no header modification needed)")
+            else:
+                # Need to modify headers; stream seqtk outputs through a small modifier into pigz
+                with open(combined_fasta, 'wb') as outf:
+                    comp_proc = subprocess.Popen([compressor, '-c'], stdin=subprocess.PIPE, stdout=outf)
+                try:
+                    for fastq_path, suffix in ((r1_path, r1_suffix), (r2_path, r2_suffix)):
+                        # Spawn seqtk for this fastq and stream its stdout
+                        proc = subprocess.Popen([seqtk_path, 'seq', '-A', fastq_path], stdout=subprocess.PIPE)
+                        assert proc.stdout is not None
+                        buf = b''
+                        for chunk in iter(lambda: proc.stdout.read(8192), b''):
+                            if not chunk:
+                                break
+                            buf += chunk
+                            parts = buf.split(b'\n')
+                            buf = parts.pop()  # last partial
+                            for part in parts:
+                                if part.startswith(b'>'):
+                                    header = part[1:].decode('utf-8', errors='ignore').rstrip()
+                                    if suffix:
+                                        if ' ' in header:
+                                            hparts = header.split(' ', 1)
+                                            out_line = f">{hparts[0]}{suffix} {hparts[1]}\n"
+                                        else:
+                                            out_line = f">{header}{suffix}\n"
+                                    else:
+                                        out_line = f">{header}\n"
+                                    comp_proc.stdin.write(out_line.encode('utf-8'))
+                                else:
+                                    comp_proc.stdin.write(part + b'\n')
+                        # Flush any remaining buffer
+                        if buf:
+                            part = buf
+                            if part.startswith(b'>'):
+                                header = part[1:].decode('utf-8', errors='ignore').rstrip()
+                                if suffix:
+                                    if ' ' in header:
+                                        hparts = header.split(' ', 1)
+                                        out_line = f">{hparts[0]}{suffix} {hparts[1]}\n"
+                                    else:
+                                        out_line = f">{header}{suffix}\n"
+                                else:
+                                    out_line = f">{header}\n"
+                                comp_proc.stdin.write(out_line.encode('utf-8'))
+                            else:
+                                comp_proc.stdin.write(part + b'\n')
+                        proc.stdout.close()
+                        proc.wait()
+                    # close pigz stdin to finish compression
+                    comp_proc.stdin.close()
+                    comp_proc.wait()
+                    used_optimised = True
+                    logger.info(f"optimised seqtk+{os.path.basename(compressor)} conversion succeeded (with header modification)")
+                except Exception:
+                        try:
+                            comp_proc.kill()
+                        except Exception:
+                            pass
+                        raise
+        except Exception as e:
+            logger.warning(f"seqtk+{os.path.basename(compressor) if compressor else 'compressor'} optimised path failed, falling back to Python converter: {e}")
+
+    if not used_optimised:
+        logger.info("Using native Python FASTQ->FASTA converter (seqtk+pigz not used)")
+        # Convert both FASTQ files and append into a single FASTA (native Python streamer)
+        with gzip.open(combined_fasta, 'wb') as out:
+            fastq_to_fasta_py(r1_path, out, suffix=r1_suffix)
+            fastq_to_fasta_py(r2_path, out, suffix=r2_suffix)
+
+    # Write metadata to enable safe reuse in future runs
+    try:
+        meta = {
+            'r1_path': os.path.abspath(r1_path),
+            'r2_path': os.path.abspath(r2_path),
+            'r1_size': os.path.getsize(r1_path),
+            'r2_size': os.path.getsize(r2_path),
+            'r1_mtime': os.path.getmtime(r1_path),
+            'r2_mtime': os.path.getmtime(r2_path),
+            'r1_suffix': r1_suffix,
+            'r2_suffix': r2_suffix,
+            'created': time.time()
+        }
+        with open(meta_path, 'w') as mh:
+            json.dump(meta, mh)
+    except Exception:
+        # Non-fatal — conversion succeeded but we couldn't write metadata
+        logger.debug("Failed to write FASTA metadata file; future runs may re-create the combined FASTA")
 
     logger.info(f"Combined FASTA created at {combined_fasta}")
     options.input_fasta = combined_fasta
@@ -273,16 +512,33 @@ def cleanup_temp_files(temp_dir, files_to_remove, logger):
     # Remove temporary files created in the temp directory
     if not temp_dir:
         return
-
     cleaned_count = 0
+    # Normalise temp_dir to absolute path for safe containment checks
+    try:
+        abs_temp_dir = os.path.abspath(temp_dir)
+    except Exception:
+        abs_temp_dir = temp_dir
+
     for file_path in files_to_remove:
-        if file_path and os.path.exists(file_path) and temp_dir in file_path:
+        try:
+            if not file_path:
+                continue
+            fp = str(file_path)
+            if not os.path.exists(fp):
+                continue
+            # Ensure file is within the temp directory (avoid substring pitfalls)
+            abs_fp = os.path.abspath(fp)
+            if not abs_fp.startswith(abs_temp_dir.rstrip(os.path.sep) + os.path.sep) and abs_fp != abs_temp_dir:
+                # Not inside temp dir; skip
+                continue
             try:
-                os.remove(file_path)
-                logger.info(f"Removed temporary file: {file_path}")
+                os.remove(abs_fp)
+                logger.info(f"Removed temporary file: {abs_fp}")
                 cleaned_count += 1
             except Exception as e:
-                logger.warning(f"Failed to remove temporary file {file_path}: {e}")
+                logger.warning(f"Failed to remove temporary file {abs_fp}: {e}")
+        except Exception:
+            continue
 
     if cleaned_count > 0:
         logger.info(f"Cleaned up {cleaned_count} temporary file(s)")
@@ -349,7 +605,8 @@ def handle_all_input_files(options, logger):
         r1_prepared, r2_prepared, needs_cleanup = prepare_fastq_for_alignment(
             r1_path, r2_path,
             options.temp_directory,
-            logger
+            logger,
+            getattr(options, 'force_modify_fastq', False)
         )
 
         # Track modified FASTQ files for cleanup
@@ -426,6 +683,27 @@ def handle_all_input_files(options, logger):
         logger.info(f"Input type: {options.sequence_type}")
 
         # Check input file exists and is a file
+        # Support '-' as stdin. If '-' is provided and data is piped (not TTY), materialise into temp file.
+        if options.input == '-':
+            try:
+                if not sys.stdin.isatty():
+                    tmpf = tempfile.NamedTemporaryFile(delete=False, dir=options.temp_directory or None, prefix='genefior_stdin_', suffix='.fasta')
+                    data = sys.stdin.buffer.read()
+                    tmpf.write(data)
+                    tmpf.flush()
+                    tmpf.close()
+                    logger.info(f"Materialised piped stdin to temporary FASTA: {tmpf.name}")
+                    options.input = tmpf.name
+                    options.temp_files_to_cleanup.append(tmpf.name)
+                else:
+                    logger.error("Input '-' was provided but stdin is a TTY (no piped data). Provide a file or pipe FASTA data into stdin.")
+                    print("Error: Input '-' provided but no piped data detected", file=sys.stderr)
+                    sys.exit(1)
+            except Exception as e:
+                logger.error(f"Failed to materialise stdin input '-': {e}")
+                print(f"Error: Failed to read stdin: {e}", file=sys.stderr)
+                sys.exit(1)
+
         if not os.path.isfile(options.input):
             logger.error(f"Input file '{options.input}' not found")
             print(f"Error: Input file '{options.input}' not found", file=sys.stderr)

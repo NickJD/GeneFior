@@ -444,6 +444,9 @@ Examples:
     query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
                                       dest='query_min_coverage',
                                       help='Minimum coverage threshold in percent (default: 40.0)')
+    query_threshold_group.add_argument('--q-min-id', '--query-min-identity', type=float, default=80.0,
+                                      dest='query_min_identity',
+                                      help='Minimum identity threshold in percent (HSP for blast/diamond) (default: 80.0)')
 
     gene_detection_group = parser.add_argument_group('Gene Detection Parameters')
     gene_detection_group.add_argument('--d-min-cov', '--detection-min-coverage', type=float, default=80.0,
@@ -532,11 +535,12 @@ Examples:
         databases={},  # to be set based on user input or discovered files
         threads=options.threads if hasattr(options, 'threads') else 4,
         tool_sensitivity_params={},  # to be set if user provides
+        query_min_coverage=options.query_min_coverage,
+        query_min_identity=options.query_min_identity,
         detection_min_coverage=options.detection_min_coverage,
         detection_min_identity=options.detection_min_identity,
         detection_min_base_depth=options.detection_min_base_depth,
         detection_min_num_reads=options.detection_min_num_reads,
-        query_min_coverage=options.query_min_coverage,
         run_dna=True,
         run_protein=True,
         sequence_type='Single-FASTA',
