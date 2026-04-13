@@ -9,8 +9,10 @@ This toolkit utilises a combined approach that uses BLAST, BWA, Bowtie2, DIAMOND
     - bowtie2 >=2.5.4
     - bwa >=0.7.19
     - minimap2 >=2.30
+    - mmseqs2 >=18-8cc5c
     - seqtk >=1.4
     - pigz >=2.8
+
 ### Installation:
 GeneFíor is available via bioconda. To install, use the following command:
 ```commandline
@@ -26,7 +28,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.7.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+GeneFíor v0.7.1 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -124,7 +126,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.7.0 AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.7.1 AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -224,7 +226,7 @@ Examples:
 ### Genefíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-eneFíor v0.6.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+eneFíor v0.7.1 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -285,7 +287,7 @@ Examples:
 ### Genefíor-Gene-Stats is used to generate summary statistics and visualizations from Genefíor results.
 
 ```commandline
-Genefíor v0.6.0 - Genefíor-Gene-Stats: Generate detailed coverage visualisations for Gene genes
+Genefíor v0.7.1 - Genefíor-Gene-Stats: Generate detailed coverage visualisations for Gene genes
 
 options:
   -h, --help            show this help message and exit

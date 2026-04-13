@@ -370,6 +370,7 @@ def run(options, workflow, logger):
     logger.info(f"Output directory: {options.output}")
     logger.info(f"Detection thresholds:")
     logger.info(f"  Query min coverage: {options.query_min_coverage}%")
+    logger.info(f"  Query min id: {options.query_min_id}%")
     logger.info(f"  Gene min coverage: {options.detection_min_coverage}%")
     logger.info(f"  Min identity: {options.detection_min_identity}%")
     logger.info(f"  Min base depth: {options.detection_min_base_depth}×")
@@ -518,7 +519,7 @@ Examples:
         # Tool selection
     if options.tools == ['all']:
         options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  # , 'hmmer_dna','hmmer_protein']
-    if options.report_fasta != ['None'] and any(tool in options.tools for tool in ['blastx', 'blastn', 'diamond']):
+    if options.report_fasta != [None] and any(tool in options.tools for tool in ['blastx', 'blastn', 'diamond']):
         if options.query_fasta is None:
             logger.error("Error: --query-fasta must be provided when --report-fasta is used with blast/diamond outputs")
             sys.exit(1)

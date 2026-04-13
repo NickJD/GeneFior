@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "GeneFior"
-version = "0.7.0"
+version = "0.7.1"
 authors = [
     {name = "Nicholas Dimonaco", email = "nicholas@dimonaco.co.uk"}
 ]
@@ -27,9 +27,12 @@ Homepage = "https://github.com/NickJD/GeneFior"
 "Bug Tracker" = "https://github.com/NickJD/GeneFior/issues"
 
 [project.scripts]
-AMRFior = "AMRfior.AMRfior:main"
-AMRfior = "AMRfior.AMRfior:main"
-amrfior = "AMRfior.AMRfior:main"
+AMRFior = "GeneFior.AMRfior:main"
+AMRfior = "GeneFior.AMRfior:main"
+amrfior = "GeneFior.AMRfior:main"
+GeneFior = "GeneFior.GeneFior:main"
+Genefior = "GeneFior.GeneFior:main"
+genefior = "GeneFior.GeneFior:main"
 GeneFior-Recompute = "GeneFior.GeneFior_Recompute:main"
 GeneFior-recompute = "GeneFior.GeneFior_Recompute:main"
 genefior-recompute = "GeneFior.GeneFior_Recompute:main"

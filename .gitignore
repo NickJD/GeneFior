@@ -12,3 +12,5 @@ src/GeneFior/databases/resfinder/all.fsa
 src/GeneFior/databases/card/nucleotide_fasta_protein_homolog_model_SID.fasta
 
 src/GeneFior/databases/card/protein_fasta_protein_homolog_model_SID.fasta
+
+.DS_Store
