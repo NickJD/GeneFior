@@ -66,12 +66,16 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
                 continue
             if category_name == "blast_aa":
                 # Special handling for blast_aa category
-                for tool, tag in tool_tags.items():
-                    if tool == "blastx":
-                        matching_files = list(category_dir.rglob(f"*{tag}*"))
-                        amino_acid_files = [f for f in matching_files if "aa" in f.parts or "blast_aa" in f.parts]
-                        if amino_acid_files:
-                            databases[category_name][tool] = str(amino_acid_files[0].with_suffix(''))
+                # Expose discovered protein BLAST databases as both blastx (for translated searches)
+                # and blastp (for direct protein searches) so downstream code can prefer blastp when
+                # protein inputs are provided.
+                matching_files = list(category_dir.rglob(f"*{tool_tags.get('blastx','blastdb')}*"))
+                amino_acid_files = [f for f in matching_files if "aa" in f.parts or "blast_aa" in f.parts]
+                if amino_acid_files:
+                    db_base = str(amino_acid_files[0].with_suffix(''))
+                    databases[category_name]['blastx'] = db_base
+                    # Also expose the same base for blastp (protein BLAST) so the workflow can call BLASTp
+                    databases[category_name]['blastp'] = db_base
                 continue
             if category_name == "diamond":
                 # Special handling for diamond category
@@ -107,6 +111,20 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
                             databases[category_name][tool] = str(matching_files[0].with_suffix(''))
                 continue
 
-    databases["blastn"] = databases.pop("blast_dna")
-    databases["blastx"] = databases.pop("blast_aa")
-    return databases
+    # Normalise category keys to expected names if present
+    if "blast_dna" in databases:
+        databases["blastn"] = databases.pop("blast_dna")
+    if "blast_aa" in databases:
+        databases["blastx"] = databases.pop("blast_aa")
+
+    # Flatten nested mapping into tool -> path mapping so callers receive a consistent
+    # dict[str, str] (matching the shape used for packaged DB constants).
+    flat = {}
+    for category, mapping in databases.items():
+        if isinstance(mapping, dict):
+            for tool_key, path_val in mapping.items():
+                # Only set if we have a truthy path
+                if path_val:
+                    flat[tool_key] = path_val
+
+    return flat

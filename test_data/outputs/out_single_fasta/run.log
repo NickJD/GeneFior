@@ -1,0 +1,75 @@
+2026-04-20 12:18:43,253 - INFO - Database tool availability (per selected database):
+2026-04-20 12:18:43,253 - INFO -   user-provided-db: BLASTn: Yes; BLASTx: Yes; BLASTp: Yes; DIAMOND: No
+2026-04-20 12:18:43,253 - INFO - ======================================================================
+2026-04-20 12:18:43,253 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-04-20 12:18:43,253 - INFO - Started at: 2026-04-20 12:18:43
+2026-04-20 12:18:43,253 - INFO - ======================================================================
+2026-04-20 12:18:43,253 - INFO - Threads: 4
+2026-04-20 12:18:43,253 - INFO - Database(s) chosen:
+2026-04-20 12:18:43,253 - INFO -   User-Provided: resfinder
+2026-04-20 12:18:43,253 - INFO -  Tool(s) chosen:
+2026-04-20 12:18:43,253 - INFO -   BLASTn: Yes
+2026-04-20 12:18:43,253 - INFO -   BLASTx: Yes
+2026-04-20 12:18:43,253 - INFO -   BLASTp: No
+2026-04-20 12:18:43,253 - INFO -   DIAMOND: Yes
+2026-04-20 12:18:43,253 - INFO -   Bowtie2: Yes
+2026-04-20 12:18:43,253 - INFO -   BWA: Yes
+2026-04-20 12:18:43,253 - INFO -   Minimap2: Yes
+2026-04-20 12:18:43,253 - INFO - Min query coverage: 40.0%
+2026-04-20 12:18:43,254 - INFO - Min query identity: 80.0%
+2026-04-20 12:18:43,254 - INFO - Min detection coverage: 80.0%
+2026-04-20 12:18:43,254 - INFO - Min detection identity: 80.0%
+2026-04-20 12:18:43,254 - INFO - Run DNA mode: True
+2026-04-20 12:18:43,254 - INFO - Run Protein mode: True
+2026-04-20 12:18:43,254 - INFO - Sensitivity parameters: default - None
+2026-04-20 12:18:43,254 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-04-20 12:18:43,254 - INFO - ======================================================================
+2026-04-20 12:18:43,254 - INFO - GeneFíor I/O processing...
+2026-04-20 12:18:43,254 - INFO - ======================================================================
+2026-04-20 12:18:43,254 - INFO - Input type: Single-FASTA
+2026-04-20 12:18:43,254 - INFO - Input file: /Users/nicholas/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz (5.58 MB)
+2026-04-20 12:18:43,254 - INFO - Copying FASTA to temp directory...
+2026-04-20 12:18:43,254 - INFO - Copying /Users/nicholas/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz to temp directory /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta...
+2026-04-20 12:18:43,254 - INFO - File size: 5.58 MB
+2026-04-20 12:18:43,258 - INFO - Successfully copied to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,258 - INFO - FASTA will be read from temp directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,258 - INFO - Output directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-04-20 12:18:43,258 - INFO - Temp directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-04-20 12:18:43,259 - INFO - Files tracked for cleanup: 1
+2026-04-20 12:18:43,259 - INFO -   - /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,259 - INFO - ======================================================================
+2026-04-20 12:18:43,259 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-04-20 12:18:43,259 - INFO - 
+### Processing User-provided-db Database ###
+2026-04-20 12:18:43,259 - INFO - Parameters for user-provided-db - BLASTn: blastn -query - -db /Users/nicholas/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40 -perc_identity 80.0
+2026-04-20 12:18:43,259 - INFO - gz_input=True, fasta=/Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,266 - INFO - user-provided-db - BLASTn stderr: stdbuf: blastn: No such file or directory
+2026-04-20 12:18:43,266 - ERROR - user-provided-db - BLASTn failed with return code 2
+2026-04-20 12:18:43,266 - INFO - Parameters for user-provided-db - BLASTx: blastx -query - -task blastx-fast -db /Users/nicholas/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-04-20 12:18:43,266 - INFO - gz_input=True, fasta=/Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,272 - INFO - user-provided-db - BLASTx stderr: stdbuf: blastx: No such file or directory
+2026-04-20 12:18:43,272 - ERROR - user-provided-db - BLASTx failed with return code 2
+2026-04-20 12:18:43,272 - INFO - No detections found for user-provided-db - No matrix generated.
+2026-04-20 12:18:43,272 - INFO - 
+======================================================================
+2026-04-20 12:18:43,272 - INFO - PIPELINE SUMMARY
+2026-04-20 12:18:43,272 - INFO - ======================================================================
+2026-04-20 12:18:43,273 - INFO - 
+USER-PROVIDED-DB:
+2026-04-20 12:18:43,273 - INFO -   ✗ BLASTn-DNA.................... 0 genes detected
+2026-04-20 12:18:43,273 - INFO -   ✗ BLASTx-AA..................... 0 genes detected
+2026-04-20 12:18:43,273 - INFO - ======================================================================
+2026-04-20 12:18:43,273 - INFO - Detection matrices saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-04-20 12:18:43,273 - INFO - Tool statistics saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats
+2026-04-20 12:18:43,273 - INFO - Raw outputs saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs
+2026-04-20 12:18:43,273 - INFO - ======================================================================
+2026-04-20 12:18:43,273 - INFO - Tool failure - BLASTn-DNA (database: user-provided-db): detected 0 genes
+2026-04-20 12:18:43,273 - WARNING -   -> BLASTn-DNA failed for user-provided-db
+2026-04-20 12:18:43,273 - INFO - Tool failure - BLASTx-AA (database: user-provided-db): detected 0 genes
+2026-04-20 12:18:43,273 - WARNING -   -> BLASTx-AA failed for user-provided-db
+2026-04-20 12:18:43,273 - WARNING - All tools failed (no external alignment executables found or all tool runs returned error). Continuing without hard failure.
+2026-04-20 12:18:43,273 - INFO - Cleaning up temporary files...
+2026-04-20 12:18:43,273 - INFO - ======================================================================
+2026-04-20 12:18:43,273 - INFO - Removed temporary file: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-04-20 12:18:43,273 - INFO - Cleaned up 1 temporary file(s)
+2026-04-20 12:18:43,273 - INFO - GeneFíor completed in 0:00:00.021730.

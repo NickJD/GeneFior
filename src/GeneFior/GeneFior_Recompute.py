@@ -3,6 +3,7 @@ import sys
 import os
 from pathlib import Path
 import logging
+import json
 from datetime import datetime
 from collections import defaultdict
 
@@ -469,8 +470,8 @@ Examples:
     # Output selection
     output_group = parser.add_argument_group('Output Parameterts')
     output_group.add_argument('--report-fasta',
-                            choices=['None', 'all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=[None], #, 'hmmer_dna','hmmer_protein'],
+                            choices=['None', 'all', 'detected', 'detected-all'],
+                            default=None,
                             dest='report_fasta',
                             help='Specify whether to output sequences that "mapped" to genes.'
                                  '"all" should only be used for deep investigation/debugging.'
@@ -518,8 +519,22 @@ Examples:
 
         # Tool selection
     if options.tools == ['all']:
-        options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  # , 'hmmer_dna','hmmer_protein']
-    if options.report_fasta != [None] and any(tool in options.tools for tool in ['blastx', 'blastn', 'diamond']):
+        # Expand "all" differently depending on sequence type. For recompute workflows
+        # that operate on gene FASTA inputs we should avoid including read-mappers.
+        if getattr(options, 'sequence_type', None) == 'Genes-FASTA':
+            genes_type = getattr(options, 'genes_type', None)
+            if genes_type == 'aa':
+                options.tools = ['blastp', 'diamond']
+            elif genes_type == 'dna':
+                options.tools = ['blastn', 'diamond']
+            else:
+                # Unknown genes_type: include nucleotide and translated searches plus DIAMOND
+                options.tools = ['blastn', 'blastx', 'diamond']
+        else:
+            # Non-Genes inputs: include full toolset
+            options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  # , 'hmmer_dna','hmmer_protein']
+    # If user requested FASTA reporting for BLAST/DIAMOND outputs, require --query-fasta
+    if options.report_fasta is not None and any(tool in options.tools for tool in ['blastx', 'blastn', 'diamond']):
         if options.query_fasta is None:
             logger.error("Error: --query-fasta must be provided when --report-fasta is used with blast/diamond outputs")
             sys.exit(1)
@@ -552,6 +567,24 @@ Examples:
     )
 
 
+
+    # write run parameters manifest to recompute output directory
+    try:
+        outdir = Path(options.output)
+        outdir.mkdir(parents=True, exist_ok=True)
+        params = {
+            'query_min_coverage': options.query_min_coverage,
+            'query_min_identity': options.query_min_identity,
+            'detection_min_coverage': options.detection_min_coverage,
+            'detection_min_identity': options.detection_min_identity,
+            'detection_min_base_depth': options.detection_min_base_depth,
+            'detection_min_num_reads': options.detection_min_num_reads,
+            'tools': options.tools
+        }
+        with open(outdir / 'run_parameters.json', 'w') as pf:
+            json.dump(params, pf, indent=2)
+    except Exception:
+        logger.debug('Failed to write run parameters to recompute output: %s', options.output)
 
     run(options, workflow, logger)
 

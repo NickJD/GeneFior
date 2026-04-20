@@ -1,4 +1,7 @@
 import os, sys
+import glob
+import re
+import logging
 import gzip
 import shutil
 import json
@@ -195,6 +198,58 @@ def check_read_id_uniqueness(r1_path, r2_path, logger, sample_size=10000):
 
 def requires_fasta_conversion(tools):
     return any(tool in ('blastn', 'blastx', 'diamond', 'all') for tool in (tools or []))
+
+
+# Module-level canonical constants for extensions and suffixes
+FASTA_EXTS = ('.fa', '.fasta', '.fna', '.ffn', '.faa', '.fas')
+FASTQ_EXTS = ('.fastq', '.fq')
+GZ_VARIANTS = ('.gz', '.gzip')
+R1_SUFFIXES = ['_r1', '_1', '.r1', '.1', '-r1', '-1']
+R2_SUFFIXES = ['_r2', '_2', '.r2', '.2', '-r2', '-2']
+
+
+def get_max_fasta_chunk_bytes(mb_value):
+    """Convert MiB value to bytes, with safe fallback."""
+    try:
+        return int(float(mb_value) * 1024.0 * 1024.0)
+    except Exception:
+        return 200 * 1024 * 1024
+
+
+def add_file_handler_for_path(logger, path, level=logging.INFO):
+    """Create a FileHandler for `path`, attach it to `logger`, and return the handler.
+
+    The caller is responsible for removing/closing the handler via remove_file_handler.
+    """
+    try:
+        parent = os.path.dirname(str(path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        fh = logging.FileHandler(str(path), mode='a')
+        fh.setLevel(level)
+        fh.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(fh)
+        return fh
+    except Exception:
+        return None
+
+
+def remove_file_handler(logger, handler):
+    try:
+        if handler:
+            try:
+                logger.removeHandler(handler)
+            except Exception:
+                pass
+            try:
+                handler.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 def FASTQ_to_FASTA(options, logger):
     # Convert paired FASTQ -> single combined FASTA when needed.
@@ -583,6 +638,382 @@ def validate_paired_fastq(options, logger):
     return r1_path, r2_path
 
 
+def discover_samples_from_input_dir(input_dir, sequence_type, logger):
+    """Discover samples in a flat input directory.
+    Returns list of (sample_name, input_spec) where input_spec is either a FASTA path
+    or a comma-separated R1,R2 FASTQ specification compatible with existing CLI.
+    """
+    samples = []
+    if not input_dir:
+        return samples
+    if not os.path.isdir(input_dir):
+        logger.error(f"Input directory not found: {input_dir}")
+        return samples
+
+    fasta_exts = FASTA_EXTS
+    fastq_exts = FASTQ_EXTS
+
+    def _strip_name_no_gz(fn, exts):
+        """Return the basename without known extension(s) or trailing .gz/gzip.
+        Preserves original case except for removed suffixes.
+        """
+        bn = os.path.basename(fn)
+        lbn = bn.lower()
+        # remove .gz or .gzip if present
+        if lbn.endswith('.gz'):
+            bn_no_gz = bn[:-3]
+            lbn_no_gz = lbn[:-3]
+        elif lbn.endswith('.gzip'):
+            bn_no_gz = bn[:-5]
+            lbn_no_gz = lbn[:-5]
+        else:
+            bn_no_gz = bn
+            lbn_no_gz = lbn
+
+        for ext in exts:
+            if lbn_no_gz.endswith(ext):
+                return bn_no_gz[:-len(ext)]
+        # fallback to splitting last extension
+        return os.path.splitext(bn_no_gz)[0]
+
+    entries = sorted(os.listdir(input_dir))
+
+    if sequence_type == 'Single-FASTA':
+        for fn in entries:
+            fp = os.path.join(input_dir, fn)
+            if not os.path.isfile(fp):
+                continue
+            ln = fn.lower()
+            if any(ln.endswith(ext) for ext in fasta_exts) or any(ln.endswith(ext + '.gz') or ln.endswith(ext + '.gzip') for ext in fasta_exts):
+                name = _strip_name_no_gz(fn, fasta_exts)
+                samples.append((name, fp))
+        return samples
+
+    # Paired-FASTQ: find R1/R2 pairs by common suffixes
+    # Build map of filenames (ignore hidden/system files like .DS_Store)
+    files = [f for f in entries if os.path.isfile(os.path.join(input_dir, f)) and not f.startswith('.') and f.lower() not in ('.ds_store', 'thumbs.db')]
+    # Map lowercased filename -> original filename for case-insensitive lookups
+    lc_to_orig = {f.lower(): f for f in files}
+
+    used = set()
+    for f in files:
+        if f in used:
+            continue
+        lc = f.lower()
+        # candidate R1 patterns (common naming conventions)
+        candidate_suffixes = ['_r1', '_1', '.r1', '.1', '-r1', '-1']
+        found = False
+        for suf in candidate_suffixes:
+            for ext in fastq_exts:
+                for gz in ['', '.gz', '.gzip']:
+                    pattern = suf + ext + gz
+                    if lc.endswith(pattern):
+                        # Work in lowercased space for reliable prefix computation
+                        prefix_lc = lc[:-len(pattern)]
+                        # try to find corresponding R2 (lowercased lookup)
+                        for r2suf in ['_r2', '_2', '.r2', '.2', '-r2', '-2']:
+                            r2_lcname = prefix_lc + r2suf + ext + gz
+                            r2orig = lc_to_orig.get(r2_lcname)
+                            if r2orig:
+                                r1p = os.path.join(input_dir, f)
+                                r2p = os.path.join(input_dir, r2orig)
+                                # sample name from prefix (preserve original case)
+                                prefix_orig = f[:-len(pattern)] if len(pattern) > 0 else f
+                                sample_name = prefix_orig if prefix_orig else _strip_name_no_gz(f, fastq_exts)
+                                # Normalise sample name (remove trailing separators)
+                                sample_name = sample_name.rstrip('._-')
+                                samples.append((sample_name, f"{r1p},{r2p}"))
+                                used.add(f)
+                                used.add(r2orig)
+                                found = True
+                                break
+                        if found:
+                            break
+                if found:
+                    break
+            if found:
+                break
+        # If not found via strict suffix matching, attempt a more flexible regex-based
+        # pairing that handles names like sample_1_trimmed.fastq.gz -> sample_2_trimmed.fastq.gz
+        if not found:
+            try:
+                # Determine the full extension (preserve original ext to build candidate names)
+                ext_full = None
+                for cand_ext in ('.fastq.gz', '.fq.gz', '.fastq', '.fq'):
+                    if lc.endswith(cand_ext):
+                        ext_full = f[-len(cand_ext):]
+                        base_orig = f[:-len(cand_ext)]
+                        base_lc = lc[:-len(cand_ext)]
+                        break
+                if not ext_full:
+                    # Unknown extension, skip
+                    continue
+
+                # Regex: capture prefix, an R1/1 token (with optional surrounding separators), and optional tail
+                # Use greedy prefix so we capture the last occurrence of the R1 token
+                m = re.match(r"(?i)^(?P<prefix>.*)(?P<suf>(?:[_\-]r?1|r?1))(?P<tail>[_\-\w]*)$", base_lc)
+                if m:
+                    prefix_lc = m.group('prefix')
+                    tail_lc = m.group('tail') or ''
+                    # Try alternative R2 suffixes
+                    for r2suf in ['_r2', '_2', '-r2', '-2', 'r2', '2']:
+                        r2_lcname = prefix_lc + r2suf + tail_lc + ext_full
+                        r2orig = lc_to_orig.get(r2_lcname)
+                        if r2orig:
+                            r1p = os.path.join(input_dir, f)
+                            r2p = os.path.join(input_dir, r2orig)
+                            # preserve original-case sample name using original base
+                            prefix_orig = base_orig[:len(base_orig) - len(m.group('suf') + (m.group('tail') or ''))]
+                            sample_name = prefix_orig if prefix_orig else _strip_name_no_gz(f, fastq_exts)
+                            sample_name = sample_name.rstrip('._-')
+                            samples.append((sample_name, f"{r1p},{r2p}"))
+                            used.add(f)
+                            used.add(r2orig)
+                            found = True
+                            break
+                        # also try with .gz variant keys if ext_full didn't include .gz originally
+                    # end for r2suf
+            except Exception:
+                # Best-effort fallback; on any error, ignore and continue
+                pass
+
+    # As a fallback, attempt to pair by common prefix before the first dot/underscore
+    if not samples:
+        prefixes = {}
+        for f in files:
+            # strip gz and fastq extensions so base tokenisation is correct
+            base = _strip_name_no_gz(f, fastq_exts)
+            # split on common delimiters
+            for sep in ('_','.'):
+                if sep in base:
+                    base = base.split(sep)[0]
+                    break
+            prefixes.setdefault(base, []).append(f)
+        for base, flist in prefixes.items():
+            if len(flist) >= 2:
+                # attempt to select one R1 and one R2 by reading names
+                r1 = None
+                r2 = None
+                for ff in flist:
+                    if 'r1' in ff.lower() or ff.lower().endswith('_1') or ff.lower().endswith('.1'):
+                        r1 = ff
+                    elif 'r2' in ff.lower() or ff.lower().endswith('_2') or ff.lower().endswith('.2'):
+                        r2 = ff
+                if r1 and r2:
+                    samples.append((base, os.path.join(input_dir, r1) + ',' + os.path.join(input_dir, r2)))
+
+    return samples
+
+
+def discover_samples_from_subdirs(parent_dir, sequence_type, logger, exclude_paths=None):
+    """Discover samples where each subdirectory contains one sample (one FASTA or a paired FASTQ set).
+    Returns list of (sample_name, input_spec).
+
+    exclude_paths: optional iterable of directory paths (strings). Any subdirectory whose absolute
+    path matches one of the exclude_paths will be skipped. This is intended to prevent the
+    discovery routine from scanning an output directory that lives inside the parent_dir.
+    """
+    samples = []
+    if not parent_dir or not os.path.isdir(parent_dir):
+        logger.error(f"Input subdirs path not found: {parent_dir}")
+        return samples
+    # Normalise exclude paths to absolute strings for robust comparison
+    exclude_abs = set()
+    try:
+        if exclude_paths:
+            for p in exclude_paths:
+                if not p:
+                    continue
+                exclude_abs.add(os.path.abspath(str(p)))
+    except Exception:
+        exclude_abs = set()
+
+    for entry in sorted(os.listdir(parent_dir)):
+        sub = os.path.join(parent_dir, entry)
+        # Skip any subdir that matches an excluded path (e.g. the pipeline output directory)
+        try:
+            if os.path.abspath(sub) in exclude_abs:
+                logger.info(f"Skipping excluded directory during discovery: {sub}")
+                continue
+        except Exception:
+            pass
+        if not os.path.isdir(sub):
+            continue
+        # Attempt to find FASTA first
+        fasta_found = []
+        for ext in ('.fa', '.fasta', '.faa', '.fna'):
+            # accept plain and gz/gzip-compressed variants
+            for pattern in (f'*{ext}', f'*{ext}.gz', f'*{ext}.gzip'):
+                for fn in glob.glob(os.path.join(sub, pattern)):
+                    if os.path.isfile(fn):
+                        fasta_found.append(fn)
+        if fasta_found:
+            samples.append((entry, fasta_found[0]))
+            continue
+
+        # Otherwise attempt to find paired fastq in subdir
+        # Reuse discover_samples_from_input_dir on subdir (Paired-FASTQ mode)
+        sub_samples = discover_samples_from_input_dir(sub, sequence_type, logger)
+        if sub_samples:
+            # pick first sample found
+            name, spec = sub_samples[0]
+            samples.append((entry, spec))
+            continue
+
+        logger.warning(f"No FASTA or paired FASTQ found in subdir: {sub}")
+    # Return discovered samples (one per subdir)
+    return samples
+
+
+def combine_detection_matrices(output_root, sample_names, logger):
+    """Combine per-sample detection_matrix files into per-database combined matrices.
+
+    Produces two outputs per database found in sample outputs:
+
+    1) <output_root>/<database>_combined_detection_matrix.tsv
+       - Backwards-compatible binary presence/absence matrix: rows are genes, columns are samples (1/0), plus Total_Samples.
+
+    2) <output_root>/<database>_combined_detection_matrix_tools.tsv
+       - Informative matrix where each cell lists which tools detected the gene in that sample (comma-separated).
+         Also includes Total_Samples (number of samples where gene was detected by at least one tool).
+
+    This function reads each per-sample <database>_detection_matrix.tsv (generated by the per-sample pipeline)
+    and infers which tools reported each gene for that sample by reading tool columns in the header.
+    """
+    import csv
+    from pathlib import Path
+
+    out_root = Path(output_root)
+    db_sample_files = {}
+
+    for s in sample_names:
+        sdir = out_root / s
+        if not sdir.is_dir():
+            continue
+        for p in sdir.glob('*_detection_matrix.tsv'):
+            db = p.name.replace('_detection_matrix.tsv', '')
+            db_sample_files.setdefault(db, {})[s] = p
+
+    if not db_sample_files:
+        logger.info("No per-sample detection_matrix files found to combine.")
+        return
+
+    created_files = []
+    for db, sample_map in db_sample_files.items():
+        # Collect all genes across samples and store per-sample detected tools
+        all_genes = set()
+        # sample -> gene -> list of tools
+        sample_gene_tools = {s: {} for s in sample_map.keys()}
+
+        for sample, path in sample_map.items():
+            try:
+                with open(path, 'r', newline='') as fh:
+                    reader = csv.reader(fh, delimiter='\t')
+                    header = next(reader, None)
+                    if not header:
+                        continue
+                    # header expected: Gene, <tool1>, <tool2>, ..., Total_Detections (last)
+                    # Identify tool columns (everything except 'Gene' and last 'Total_Detections')
+                    gene_idx = 0
+                    if len(header) < 2:
+                        continue
+                    total_idx = len(header) - 1
+                    tool_cols = [(i, col) for i, col in enumerate(header) if i != gene_idx and i != total_idx]
+
+                    for row in reader:
+                        if not row:
+                            continue
+                        gene = row[gene_idx]
+                        all_genes.add(gene)
+                        detected_tools = []
+                        for i, colname in tool_cols:
+                            try:
+                                val = row[i].strip()
+                            except Exception:
+                                val = ''
+                            # Interpret '1' or non-zero/non-empty as detection
+                            if val and val != '0':
+                                detected_tools.append(colname)
+                        sample_gene_tools.setdefault(sample, {})[gene] = detected_tools
+            except Exception as e:
+                logger.warning(f"Failed to read detection matrix for {sample} ({path}): {e}")
+
+        if not all_genes:
+            logger.info(f"No genes found in detection matrices for database '{db}'; skipping")
+            continue
+
+        genes_sorted = sorted(all_genes)
+
+        # Prepare ordered sample list preserving discovery order where possible
+        ordered_samples = [s for s in sample_names if s in sample_map]
+        if not ordered_samples:
+            ordered_samples = sorted(sample_map.keys())
+
+        # 1) Write binary combined matrix (backwards-compatible)
+        combined_path = out_root / f"{db}_combined_detection_matrix.tsv"
+        try:
+            with open(combined_path, 'w', newline='') as outfh:
+                writer = csv.writer(outfh, delimiter='\t')
+                header = ['Gene'] + ordered_samples + ['Total_Samples']
+                writer.writerow(header)
+                for gene in genes_sorted:
+                    row = [gene]
+                    total_samples = 0
+                    for sample in ordered_samples:
+                        tools = sample_gene_tools.get(sample, {}).get(gene, [])
+                        present = 1 if tools else 0
+                        row.append('1' if present else '0')
+                        if present:
+                            total_samples += 1
+                    row.append(str(total_samples))
+                    writer.writerow(row)
+            logger.info(f"Combined detection matrix written: {combined_path}")
+        except Exception as e:
+            logger.warning(f"Failed to write combined detection matrix for {db}: {e}")
+
+        # 2) Write informative tools-per-sample matrix
+        tools_combined_path = out_root / f"{db}_combined_detection_matrix_tools.tsv"
+        try:
+            with open(tools_combined_path, 'w', newline='') as outfh:
+                writer = csv.writer(outfh, delimiter='\t')
+                header = ['Gene'] + ordered_samples + ['Total_Samples']
+                writer.writerow(header)
+                for gene in genes_sorted:
+                    row = [gene]
+                    total_samples = 0
+                    for sample in ordered_samples:
+                        tools = sample_gene_tools.get(sample, {}).get(gene, [])
+                        if tools:
+                            cell = '|'.join(sorted(tools))
+                            total_samples += 1
+                        else:
+                            cell = ''
+                        row.append(cell)
+                    row.append(str(total_samples))
+                    writer.writerow(row)
+            logger.info(f"Informative tools-per-sample combined matrix written: {tools_combined_path}")
+            created_files.extend([str(combined_path), str(tools_combined_path)])
+        except Exception as e:
+            logger.warning(f"Failed to write informative tools combined matrix for {db}: {e}")
+
+    # Write a small README/manifest into the output root describing the created combined files
+    try:
+        readme_path = out_root / 'combined_detection_matrices_README.txt'
+        with open(readme_path, 'w') as rh:
+            rh.write('Combined detection matrices generated by GeneFíor/GeneFíor-Combine\n')
+            rh.write('\nFiles created:\n')
+            if created_files:
+                for p in created_files:
+                    rh.write(f"  - {p}\n")
+            else:
+                rh.write('  (no combined matrices were created)\n')
+            rh.write('\nFormats:\n')
+            rh.write('  - <database>_combined_detection_matrix.tsv: binary presence/absence matrix. Columns: Gene, <sample1>, <sample2>, ..., Total_Samples. Cell=1 indicates the gene was detected in that sample by at least one tool.\n')
+            rh.write("  - <database>_combined_detection_matrix_tools.tsv: informative matrix. Each sample cell lists the tool(s) that detected the gene (pipe-separated), or empty if none. Columns: Gene, <sample1>, <sample2>, ..., Total_Samples.\n")
+            rh.write('\nIf you prefer Excel (.xlsx) outputs, consider running the combine tool and converting the TSVs to XLSX with your preferred tool.\n')
+        logger.info(f"Wrote combined matrices README: {readme_path}")
+    except Exception as e:
+        logger.debug(f"Failed to write combined matrices README: {e}")
 def handle_all_input_files(options, logger):
     # Process input files based on sequence type and tool requirements
     logger.info("=" * 70)
@@ -734,6 +1165,23 @@ def handle_all_input_files(options, logger):
 
             options.input_fastq = None
 
+        elif options.sequence_type == 'Genes-FASTA':
+            # Genes-FASTA: treat like Single-FASTA (full-length gene sequences)
+            if options.temp_directory:
+                logger.info("Copying Genes-FASTA to temp directory...")
+                original_input = options.input
+                options.input_fasta = copy_to_temp_directory(
+                    options.input,
+                    options.temp_directory,
+                    logger
+                )
+                if options.input_fasta != original_input:
+                    options.temp_files_to_cleanup.append(options.input_fasta)
+                    logger.info(f"Genes-FASTA will be read from temp directory: {options.input_fasta}")
+            else:
+                options.input_fasta = options.input
+            options.input_fastq = None
+
         # elif options.sequence_type == 'Paired-FASTQ':
         #     # Check if BLAST-based tools require FASTA conversion
         #     requires_fasta = requires_fasta_conversion(options.tools)
@@ -780,3 +1228,9 @@ def cleanup_all_temp_files(options, logger):
             options.temp_files_to_cleanup,
             logger
         )
+
+
+# Note: discovery helpers are available as module-level functions:
+#   discover_samples_from_input_dir(...) and discover_samples_from_subdirs(...)
+# Callers should import them directly from GeneFior.utils
+

@@ -8,6 +8,8 @@ from typing import List
 from collections import defaultdict
 import subprocess
 import re
+import traceback
+import json
 
 try:
     from .constants import *
@@ -158,7 +160,7 @@ class GeneVisualiser:
 
     def __init__(self, input_dir: str, output_dir: str, genes: List[str],
                  databases: List[str], tools: List[str], ref_fasta: str = None,
-                 query_fasta: str = None):
+                 query_fasta: str = None, plot_per_tool: bool = False):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
         self.genes = set(genes) if genes else set()
@@ -169,10 +171,11 @@ class GeneVisualiser:
 
         # Create output directories
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.report_dir = self.output_dir / "coverage_reports"
+        self.report_dir = self.output_dir / "gene_reports"
         self.report_dir.mkdir(exist_ok=True)
         #self.plot_dir = self.output_dir / "coverage_plots"
-        #self.plot_dir.mkdir(exist_ok=True)
+        self.plot_dir = self.output_dir / "gene_plots"
+        self.plot_dir.mkdir(exist_ok=True)
 
         # Setup logging
         log_file = self.output_dir / f"gene-reports_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -190,6 +193,35 @@ class GeneVisualiser:
         self.gene_coverages = defaultdict(lambda: defaultdict(dict))  # {database: {tool: {gene: GeneCoverage}}}
         self.gene_sequences = {}  # {gene: sequence} from reference
         self.query_sequences = {}  # Query sequences from FASTA
+        # Detected genes cache per database (read from <input_dir>/<database>_detection_matrix.tsv)
+        self.detected_genes_by_db = {}
+        # Default behavior: only report genes that were marked as detected in the detection matrix
+        self.report_only_detected = True
+        # Query filtering thresholds - will be loaded from run_parameters.json if present
+        self.query_min_coverage = None
+        self.query_min_identity = None
+        # Try to enable plotting (matplotlib). If not available, continue without plots.
+        # By default we DO NOT generate per-tool individual coverage PNGs; only combined comparison plots
+        # will be produced. Use the CLI flag --plot-per-tool to enable per-tool PNG generation.
+        self.plot_enabled = False
+        # Controlled via constructor/CLI: if True generate individual per-tool PNGs in addition to comparison plots
+        self.generate_individual_plots = bool(plot_per_tool)
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            self.plt = plt
+            self.plot_enabled = True
+            logging.getLogger(__name__).info('matplotlib available - plotting enabled (individual per-tool plots disabled by default)')
+        except Exception:
+            # matplotlib may not be installed in minimal environments
+            logging.getLogger(__name__).warning('matplotlib not available - plots will be disabled')
+
+        # Attempt to load run parameters from the input directory (if present)
+        try:
+            self.load_run_parameters()
+        except Exception:
+            self.logger.debug('No run parameters file found or failed to load; continuing without applying upstream query filters')
 
     def load_reference_sequences(self):
         # Load reference sequences from FASTA.
@@ -294,6 +326,59 @@ class GeneVisualiser:
                     sstart = int(fields[8])  # Subject start
                     send = int(fields[9])  # Subject end
                     slen = int(fields[13])  # Subject length
+
+                    # If this is a protein alignment (blastx/diamond) the subject
+                    # coordinates and length are in amino-acids. Convert to nucleotide
+                    # coordinates so coverage plots align with nucleotide-based tools
+                    # (e.g. bwa/bowtie2). Conversion: aa position -> nucleotide pos = aa_pos * 3
+                    if tool in ('blastx', 'diamond'):
+                        try:
+                            ref_seq = self.gene_sequences.get(gene)
+                            # If a reference nucleotide sequence is available we can
+                            # sanity-check the conversion (expected ref len ~= slen*3)
+                            if ref_seq is not None:
+                                if abs(len(ref_seq) - (slen * 3)) <= 3:
+                                    self.logger.debug(f"Converting protein coords -> nucleotides for {gene} (ref present)")
+                                else:
+                                    self.logger.debug(f"Converting protein coords for {gene} but reference length ({len(ref_seq)}) does not match expected {slen*3}; proceeding anyway")
+                            else:
+                                self.logger.debug(f"No reference sequence for {gene}; assuming diamond/blastx subject coords are amino-acid positions and converting to nucleotides")
+
+                            sstart = sstart * 3
+                            send = send * 3
+                            slen = slen * 3
+                        except Exception:
+                            pass
+
+                    # Optional filtering: pident (identity) and query length
+                    identity = None
+                    qlen = None
+                    try:
+                        if len(fields) > 2:
+                            identity = float(fields[2])
+                    except Exception:
+                        identity = None
+                    try:
+                        if len(fields) > 12:
+                            qlen = int(fields[12])
+                    except Exception:
+                        qlen = None
+
+                    # Compute query coverage if possible
+                    query_cov = 0.0
+                    try:
+                        if qlen and qlen > 0:
+                            query_cov = (abs(qend - qstart) + 1) / qlen * 100
+                    except Exception:
+                        query_cov = 0.0
+
+                    # Apply upstream query filters if they are defined in the run parameters
+                    if self.query_min_identity is not None and identity is not None:
+                        if identity < float(self.query_min_identity):
+                            continue
+                    if self.query_min_coverage is not None:
+                        if query_cov < float(self.query_min_coverage):
+                            continue
 
                     # Initialise coverage if needed
                     if gene not in self.gene_coverages[database][tool]:
@@ -407,6 +492,61 @@ class GeneVisualiser:
                 seq = fields[9]
                 qual = fields[10] if len(fields) > 10 else None
 
+                # Pre-scan CIGAR to compute aligned positions and alignment length for filtering
+                try:
+                    cigar_re = re.compile(r'(\d+)([MIDNSHP=X])')
+                    ref_pos_tmp = ref_start
+                    aligned_positions = set()
+                    alignment_length = 0
+                    for count_str, op in cigar_re.findall(cigar):
+                        length = int(count_str)
+                        if op in ('M', '=', 'X'):
+                            aligned_positions.update(range(ref_pos_tmp, ref_pos_tmp + length))
+                            ref_pos_tmp += length
+                            alignment_length += length
+                        elif op == 'I':
+                            alignment_length += length
+                        elif op in ('D', 'N'):
+                            ref_pos_tmp += length
+                            alignment_length += length
+                        elif op == 'S':
+                            # soft clip - consumes query but not reference
+                            alignment_length += length
+                except Exception:
+                    aligned_positions = set()
+                    alignment_length = 0
+
+                # Parse optional tags (NM) to estimate mismatches
+                nm = None
+                for opt in fields[11:]:
+                    if opt.startswith('NM:i:'):
+                        try:
+                            nm = int(opt.split(':')[-1])
+                        except Exception:
+                            nm = None
+                        break
+
+                # Compute identity and query coverage if possible
+                identity = None
+                query_cov = 0.0
+                try:
+                    if alignment_length > 0 and nm is not None:
+                        identity = (alignment_length - nm) / alignment_length * 100
+                    query_length = len(seq) if seq and seq != '*' else 0
+                    if query_length > 0 and aligned_positions:
+                        query_cov = len(aligned_positions) / query_length * 100
+                except Exception:
+                    identity = None
+                    query_cov = 0.0
+
+                # Apply upstream query filters if defined
+                if self.query_min_identity is not None and identity is not None:
+                    if identity < float(self.query_min_identity):
+                        continue
+                if self.query_min_coverage is not None:
+                    if query_cov < float(self.query_min_coverage):
+                        continue
+
                 # Initialise coverage if needed
                 gene_len = gene_lengths.get(gene, 0)
                 if gene not in self.gene_coverages[database][tool]:
@@ -474,10 +614,10 @@ class GeneVisualiser:
 
         report_file = self.report_dir / f"{database}_{tool}_{safe_gene}_coverage.txt"
 
-        if tool in ('blastx', 'diamond'): # +3 gene length for AA
-            marker = 'aa'
-        else:
-            marker = 'bp'
+        # Coverage/report units are in base pairs (bp). For protein tools
+        # (blastx/diamond) we converted coordinates to nucleotide positions
+        # when parsing so plots are directly comparable across tools.
+        marker = 'bp'
 
         with open(report_file, 'w') as f:
             f.write("=" * 80 + "\n")
@@ -586,6 +726,12 @@ class GeneVisualiser:
             f.write("     +" + "-" * len(bins) + "\n")
 
         self.logger.info(f"Generated report: {report_file}")
+        # Generate PNG coverage plot if plotting enabled and individual plotting requested
+        try:
+            if getattr(self, 'plot_enabled', False) and getattr(self, 'generate_individual_plots', False):
+                self.generate_coverage_plot(gene, database, tool, coverage)
+        except Exception as e:
+            self.logger.debug(f"Failed to generate coverage plot for {gene} ({database}/{tool}): {e}\n{traceback.format_exc()}")
 
     def generate_comparison_report(self, gene: str, database: str):
         # Generate comparison report across all tools for a gene.
@@ -597,6 +743,7 @@ class GeneVisualiser:
 
         if not tools_with_data:
             return
+
 
         with open(report_file, 'w') as f:
             f.write("=" * 80 + "\n")
@@ -643,6 +790,84 @@ class GeneVisualiser:
             f.write(f"Tool-specific regions:           {len(covered_by_any - covered_by_all):,}\n")
 
         self.logger.info(f"Generated comparison report: {report_file}")
+        # Generate comparison plot across tools
+        try:
+            if getattr(self, 'plot_enabled', False):
+                self.generate_comparison_plot(gene, database)
+        except Exception as e:
+            self.logger.debug(f"Failed to generate comparison plot for {gene} ({database}): {e}\n{traceback.format_exc()}")
+
+    def generate_coverage_plot(self, gene: str, database: str, tool: str, coverage: GeneCoverage):
+        """Create a PNG coverage plot for a single gene/tool showing depth across the gene and variant markers."""
+        try:
+            stats = coverage.get_coverage_stats()
+            length = coverage.gene_length
+            if length <= 0:
+                return
+
+            positions = list(range(1, length + 1))
+            depths = [coverage.positions[i].depth for i in range(length)]
+
+            fig, ax = self.plt.subplots(figsize=(12, 4))
+            ax.plot(positions, depths, color='tab:blue', linewidth=0.8)
+            ax.fill_between(positions, depths, color='tab:blue', alpha=0.1)
+            ax.set_xlabel('Position')
+            ax.set_ylabel('Depth')
+            ax.set_title(f"{database} | {tool} | {gene}")
+            ax.grid(alpha=0.3)
+
+            # Mark variant positions
+            for var in stats.get('variants', []):
+                pos = var.get('pos', None)
+                if pos is not None and 0 <= pos < length:
+                    ax.axvline(x=pos + 1, color='red', alpha=0.6, linestyle='--')
+
+            # Mark uncovered regions (gaps) as shaded areas
+            for gap_start, gap_end in stats.get('gaps', []):
+                ax.axvspan(gap_start + 1, gap_end + 1, color='grey', alpha=0.15)
+
+            outpath = self.plot_dir / f"{database}_{tool}_{gene.replace('|','_').replace('/','_').replace(':','_')}_coverage.png"
+            fig.tight_layout()
+            fig.savefig(str(outpath), dpi=150)
+            self.plt.close(fig)
+            self.logger.info(f"Coverage plot written: {outpath}")
+        except Exception as e:
+            self.logger.debug(f"Error generating coverage plot for {gene} ({database}/{tool}): {e}")
+
+    def generate_comparison_plot(self, gene: str, database: str):
+        """Create a comparison PNG plotting coverage from all tools for a gene.
+
+        Plots per-tool coverage lines on the same axes to visualise agreement.
+        """
+        try:
+            tools_with_data = [tool for tool in self.tools if gene in self.gene_coverages[database].get(tool, {})]
+            if not tools_with_data:
+                return
+
+            fig, ax = self.plt.subplots(figsize=(12, 4))
+            max_depth = 0
+            length = None
+            for tool in tools_with_data:
+                cov = self.gene_coverages[database][tool][gene]
+                length = cov.gene_length if length is None else length
+                depths = [cov.positions[i].depth for i in range(cov.gene_length)]
+                positions = list(range(1, cov.gene_length + 1))
+                ax.plot(positions, depths, label=tool, linewidth=1.0)
+                max_depth = max(max_depth, max(depths) if depths else 0)
+
+            ax.set_xlabel('Position')
+            ax.set_ylabel('Depth')
+            ax.set_title(f"{database} | {gene} | tool comparison")
+            ax.legend(loc='upper right', fontsize='small')
+            ax.grid(alpha=0.3)
+
+            outpath = self.plot_dir / f"{database}_{gene.replace('|','_').replace('/','_').replace(':','_')}_comparison.png"
+            fig.tight_layout()
+            fig.savefig(str(outpath), dpi=150)
+            self.plt.close(fig)
+            self.logger.info(f"Comparison plot written: {outpath}")
+        except Exception as e:
+            self.logger.debug(f"Error generating comparison plot for {gene} ({database}): {e}")
 
     def discover_files(self):
         # Discover alignment files in input directory.
@@ -680,6 +905,78 @@ class GeneVisualiser:
         self.logger.info(f"Found {len(found_files)} alignment files")
         self.found_files = found_files
         return True
+
+    def load_detected_genes(self, database: str):
+        """Load detected genes from a per-sample detection matrix in the input directory.
+
+        Looks for <input_dir>/<database>_detection_matrix.tsv and collects genes that have Total_Detections>0
+        or any tool column non-zero. Returns a set of gene names. On error or missing file returns None.
+        """
+        det_path = Path(self.input_dir) / f"{database}_detection_matrix.tsv"
+        if not det_path.exists():
+            self.logger.warning(f"Detection matrix not found for '{database}': {det_path}")
+            return None
+        detected = set()
+        try:
+            import csv
+            with open(det_path, 'r', newline='') as fh:
+                reader = csv.reader(fh, delimiter='\t')
+                header = next(reader, None)
+                if not header:
+                    return None
+                gene_idx = 0
+                total_idx = len(header) - 1
+                tool_cols = [i for i in range(len(header)) if i != gene_idx and i != total_idx]
+                for row in reader:
+                    if not row:
+                        continue
+                    gene = row[gene_idx]
+                    # If Total_Detections column exists and >0 treat as detected
+                    try:
+                        total = int(row[total_idx])
+                    except Exception:
+                        # fall back to any tool column non-empty/non-zero
+                        total = 0
+                        for i in tool_cols:
+                            if i < len(row) and row[i] and row[i] != '0':
+                                total = 1
+                                break
+                    if total > 0:
+                        detected.add(gene)
+            return detected
+        except Exception as e:
+            self.logger.warning(f"Failed to read detection matrix {det_path}: {e}")
+            return None
+
+    def load_run_parameters(self):
+        """Attempt to load run parameters (JSON) from the input directory or its subdirectories.
+
+        Looks for a file named 'run_parameters.json' (written by GeneFíor / AMRfíor / Recompute)
+        and extracts query filtering thresholds to be applied by the visualiser.
+        """
+        search_root = Path(self.input_dir)
+        candidates = list(search_root.rglob('run_parameters.json'))
+        if not candidates:
+            # nothing found
+            return None
+
+        try:
+            with open(candidates[0], 'r') as fh:
+                params = json.load(fh)
+            self.logger.info(f"Loaded run parameters from: {candidates[0]}")
+            # Extract relevant thresholds
+            self.query_min_coverage = params.get('query_min_coverage', None)
+            self.query_min_identity = params.get('query_min_identity', None)
+            # Also allow top-level 'q-min-cov' style keys if present
+            if self.query_min_coverage is None and 'q-min-cov' in params:
+                self.query_min_coverage = params.get('q-min-cov')
+            if self.query_min_identity is None and 'q-min-id' in params:
+                self.query_min_identity = params.get('q-min-id')
+
+            return params
+        except Exception as e:
+            self.logger.warning(f"Failed to parse run parameters file: {e}")
+            return None
 
     def run(self):
         # Main execution.
@@ -721,11 +1018,22 @@ class GeneVisualiser:
 
         report_count = 0
         for database in self.databases:
+            # Load detected genes for this database (if we're reporting only detected genes)
+            detected_set = None
+            if self.report_only_detected:
+                detected_set = self.load_detected_genes(database)
+                if detected_set is None:
+                    # If detection matrix missing or unreadable, fallback to reporting all genes but warn
+                    self.logger.warning(f"Falling back to reporting all genes for database '{database}' because detection matrix could not be read")
+                    detected_set = None
             for tool in self.tools:
                 if tool not in self.gene_coverages[database]:
                     continue
 
                 for gene, coverage in self.gene_coverages[database][tool].items():
+                    # If requested, only report genes that appear in the detection matrix
+                    if self.report_only_detected and detected_set is not None and gene not in detected_set:
+                        continue
                     self.generate_text_report(gene, database, tool, coverage)
                     report_count += 1
 
@@ -736,6 +1044,8 @@ class GeneVisualiser:
                     all_genes.update(self.gene_coverages[database][tool].keys())
 
             for gene in all_genes:
+                if self.report_only_detected and detected_set is not None and gene not in detected_set:
+                    continue
                 self.generate_comparison_report(gene, database)
 
         # Summary
@@ -745,6 +1055,14 @@ class GeneVisualiser:
         total_reports = len(list(self.report_dir.glob("*.txt")))
         self.logger.info(f"Generated {total_reports} coverage reports")
         self.logger.info(f"Reports saved to: {self.report_dir}")
+        # Report plots summary
+        try:
+            if getattr(self, 'plot_enabled', False):
+                total_plots = len(list(self.plot_dir.glob("*.png")))
+                self.logger.info(f"Generated {total_plots} PNG plots")
+                self.logger.info(f"Plots saved to: {self.plot_dir}")
+        except Exception:
+            pass
         self.logger.info("=" * 70)
 
         return True
@@ -777,6 +1095,8 @@ Examples:
                         help='Output directory for visualisation reports')
     parser.add_argument('-g', '--genes', required=False,
                         help='Comma-separated gene names (FULL NAMES) or path to file with gene names (one per line)')
+    parser.add_argument('--all-genes', action='store_true', default=False,
+                        help='Include all genes found in raw outputs (default: only genes listed as detected in detection_matrix.tsv)')
     parser.add_argument('--databases', nargs='+', required=True,
                         choices=['resfinder', 'card', 'ncbi'],
                         help='Database(s) to interrogate')
@@ -787,6 +1107,8 @@ Examples:
                         help='NOT IMPLEMENTED YET - Reference FASTA file for variant calling (optional)')
     parser.add_argument('--query-fasta',
                         help='NOT IMPLEMENTED YET - Query FASTA file (your input reads) for BLAST base-level analysis (optional)')
+    parser.add_argument('--plot-per-tool', action='store_true', default=False,
+                        help='Generate individual per-tool coverage PNGs in addition to combined comparison plots (default: off)')
 
 
     options = parser.parse_args()
@@ -798,7 +1120,18 @@ Examples:
 
         # Tool selection
     if options.tools == ['all']:
-        options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']  # , 'hmmer_dna','hmmer_protein']
+        # Expand "all" differently depending on sequence type. For gene-visualiser
+        # invocations that operate on gene FASTA inputs we should avoid including read-mappers.
+        if getattr(options, 'sequence_type', None) == 'Genes-FASTA':
+            genes_type = getattr(options, 'genes_type', None)
+            if genes_type == 'aa':
+                options.tools = ['blastp', 'diamond']
+            elif genes_type == 'dna':
+                options.tools = ['blastn', 'diamond']
+            else:
+                options.tools = ['blastn', 'blastx', 'diamond']
+        else:
+            options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']
 
     # Parse genes
     genes = []
@@ -820,8 +1153,12 @@ Examples:
         databases=options.databases,
         tools=options.tools,
         ref_fasta=options.ref_fasta,
-        query_fasta=options.query_fasta
+        query_fasta=options.query_fasta,
+        plot_per_tool=options.plot_per_tool
     )
+    # Respect user request to include all genes
+    if options.all_genes:
+        visualiser.report_only_detected = False
 
     success = visualiser.run()
     sys.exit(0 if success else 1)

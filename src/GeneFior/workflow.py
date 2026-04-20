@@ -12,6 +12,7 @@ import signal
 from collections import defaultdict
 from pathlib import Path
 import logging
+import shlex
 from typing import Any, Dict, List, Set, Tuple, Iterator
 import re
 from typing import Optional
@@ -39,6 +40,8 @@ class Workflow:
                  detection_min_identity: float = 80.0,
                  detection_min_base_depth: float = 1.0,
                  detection_min_num_reads: int = 1,
+                  evalue: Optional[float] = None,
+                  min_bitscore: Optional[float] = None,
 
                  run_dna: bool = True, run_protein: bool = True,
                  sequence_type: str = 'Single-FASTA',
@@ -50,12 +53,15 @@ class Workflow:
                  temp_directory: Optional[str] = None,
                  chunk_jobs: Optional[int] = None,
                  chunk_threads_per_job: Optional[int] = None,
-                 preserve_chunks: bool = False):
-                 
+                   preserve_chunks: bool = False,
+                    extra_tool_params: Dict[str, str] = None,
+                    genes_type: Optional[str] = None):
+
                  
         ### Handle input FASTA and FASTQ
-        if input_fasta is not None:
-            self.input_fasta = Path(input_fasta)
+        # Always define the attribute `input_fasta` (may be None) to avoid AttributeError
+        # when other methods reference it. Use Path when a value is provided.
+        self.input_fasta = Path(input_fasta) if input_fasta is not None else None
         if input_fastq is None:
             self.input_fastq = None
             self.input_fastq_is_paired = False
@@ -121,6 +127,27 @@ class Workflow:
                 self.chunk_threads_per_job = None
         # Preserve chunks flag (do not delete part files) - default False
         self.preserve_chunks = bool(preserve_chunks)
+        # E-value threshold for tools that accept it. If None, do not pass an
+        # explicit e-value to the tool and let the tool use its own default.
+        self.evalue = float(evalue) if evalue is not None else None
+        # Minimum bitscore threshold for BLAST/DIAMOND hits. If None, no bitscore
+        # filtering is applied and tool defaults / post-filtering rules are used.
+        self.min_bitscore = float(min_bitscore) if min_bitscore is not None else None
+        # Arbitrary extra parameters to append to specific tools (dict: tool -> param string)
+        self.extra_tool_params = extra_tool_params or {}
+        # The input type is indicated via self.sequence_type. If it equals
+        # 'Genes-FASTA' the pipeline treats inputs as full-length gene FASTA(s)
+        # (and will skip read-mappers). The optional `genes_type` parameter,
+        # when provided, forces interpretation to either 'dna' or 'protein'
+        # and bypasses auto-detection.
+        self.genes_type = genes_type
+        # Track whether this workflow was invoked with Genes-FASTA input. Use an
+        # explicit boolean so we don't mutate `self.sequence_type` (which is
+        # used elsewhere to decide flags). This preserves the original signal
+        # while allowing downstream logic to check `is_genes_fasta`.
+        self.is_genes_fasta = (sequence_type == 'Genes-FASTA')
+        # Store any detected/declared genes alphabet type ('dna'|'protein'|None)
+        self.detected_genes_type = None
 
 
         self.run_dna = run_dna
@@ -409,6 +436,68 @@ class Workflow:
                 pass
         return True
 
+    def _detect_genes_type(self, max_sequences: int = 50) -> Optional[str]:
+        """Heuristic to detect whether a provided Genes-FASTA contains DNA or protein sequences.
+        Returns 'dna', 'protein', or None if unknown. Reads up to `max_sequences` sequences from the
+        input FASTA (handles gzip)."""
+        try:
+            fasta_path = str(self.input_fasta)
+            is_gz = fasta_path.endswith(('.gz', '.gzip'))
+            opener = gzip.open if is_gz else open
+            dna_chars = set(list('ACGTNacgtn'))
+            protein_chars = set(list('ACDEFGHIKLMNPQRSTVWYacdefghiklmnpqrstvw y'))
+            # Keep simple counters of characters observed
+            dna_score = 0
+            protein_score = 0
+            seq_count = 0
+            with opener(fasta_path, 'rt') as fh:
+                seq = ''
+                for line in fh:
+                    if line.startswith('>'):
+                        if seq:
+                            seq_count += 1
+                            # sample characters
+                            s = seq.strip()
+                            if not s:
+                                seq = ''
+                                continue
+                            # Count letters
+                            letters = [c for c in s if c.isalpha()]
+                            if not letters:
+                                seq = ''
+                                continue
+                            # Compute simple ratio of DNA-like letters
+                            letters_set = set(letters)
+                            if letters_set.issubset(dna_chars):
+                                dna_score += 1
+                            else:
+                                # if many letters outside DNA alphabet, treat as protein
+                                protein_score += 1
+                            seq = ''
+                            if seq_count >= max_sequences:
+                                break
+                    else:
+                        seq += line.strip()
+                # handle last sequence
+                if seq and seq_count < max_sequences:
+                    s = seq.strip()
+                    letters = [c for c in s if c.isalpha()]
+                    if letters:
+                        letters_set = set(letters)
+                        if letters_set.issubset(dna_chars):
+                            dna_score += 1
+                        else:
+                            protein_score += 1
+            # Decide
+            if dna_score > 0 and protein_score == 0:
+                return 'dna'
+            if protein_score > 0 and dna_score == 0:
+                return 'protein'
+            # Mixed or unknown
+            return None
+        except Exception:
+            return None
+
     def run_command(self, cmd: List[str], tool_name: str) -> bool:
         # Run a tool and log the results.
         self.logger.info(f"Running {tool_name}...")
@@ -439,6 +528,20 @@ class Workflow:
         except subprocess.CalledProcessError as e:
             self.logger.error(f"{tool_name} failed with return code {e.returncode}")
             self.logger.error(f"Error message: {e.stderr}")
+            # If extra parameters were supplied for this tool, warn the user that
+            # the failure may be caused by incompatible/invalid parameters.
+            try:
+                lowered = tool_name.lower()
+                for key, params in (self.extra_tool_params or {}).items():
+                    if key and key.lower() in lowered:
+                        self.logger.warning("\n" + "*" * 80)
+                        self.logger.warning(f"WARNING: Additional parameters provided for tool '{key}': {params}")
+                        self.logger.warning("These parameters may be incompatible with the tool and could have caused the failure.")
+                        self.logger.warning("Please re-run without the extra params or verify they are valid for this tool.")
+                        self.logger.warning("" + "*" * 80 + "\n")
+                        break
+            except Exception:
+                pass
             return False
         except FileNotFoundError:
             self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
@@ -583,12 +686,22 @@ class Workflow:
                         qstart = int(fields[6])
                         qend = int(fields[7])
                         qlen = int(fields[12])
+                        # bitscore is present in the standard outfmt used by BLAST/DIAMOND
+                        bitscore = float(fields[11]) if len(fields) > 11 else None
                     except Exception:
                         continue
 
                     query_coverage = ((abs(qend - qstart) + 1) / qlen) * 100 if qlen else 0.0
 
                     if identity >= getattr(self, 'query_min_identity', 0.0) and query_coverage >= getattr(self, 'query_min_coverage', 0.0):
+                        # If the user requested a minimum bitscore, enforce it here
+                        if getattr(self, 'min_bitscore', None) is not None:
+                            try:
+                                if bitscore is None or bitscore < float(self.min_bitscore):
+                                    continue
+                            except Exception:
+                                # If bitscore parsing fails, be conservative and skip
+                                continue
                         outf.write(line)
                         kept += 1
 
@@ -612,6 +725,20 @@ class Workflow:
 
             if proc.returncode != 0:
                 self.logger.error(f"{tool_name} failed with return code {proc.returncode}")
+                # If extra parameters were supplied for this tool, warn the user that
+                # the failure may be caused by incompatible/invalid parameters.
+                try:
+                    lowered = tool_name.lower()
+                    for key, params in (self.extra_tool_params or {}).items():
+                        if key and key.lower() in lowered:
+                            self.logger.warning("\n" + "*" * 80)
+                            self.logger.warning(f"WARNING: Additional parameters provided for tool '{key}': {params}")
+                            self.logger.warning("These parameters may be incompatible with the tool and could have caused the failure.")
+                            self.logger.warning("Please re-run without the extra params or verify they are valid for this tool.")
+                            self.logger.warning("" + "*" * 80 + "\n")
+                            break
+                except Exception:
+                    pass
                 return False
 
             self.logger.info(f"Filtered {tool_name} output {output_file}: kept {kept}/{total} hits (identity>={self.detection_min_identity}, qcov>={self.query_min_coverage}%)")
@@ -958,11 +1085,23 @@ class Workflow:
                     self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
 
     def run_blast(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
-        """Run BLAST in DNA (blastn) or protein (blastx) mode.
-            If input FASTA is gzipped, stream decompressed data to BLAST via stdin
-            (uses `-query -`) to avoid creating a temporary uncompressed file."""
-        blast_cmd = 'blastn' if mode == 'dna' else 'blastx'
-        tool_name = 'BLASTn' if mode == 'dna' else 'BLASTx'
+        """Run BLAST using the requested blast tool.
+        mode may be one of: 'dna'|'blastn', 'protein'|'blastx', or 'blastp'.
+        If input FASTA is gzipped, stream decompressed data to BLAST via stdin (uses `-query -`)."""
+        # Normalise mode into concrete blast program name
+        m = str(mode).lower() if mode is not None else 'dna'
+        if m in ('dna', 'blastn'):
+            blast_cmd = 'blastn'
+            tool_name = 'BLASTn'
+        elif m in ('protein', 'blastx'):
+            blast_cmd = 'blastx'
+            tool_name = 'BLASTx'
+        elif m == 'blastp':
+            blast_cmd = 'blastp'
+            tool_name = 'BLASTp'
+        else:
+            self.logger.error(f"Invalid BLAST mode requested: {mode}")
+            return False, set()
         # Extract the path from the dictionary if `database` is a dict
         if isinstance(database, dict):
             database = database.get(blast_cmd)
@@ -976,52 +1115,66 @@ class Workflow:
         # Common outfmt used for both modes
         outfmt_fields = '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen'
 
-        # Determine if input is gzipped
-        fasta_path_str = str(self.input_fasta)
-        gz_input = fasta_path_str.endswith(('.gz', '.gzip'))
+        # Determine if input is gzipped. Use a safe string when input_fasta is None.
+        fasta_path_str = str(self.input_fasta) if getattr(self, 'input_fasta', None) else ''
+        gz_input = bool(fasta_path_str and fasta_path_str.endswith(('.gz', '.gzip')))
 
-        if mode == 'dna':
-            blast_cmd = 'blastn'
-            query_arg = '-' if gz_input else fasta_path_str
-            # Request BLAST to write tabular output to stdout so we can filter in Python
-            cmd = [
-                blast_cmd,
-                '-query', query_arg,
-                '-db', db_path,
-                '-out', '-',
-                '-outfmt', outfmt_fields,
-                '-num_threads', str(self.threads),
-                '-qcov_hsp_perc', str(int(self.query_min_coverage)),
-                '-perc_identity', str(self.query_min_identity)
-            ]
-        elif mode == 'protein':
-            blast_cmd = 'blastx'
-            query_arg = '-' if gz_input else fasta_path_str
-            cmd = [
-                blast_cmd,
-                '-query', query_arg,
-                '-db', db_path,
-                '-task', self.blastx_task,
-                '-out', '-',
-                '-outfmt', outfmt_fields,
-                '-num_threads', str(self.threads),
-                '-qcov_hsp_perc', str(int(self.query_min_coverage))
-            ]
-        else:
-            self.logger.error(f"Invalid BLAST'ing' mode: {mode}")
-            return False, set()
+        query_arg = '-' if gz_input else fasta_path_str
+        # Build common command base
+        # Build base command. Do NOT pass '-perc_identity' to BLAST programs that don't accept it
+        # (blastp in particular raises an "Unknown argument: perc_identity" error).
+        cmd = [
+            blast_cmd,
+            '-query', query_arg,
+            '-db', db_path,
+            '-out', '-',
+            '-outfmt', outfmt_fields,
+            '-num_threads', str(self.threads),
+            '-qcov_hsp_perc', str(int(self.query_min_coverage)),
+        ]
+        # Only include an explicit evalue if the user supplied one; otherwise
+        # allow BLAST to use its internal default
+        if getattr(self, 'evalue', None) is not None:
+            cmd.extend(['-evalue', str(self.evalue)])
+
+        # Only add '-perc_identity' for BLAST programs that accept it (blastn).
+        # We rely on post-filtering in parse_blast_results for identity thresholds
+        # for other programs (blastx/blastp/diamond).
+        try:
+            if blast_cmd == 'blastn':
+                cmd.extend(['-perc_identity', str(self.query_min_identity)])
+        except Exception:
+            pass
+
+        # Add blastx-specific task if requested
+        if blast_cmd == 'blastx':
+            try:
+                cmd.insert(3, '-task')
+                cmd.insert(4, str(self.blastx_task))
+            except Exception:
+                pass
+
+        # Append any user-specified extra parameters for this blast_cmd
+        try:
+            extra = (self.extra_tool_params or {}).get(blast_cmd)
+            if extra:
+                extra_args = shlex.split(str(extra))
+                cmd.extend(extra_args)
+        except Exception:
+            pass
 
         success = False
         # If input FASTA file is large, split into chunks and run BLAST per-chunk to reduce memory/IO
         try:
             file_size = None
             try:
-                file_size = os.path.getsize(str(self.input_fasta))
+                # Only attempt to stat the file if we have a real path
+                file_size = os.path.getsize(fasta_path_str) if fasta_path_str and os.path.isfile(fasta_path_str) else None
             except Exception:
                 file_size = None
 
             # Determine if input FASTA is a regular file that can be chunked
-            input_path_str = str(self.input_fasta) if hasattr(self, 'input_fasta') else None
+            input_path_str = fasta_path_str if fasta_path_str else None
             input_is_regular_file = False
             try:
                 input_is_regular_file = bool(input_path_str and input_path_str != '-' and os.path.isfile(input_path_str))
@@ -1113,24 +1266,6 @@ class Workflow:
                     base = max(1, int(self.threads) // concurrency)
                     remainder = int(self.threads) - (base * concurrency)
                     threads_per_job_list = [base + (1 if i < remainder else 0) for i in range(concurrency)]
-                # # Determine concurrency now (we don't yet know num_chunks) -- cap by chunk_jobs and thread-based cap
-                # if self.chunk_jobs and self.chunk_jobs > 0:
-                #     if max_concurrency_by_threads is not None:
-                #         concurrency = min(self.chunk_jobs, max_concurrency_by_threads)
-                #     else:
-                #         concurrency = self.chunk_jobs
-                # else:
-                #     concurrency = max_concurrency_by_threads if max_concurrency_by_threads is not None else 1
-                #
-                # concurrency = max(1, int(concurrency))
-                #
-                # # Compute threads per concurrent job distribution
-                # if self.chunk_threads_per_job:
-                #     threads_per_job_list = [max(1, int(self.chunk_threads_per_job))] * concurrency
-                # else:
-                #     base = max(1, int(self.threads) // concurrency)
-                #     remainder = int(self.threads) - (base * concurrency)
-                #     threads_per_job_list = [base + (1 if i < remainder else 0) for i in range(concurrency)]
 
                 self.logger.info(f"Starting on-the-fly chunking with concurrency={concurrency}, threads per job distribution={threads_per_job_list}, max_concurrency_by_threads={max_concurrency_by_threads}")
 
@@ -1175,28 +1310,27 @@ class Workflow:
                         slot = i % concurrency
                         threads_for_this = threads_per_job_list[slot]
                         chunk_output = output_file.parent / f"{output_file.stem}.part{i:04d}.tsv"
-                        if mode == 'dna':
-                            per_cmd = [
-                                'blastn',
-                                '-query', str(chunk),
-                                '-db', db_path,
-                                '-out', '-',
-                                '-outfmt', outfmt_fields,
-                                '-num_threads', str(threads_for_this),
-                                '-qcov_hsp_perc', str(int(self.query_min_coverage)),
-                                '-perc_identity', str(self.query_min_identity)
-                            ]
-                        else:
-                            per_cmd = [
-                                'blastx',
-                                '-query', str(chunk),
-                                '-db', db_path,
-                                '-task', self.blastx_task,
-                                '-out', '-',
-                                '-outfmt', outfmt_fields,
-                                '-num_threads', str(threads_for_this),
-                                '-qcov_hsp_perc', str(int(self.query_min_coverage))
-                            ]
+                        # Build per-chunk command for the concrete blast_cmd
+                        per_cmd = [
+                            blast_cmd,
+                            '-query', str(chunk),
+                            '-db', db_path,
+                            '-out', '-',
+                            '-outfmt', outfmt_fields,
+                            '-num_threads', str(threads_for_this),
+                            '-qcov_hsp_perc', str(int(self.query_min_coverage)),
+                        ]
+                        if getattr(self, 'evalue', None) is not None:
+                            per_cmd.extend(['-evalue', str(self.evalue)])
+                        if blast_cmd == 'blastx':
+                            per_cmd.insert(3, '-task')
+                            per_cmd.insert(4, str(self.blastx_task))
+                        try:
+                            extra = (self.extra_tool_params or {}).get(blast_cmd)
+                            if extra:
+                                per_cmd.extend(shlex.split(str(extra)))
+                        except Exception:
+                            pass
 
                         self.logger.info(f"Submitting chunk {i+1} (slot {slot}, threads={threads_for_this}): {chunk}")
                         fut = executor.submit(self._stream_filter_hits, per_cmd, chunk_output, f"{database} - {tool_name} (chunk {i})", False, str(chunk))
@@ -1311,7 +1445,7 @@ class Workflow:
             self.write_tool_stats(database, tool_name, gene_reads)
         return success, detected
 
-    def run_diamond(self, db_path: str, database: str) -> Tuple[bool, Set[str]]:
+    def run_diamond(self, db_path: str, database: str, query_mode: str = 'blastx') -> Tuple[bool, Set[str]]:
         # Run DIAMOND protein search (blastx for DNA->protein).
         # Extract the path from the dictionary if `database` is a dict
         if isinstance(database, dict):
@@ -1324,18 +1458,18 @@ class Workflow:
             raise ValueError(f"Invalid database path: {db_path}")
 
         output_file = self.raw_dir / f"{database}_diamond_results.tsv"
-        tool_name = "DIAMOND"
+        tool_name = f"DIAMOND-{str(query_mode).upper()}"
 
         fasta_path_str = str(self.input_fasta)
         gz_input = fasta_path_str.endswith(('.gz', '.gzip'))
         if gz_input and not self.check_gzip(fasta_path_str): # If input is gzipped, check integrity first
-            return False
+            return False, set()
         else: # Run DIAMOND normally
-            params = self.tool_sensitivity_params.get('diamond', None)
+            params = (self.tool_sensitivity_params or {}).get('diamond', None)
             sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
 
             cmd = [
-                'diamond', 'blastx',
+                'diamond', str(query_mode),
                 '-q', str(self.input_fasta),
                 '-d', db_path,
                 '-o', str(output_file),
@@ -1350,6 +1484,22 @@ class Workflow:
             ]
             if sensitivity and sensitivity != 'default':
                 cmd.append(sensitivity)
+
+            # Add evalue for DIAMOND only if the user supplied one. Otherwise
+            # leave DIAMOND to use its default e-value.
+            try:
+                if getattr(self, 'evalue', None) is not None:
+                    cmd.extend(['-e', str(self.evalue)])
+            except Exception:
+                pass
+            # Append any user-specified extra parameters for DIAMOND
+            try:
+                extra = (self.extra_tool_params or {}).get('diamond')
+                if extra:
+                    extra_args = shlex.split(str(extra))
+                    cmd.extend(extra_args)
+            except Exception:
+                pass
 
             success = self.run_command(cmd, f"{database} - {tool_name}")
             detected = set()
@@ -1374,14 +1524,14 @@ class Workflow:
         summary_file = self.raw_dir / f"{database}_bowtie2_summary.txt"
         tool_name = "Bowtie2"
 
-        if self.sequence_type == 'Single-FASTA':
+        if self.sequence_type == 'Single-FASTA' or getattr(self, 'is_genes_fasta', False):
             flags = ['-f', '-U', str(self.input_fasta)]
         elif self.sequence_type == 'Paired-FASTQ':
             flags = ['-1', str(self.input_fastq[0]), '-2', str(self.input_fastq[1])]
         else:
             flags = []
 
-        params = self.tool_sensitivity_params.get('bowtie2', None)
+        params = (self.tool_sensitivity_params or {}).get('bowtie2', None)
         sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
 
         cmd = [
@@ -1395,6 +1545,15 @@ class Workflow:
         ]
         if sensitivity and sensitivity != 'default':
             cmd.append(sensitivity)
+
+        # Append any user-specified extra parameters for Bowtie2
+        try:
+            extra = (self.extra_tool_params or {}).get('bowtie2')
+            if extra:
+                extra_args = shlex.split(str(extra))
+                cmd.extend(extra_args)
+        except Exception:
+            pass
 
         success = self.run_command(cmd, f"{database} - {tool_name}")
         if not success:
@@ -1435,7 +1594,7 @@ class Workflow:
         sorted_bam = self.raw_dir / f"{database}_bwa_results_sorted.bam"
         tool_name = "BWA"
 
-        if self.sequence_type == 'Single-FASTA':
+        if self.sequence_type == 'Single-FASTA' or getattr(self, 'is_genes_fasta', False):
             flags = [ str(self.input_fasta)]
         elif self.sequence_type == 'Paired-FASTQ':
             flags = [ str(self.input_fastq[0]), str(self.input_fastq[1])]
@@ -1449,6 +1608,17 @@ class Workflow:
             db_path,
             ] + flags + [
         ]
+
+        # Append any user-specified extra parameters for BWA
+        try:
+            extra = (self.extra_tool_params or {}).get('bwa')
+            if extra:
+                extra_args = shlex.split(str(extra))
+                # Insert extra args after the 'mem' subcommand and before db/flags
+                # For simplicity append at end which is usually acceptable
+                cmd.extend(extra_args)
+        except Exception:
+            pass
 
         # Run BWA and write output to SAM file
         try:
@@ -1495,7 +1665,7 @@ class Workflow:
         tool_name = "Minimap2"
 
 
-        if self.sequence_type == 'Single-FASTA':
+        if self.sequence_type == 'Single-FASTA' or getattr(self, 'is_genes_fasta', False):
             flags = [ str(self.input_fasta)]
         elif self.sequence_type == 'Paired-FASTQ':
             flags = [ str(self.input_fastq[0]), str(self.input_fastq[1])]
@@ -1513,6 +1683,15 @@ class Workflow:
         ]
 
         try:
+            # Append any user-specified extra parameters for Minimap2
+            try:
+                extra = (self.extra_tool_params or {}).get('minimap2')
+                if extra:
+                    extra_args = shlex.split(str(extra))
+                    cmd.extend(extra_args)
+            except Exception:
+                pass
+
             success = self.run_command(cmd, f"{database} - {tool_name}")
         except Exception as e:
             self.logger.error(f"Error running Minimap2: {e}")
@@ -1558,17 +1737,43 @@ class Workflow:
             hmmer_cmd,
             '--tblout', str(output_file),
             '--domtblout', str(domtbl_file),
-            '-E', str(self.evalue),
             '--cpu', str(self.threads),
             db_path,
             str(self.input_fasta)
         ]
+        # Only add -E (e-value threshold) if user set it explicitly
+        if getattr(self, 'evalue', None) is not None:
+            try:
+                cmd.insert(3, '-E')
+                cmd.insert(4, str(self.evalue))
+            except Exception:
+                pass
+
+        # Append any user-specified extra parameters for HMMER/nhmmer/hmmsearch
+        try:
+            # Check several potential keys the user might provide
+            extra = None
+            if (self.extra_tool_params or {}).get('hmmer'):
+                extra = (self.extra_tool_params or {}).get('hmmer')
+            elif (self.extra_tool_params or {}).get(hmmer_cmd):
+                extra = (self.extra_tool_params or {}).get(hmmer_cmd)
+            if extra:
+                extra_args = shlex.split(str(extra))
+                cmd.extend(extra_args)
+        except Exception:
+            pass
 
         success = self.run_command(cmd, f"{database} - {tool_name}")
         detected = set()
         if success:
             detected = self.parse_hmmer_results(output_file, database, tool_name)
-            self.write_tool_stats(database, tool_name)
+            # HMMER parsing does not currently produce per-read gene_reads structures
+            # so pass an empty dict to write_tool_stats to avoid AttributeError
+            try:
+                self.write_tool_stats(database, tool_name, gene_reads={})
+            except Exception:
+                # Non-fatal: log and continue
+                self.logger.debug("write_tool_stats failed for HMMER output; continuing")
         return success, detected
 
     def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
@@ -1589,7 +1794,8 @@ class Workflow:
             self.gene_stats[database][tool_name] = defaultdict(GeneStats)
 
         if not output_file.exists():
-            return detected_genes
+            # No output present -> return empty detected set and empty gene_reads dict
+            return set(), {}
 
         # Load all reads from input FASTA for later FASTA output (cached) - Should only load once
         if not hasattr(self, 'all_reads'):
@@ -1643,6 +1849,11 @@ class Workflow:
                     send = int(fields[9])  # subject end
                     qlen = int(fields[12])  # query length (added to output format)
                     slen = int(fields[13])  # subject length (added to output format)
+                    # bitscore included in the standard outfmt
+                    try:
+                        bitscore = float(fields[11]) if len(fields) > 11 else None
+                    except Exception:
+                        bitscore = None
 
                     try:
                         alignment_len = int(fields[3])
@@ -1654,9 +1865,9 @@ class Workflow:
                     if slen is not None:
                         gene_lengths[gene] = max(gene_lengths.get(gene, 0), slen)
 
-                    # Determine whether this is a translated search (blastx/diamond-blastx)
+                    # Determine whether this is a translated search (blastx / diamond blastx)
                     tool_name_l = tool_name.lower() if isinstance(tool_name, str) else ''
-                    is_translated_search = ('blastx' in tool_name_l) or ('diamond' in tool_name_l)
+                    is_translated_search = ('blastx' in tool_name_l)
 
                     # Compute query coverage. Prefer alignment_len/qlen when available.
                     # For translated searches alignment_len is in amino-acids while qlen is in nucleotides;
@@ -1680,6 +1891,15 @@ class Workflow:
                     mapped_reads += 1
 
                     if identity >= self.query_min_identity and query_coverage >= self.query_min_coverage:
+                        # If a minimum bitscore threshold was provided, enforce it here
+                        if getattr(self, 'min_bitscore', None) is not None:
+                            try:
+                                if bitscore is None or bitscore < float(self.min_bitscore):
+                                    # does not meet bitscore threshold
+                                    continue
+                            except Exception:
+                                # on parse error be conservative and skip
+                                continue
                         # Initialise stats if first hit for this gene
                         if gene not in self.gene_stats[database][tool_name]:
                             self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
@@ -1956,8 +2176,15 @@ class Workflow:
                     self.gene_stats[database][tool_name][gene].add_hit(score, score)
 
                     # HMMER doesn't directly give coverage/identity like BLAST
-                    # Use E-value as primary filter
-                    if evalue <= self.evalue:
+                    # Use E-value as primary filter. If the user did not set an
+                    # explicit e-value threshold, accept all HMMER hits (do not
+                    # filter by e-value here).
+                    try:
+                        if getattr(self, 'evalue', None) is None or evalue <= float(self.evalue):
+                            detected_genes.add(gene)
+                            self.detections[database][gene][tool_name] = True
+                    except Exception:
+                        # On parse/compare errors, be conservative and accept the hit
                         detected_genes.add(gene)
                         self.detections[database][gene][tool_name] = True
 
@@ -1984,6 +2211,10 @@ class Workflow:
         - Avg_Identity: Average identity across all qualifying sequences (%)
         - Detected: 1 if gene passes all thresholds, 0 otherwise
         """
+        # Normalise gene_reads to a safe empty structure if caller did not provide one
+        if gene_reads is None:
+            gene_reads = defaultdict(lambda: {'passing': [], 'all': []})
+
         stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
 
         gene_stats = self.gene_stats[database][tool_name]
@@ -2084,32 +2315,85 @@ class Workflow:
     def run_workflow(self,options):
         results = {}
 
+        # If user indicated the inputs are full-length gene FASTA(s), adjust internal
+        # flags: force Single-FASTA sequence type and (optionally) restrict which
+        # tool classes to run based on the declared genes_type.
+        # If the declared sequence type is Genes-FASTA, treat inputs as
+        # full-length gene FASTA(s): force internal sequence_type to
+        # 'Single-FASTA' for downstream logic and attempt auto-detection of
+        # DNA vs protein to influence which tools are run.
+        if getattr(self, 'sequence_type', None) == 'Genes-FASTA':
+            try:
+                self.logger.info("Genes-input mode enabled: treating input as full-length gene FASTA(s). Skipping read-mappers.")
+                # Preserve original sequence_type but set a dedicated flag so
+                # downstream checks can decide behavior without relying on a
+                # mutated `sequence_type`.
+                self.is_genes_fasta = True
+                # If the caller provided an explicit genes_type use it; otherwise auto-detect
+                if getattr(self, 'genes_type', None):
+                    detected = getattr(self, 'genes_type')
+                    self.logger.info(f"Using user-specified genes_type: {detected}")
+                else:
+                    detected = self._detect_genes_type()
+                if detected == 'protein':
+                    self.logger.info("Detected gene FASTA type: protein. Will run protein searches (BLASTp/DIAMOND blastp).")
+                    self.run_dna = False
+                    self.run_protein = True
+                elif detected == 'dna':
+                    self.logger.info("Detected gene FASTA type: DNA. Will run BLASTn and translated protein searches (BLASTx/DIAMOND blastx).")
+                    self.run_dna = True
+                    self.run_protein = True
+                else:
+                    self.logger.info("Could not auto-detect gene FASTA type; leaving run_dna/run_protein as configured.")
+                self.detected_genes_type = detected
+            except Exception:
+                # Non-fatal: if detection fails we continue with configured flags
+                self.detected_genes_type = None
+
         # Iterate over each database in the provided `databases` dictionary
         for db_name, db_paths in self.databases.items():
             results[db_name] = {}
             self.logger.info(f"\n### Processing {db_name.capitalize()} Database ###")
 
+            # BLASTn for DNA queries
             if self.run_dna and db_paths.get('blastn'):
                 results[db_name]['BLASTn-DNA'] = self.run_blast(
-                    db_paths['blastn'], db_name, 'dna')
+                    db_paths['blastn'], db_name, 'blastn')
 
-            if self.run_protein and db_paths.get('blastx'):
-                results[db_name]['BLASTx-AA'] = self.run_blast(
-                    db_paths['blastx'], db_name, 'protein')
+            # Protein searches: choose BLASTp for protein queries, BLASTx for nucleotide->protein
+            if self.run_protein:
+                # If inputs are Genes-FASTA and detected/declared as protein prefer
+                # BLASTp when available; otherwise fall back to BLASTx.
+                if getattr(self, 'is_genes_fasta', False) and getattr(self, 'detected_genes_type', None) == 'protein':
+                    # prefer blastp if available
+                    if db_paths.get('blastp'):
+                        results[db_name]['BLASTp-AA'] = self.run_blast(db_paths['blastp'], db_name, 'blastp')
+                    elif db_paths.get('blastx'):
+                        self.logger.warning(f"No BLASTp available for {db_name}; falling back to BLASTx (may be suboptimal for protein queries)")
+                        results[db_name]['BLASTx-AA'] = self.run_blast(db_paths['blastx'], db_name, 'blastx')
+                else:
+                    if db_paths.get('blastx'):
+                        results[db_name]['BLASTx-AA'] = self.run_blast(db_paths['blastx'], db_name, 'blastx')
 
+            # DIAMOND: choose blastp for protein queries, blastx for nucleotide queries
             if self.run_protein and db_paths.get('diamond'):
-                results[db_name]['DIAMOND-AA'] = self.run_diamond(
-                    db_paths['diamond'], db_name)
+                if getattr(self, 'is_genes_fasta', False) and getattr(self, 'detected_genes_type', None) == 'protein':
+                    results[db_name]['DIAMOND-AA'] = self.run_diamond(db_paths['diamond'], db_name, query_mode='blastp')
+                else:
+                    results[db_name]['DIAMOND-AA'] = self.run_diamond(db_paths['diamond'], db_name, query_mode='blastx')
 
-            if self.run_dna and db_paths.get('bowtie2'):
+            # Skip read-mappers entirely when the user has indicated the input
+            # are full-length gene FASTA(s). In that case we only run BLAST/DIAMOND/HMMER
+            # style searches appropriate for full-length sequences.
+            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and db_paths.get('bowtie2'):
                 results[db_name]['Bowtie2-DNA'] = self.run_bowtie2(
                     db_paths['bowtie2'], db_name)
 
-            if self.run_dna and db_paths.get('bwa'):
+            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and db_paths.get('bwa'):
                 results[db_name]['BWA-DNA'] = self.run_bwa(
                     db_paths['bwa'], db_name)
 
-            if db_paths.get('minimap2'):
+            if (not getattr(self, 'is_genes_fasta', False)) and db_paths.get('minimap2'):
                 results[db_name]['Minimap2-DNA'] = self.run_minimap2(
                     db_paths['minimap2'], db_name, options.minimap2_preset)
 
@@ -2135,104 +2419,7 @@ class Workflow:
                     self.logger.info(f"  Gene name changes file: {changes_file}")
                     self.gene_name_changes.clear()
 
-        # results = {'resfinder': {}, 'card': {}}
-        #
-        # # Process ResFinder database
-        # if self.resfinder_dbs:
-        #     self.logger.info("\n### Processing ResFinder Database ###")
-        #
-        #     if self.run_dna and self.resfinder_dbs.get('blastn'):
-        #         results['resfinder']['BLASTn-DNA'] = self.run_blast(
-        #             self.resfinder_dbs['blastn'], 'resfinder', 'dna')
-        #
-        #     if self.run_protein and self.resfinder_dbs.get('blastx'):
-        #         results['resfinder']['BLASTx-AA'] = self.run_blast(
-        #             self.resfinder_dbs['blastx'], 'resfinder', 'protein')
-        #
-        #     if self.run_protein and self.resfinder_dbs.get('diamond'):
-        #         results['resfinder']['DIAMOND-AA'] = self.run_diamond(
-        #             self.resfinder_dbs['diamond'], 'resfinder')
-        #
-        #     if self.run_dna and self.resfinder_dbs.get('bowtie2'):
-        #         results['resfinder']['Bowtie2-DNA'] = self.run_bowtie2(
-        #             self.resfinder_dbs['bowtie2'], 'resfinder')
-        #
-        #     if self.run_dna and self.resfinder_dbs.get('bwa'):
-        #         results['resfinder']['BWA-DNA'] = self.run_bwa(
-        #             self.resfinder_dbs['bwa'], 'resfinder')
-        #
-        #     if self.resfinder_dbs.get('minimap2'):
-        #         results['resfinder']['Minimap2-DNA'] = self.run_minimap2(
-        #             self.resfinder_dbs['minimap2'], 'resfinder', options.minimap2_preset)
-        #
-        #     # if self.run_dna and self.resfinder_dbs.get('hmmer_dna'):
-        #     #     results['resfinder']['HMMER-DNA'] = self.run_hmmer(
-        #     #         self.resfinder_dbs['hmmer_dna'], 'resfinder', 'dna')
-        #     #
-        #     # if self.run_protein and self.resfinder_dbs.get('hmmer_protein'):
-        #     #     results['resfinder']['HMMER-PROTEIN'] = self.run_hmmer(
-        #     #         self.resfinder_dbs['hmmer_protein'], 'resfinder', 'protein')
-        #
-        #     self.generate_detection_matrix('resfinder')
-        #
-        #     if options.report_fasta != None:
-        #         # Write gene name changes to TSV if any changes were made
-        #         if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
-        #             changes_file = self.fasta_dir / f"resfinder_gene_name_changes.tsv"
-        #             with open(changes_file, "w", newline='') as f:
-        #                 writer = csv.writer(f, delimiter='\t')
-        #                 writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
-        #                 writer.writerows(self.gene_name_changes)
-        #             self.logger.info(f"  Gene name changes file: {changes_file}")
-        #             self.gene_name_changes.clear()
-        #
-        # # Process CARD database
-        # if self.card_dbs:
-        #     self.logger.info("\n### Processing CARD Database ###")
-        #
-        #     if self.run_dna and self.card_dbs.get('blastn'):
-        #         results['card']['BLASTn-DNA'] = self.run_blast(
-        #             self.card_dbs['blastn'], 'card', 'dna')
-        #
-        #     if self.run_protein and self.card_dbs.get('blastx'):
-        #         results['card']['BLASTx-AA'] = self.run_blast(
-        #             self.card_dbs['blastx'], 'card', 'protein')
-        #
-        #     if self.run_protein and self.card_dbs.get('diamond'):
-        #         results['card']['DIAMOND-AA'] = self.run_diamond(
-        #             self.card_dbs['diamond'], 'card')
-        #
-        #     if self.run_dna and self.card_dbs.get('bowtie2'):
-        #         results['card']['Bowtie2-DNA'] = self.run_bowtie2(
-        #             self.card_dbs['bowtie2'], 'card')
-        #
-        #     if self.run_dna and self.card_dbs.get('bwa'):
-        #         results['card']['BWA-DNA'] = self.run_bwa(
-        #             self.card_dbs['bwa'], 'card')
-        #
-        #     if self.card_dbs.get('minimap2'):
-        #         results['card']['Minimap2-DNA'] = self.run_minimap2(
-        #             self.card_dbs['minimap2'], 'card', options.minimap2_preset)
-        #
-        #     # if self.run_dna and self.card_dbs.get('hmmer_dna'):
-        #     #     results['card']['HMMER-DNA'] = self.run_hmmer(
-        #     #         self.card_dbs['hmmer_dna'], 'card', 'dna')
-        #     #
-        #     # if self.run_protein and self.card_dbs.get('hmmer_protein'):
-        #     #     results['card']['HMMER-PROTEIN'] = self.run_hmmer(
-        #     #         self.card_dbs['hmmer_protein'], 'card', 'protein')
-        #
-        #     self.generate_detection_matrix('card')
-        #     if options.report_fasta != None:
-        #         # Write gene name changes to TSV if any changes were made
-        #         if hasattr(self, 'gene_name_changes') and self.gene_name_changes:
-        #             changes_file = self.fasta_dir / f"card_gene_name_changes.tsv"
-        #             with open(changes_file, "w", newline='') as f:
-        #                 writer = csv.writer(f, delimiter='\t')
-        #                 writer.writerow(['Original_Gene_Name', 'Safe_Gene_Name'])
-        #                 writer.writerows(self.gene_name_changes)
-        #             self.logger.info(f"  Gene name changes file: {changes_file}")
-        #             self.gene_name_changes.clear()
+   
 
         # Final summary
         self.logger.info("\n" + "=" * 70)
