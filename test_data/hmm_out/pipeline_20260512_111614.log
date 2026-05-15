@@ -1,0 +1,90 @@
+2026-05-12 11:16:14,962 - INFO - Database tool availability (per selected database):
+2026-05-12 11:16:14,962 - INFO -   user-provided-db: BLASTn: No; BLASTx: No; BLASTp: No; DIAMOND: No
+2026-05-12 11:16:14,962 - INFO - ======================================================================
+2026-05-12 11:16:14,962 - INFO - Genefíor - The Gene Detection toolkit: v0.9.0
+2026-05-12 11:16:14,962 - INFO - Started at: 2026-05-12 11:16:14
+2026-05-12 11:16:14,962 - INFO - Mode: HMMER-ONLY — all other alignment tools are disabled.
+2026-05-12 11:16:14,962 - INFO - ======================================================================
+2026-05-12 11:16:14,962 - INFO - Threads: 10
+2026-05-12 11:16:14,962 - INFO - Database(s) chosen:
+2026-05-12 11:16:14,962 - INFO -   User-Provided: N/A (HMMER-only mode)
+2026-05-12 11:16:14,962 - INFO - Sequence type: Genes-FASTA (full-length gene FASTA). Read-mappers (bowtie2, bwa, minimap2) will be skipped by the workflow.
+2026-05-12 11:16:14,962 - INFO -   Genes declared as: AMINO-ACID (aa) — protein searches will be preferred (BLASTp / DIAMOND blastp when available).
+2026-05-12 11:16:14,963 - INFO -  Tool(s) chosen (note: read-mappers will be skipped for Genes-FASTA):
+2026-05-12 11:16:14,963 - INFO -   BLASTn: No
+2026-05-12 11:16:14,963 - INFO -   BLASTx: No
+2026-05-12 11:16:14,963 - INFO -   BLASTp: No
+2026-05-12 11:16:14,963 - INFO -   DIAMOND: No
+2026-05-12 11:16:14,963 - INFO -   Bowtie2: No
+2026-05-12 11:16:14,963 - INFO -   BWA: No
+2026-05-12 11:16:14,963 - INFO -   Minimap2: No
+2026-05-12 11:16:14,963 - INFO -   HMMER-Protein: Yes
+2026-05-12 11:16:14,963 - INFO -   HMMER-DNA: No
+2026-05-12 11:16:14,963 - INFO - Min query coverage: 40.0%
+2026-05-12 11:16:14,963 - INFO - Min query identity: 80.0%
+2026-05-12 11:16:14,963 - INFO - Min detection coverage: 80.0%
+2026-05-12 11:16:14,963 - INFO - Min detection identity: 80.0%
+2026-05-12 11:16:14,963 - INFO - Run DNA mode: False
+2026-05-12 11:16:14,963 - INFO - Run Protein mode: True
+2026-05-12 11:16:14,963 - INFO - Sensitivity parameters: default - None
+2026-05-12 11:16:14,963 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-12 11:16:14,963 - INFO - ======================================================================
+2026-05-12 11:16:14,963 - INFO - GeneFíor I/O processing...
+2026-05-12 11:16:14,963 - INFO - ======================================================================
+2026-05-12 11:16:14,963 - INFO - Input type: Genes-FASTA
+2026-05-12 11:16:14,963 - INFO - Input file: /home/nickd/Git/GeneFior/test_data/Genes-AA/all_aa.gz (0.18 MB)
+2026-05-12 11:16:14,963 - INFO - Copying Genes-FASTA to temp directory...
+2026-05-12 11:16:14,963 - INFO - Copying /home/nickd/Git/GeneFior/test_data/Genes-AA/all_aa.gz to temp directory /home/nickd/Git/GeneFior/test_data/hmm_out...
+2026-05-12 11:16:14,963 - INFO - File size: 0.18 MB
+2026-05-12 11:16:14,963 - INFO - Successfully copied to: /home/nickd/Git/GeneFior/test_data/hmm_out/all_aa.gz
+2026-05-12 11:16:14,963 - INFO - Genes-FASTA will be read from temp directory: /home/nickd/Git/GeneFior/test_data/hmm_out/all_aa.gz
+2026-05-12 11:16:14,963 - INFO - Output directory: /home/nickd/Git/GeneFior/test_data/hmm_out
+2026-05-12 11:16:14,963 - INFO - Temp directory: /home/nickd/Git/GeneFior/test_data/hmm_out
+2026-05-12 11:16:14,963 - INFO - Files tracked for cleanup: 1
+2026-05-12 11:16:14,963 - INFO -   - /home/nickd/Git/GeneFior/test_data/hmm_out/all_aa.gz
+2026-05-12 11:16:14,964 - INFO - ======================================================================
+2026-05-12 11:16:14,964 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-12 11:16:14,964 - INFO - Genes-input mode enabled: treating input as full-length gene FASTA(s). Skipping read-mappers.
+2026-05-12 11:16:14,964 - INFO - Using user-specified genes_type: protein
+2026-05-12 11:16:14,964 - INFO - Detected gene FASTA type: protein. Will run protein searches (BLASTp/DIAMOND blastp).
+2026-05-12 11:16:14,964 - INFO - 
+### Processing User-provided-db Database ###
+2026-05-12 11:16:14,964 - INFO -   HMMER protein mode: input prep_mode='protein'
+2026-05-12 11:16:14,975 - INFO -   HMMER protein prep (protein): wrote 3212 sequences to /home/nickd/Git/GeneFior/test_data/hmm_out/hmmer_user-provided-db_prep_z4m4nzxf.faa
+2026-05-12 11:16:14,985 - INFO -   Loaded 3091 HMMER annotations from /home/nickd/Documents/databses/ibbis-bio/biorisk/biorisk_annotations.csv
+2026-05-12 11:16:14,985 - INFO - Running user-provided-db - HMMER-PROTEIN...
+2026-05-12 11:16:14,985 - INFO - Parameters for user-provided-db - HMMER-PROTEIN: hmmsearch --tblout /home/nickd/Git/GeneFior/test_data/hmm_out/raw_outputs/user-provided-db_hmmsearch_results.tbl --domtblout /home/nickd/Git/GeneFior/test_data/hmm_out/raw_outputs/user-provided-db_hmmsearch_domtbl.txt --cpu 10 /home/nickd/Documents/databses/ibbis-bio/biorisk/biorisk.hmm /home/nickd/Git/GeneFior/test_data/hmm_out/hmmer_user-provided-db_prep_z4m4nzxf.faa
+2026-05-12 11:16:54,550 - INFO - user-provided-db - HMMER-PROTEIN completed successfully
+2026-05-12 11:16:54,590 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/hmm_out/tool_stats/user-provided-db_HMMER-PROTEIN_stats.tsv
+2026-05-12 11:16:54,596 - INFO -   HMMER annotations report: /home/nickd/Git/GeneFior/test_data/hmm_out/user-provided-db_HMMER-PROTEIN_annotations.tsv
+2026-05-12 11:16:54,596 - WARNING -   *** 11 MUST-FLAG biorisk gene(s) detected in user-provided-db [HMMER-PROTEIN]! ***
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0473: sp|Q9M653|RIPT_POLML Ribosome-inactivating protein PMRIPt OS=Polygonatum multiflorum OX=45371 GN=RIPt PE=1 SV=1
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0567: 6468278_shiga toxin A subunit partial [Enterobacteria phage f1]
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0594: 443461622_accessory cholera enterotoxin [Vibrio cholerae HC-80A1]
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0705: 408425188_Hemolysin [Staphylococcus aureus subsp. aureus ST228]
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0968: 149945381_exotoxin 7 [Staphylococcus aureus subsp. aureus JH1]
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_0981: 575527059_botulinum neurotoxin type A light chain partial [synthetic construct]
+2026-05-12 11:16:54,597 - WARNING -     - BIORISK_1087: 365234890_enterotoxin type C-1 [Staphylococcus aureus subsp. aureus 21334]
+2026-05-12 11:16:54,597 - WARNING -     - C7DQB9: Conotoxin Eb11.3
+2026-05-12 11:16:54,597 - WARNING -     - Q12120: Sterigmatocystin 8-O-methyltransferase
+2026-05-12 11:16:54,597 - WARNING -     - VFG017842gbWP011988521: (pilQ) type IV pilus biogenesis protein PilQ [Type IV pili (VF0401) - Adherence (VFC0001)] [Yersinia pseudotuberculosis IP 31758]
+2026-05-12 11:16:54,597 - WARNING -     - gi54298666refYP125035.1: defect in organelle trafficking protein DotB (ATPase) [Legionella pneumophila str. Paris]
+2026-05-12 11:16:54,597 - INFO - Generated detection matrix: /home/nickd/Git/GeneFior/test_data/hmm_out/user-provided-db_detection_matrix.tsv
+2026-05-12 11:16:54,597 - INFO -   Total genes detected: 103
+2026-05-12 11:16:54,597 - INFO -   Tools used: 1
+2026-05-12 11:16:54,597 - INFO - 
+======================================================================
+2026-05-12 11:16:54,597 - INFO - PIPELINE SUMMARY
+2026-05-12 11:16:54,597 - INFO - ======================================================================
+2026-05-12 11:16:54,597 - INFO - 
+USER-PROVIDED-DB:
+2026-05-12 11:16:54,598 - INFO -   ✓ HMMER-PROTEIN................. 103 genes detected
+2026-05-12 11:16:54,598 - INFO - ======================================================================
+2026-05-12 11:16:54,598 - INFO - Detection matrices saved to: /home/nickd/Git/GeneFior/test_data/hmm_out
+2026-05-12 11:16:54,598 - INFO - Tool statistics saved to: /home/nickd/Git/GeneFior/test_data/hmm_out/tool_stats
+2026-05-12 11:16:54,598 - INFO - Raw outputs saved to: /home/nickd/Git/GeneFior/test_data/hmm_out/raw_outputs
+2026-05-12 11:16:54,598 - INFO - ======================================================================
+2026-05-12 11:16:54,598 - INFO - Cleaning up temporary files...
+2026-05-12 11:16:54,598 - INFO - ======================================================================
+2026-05-12 11:16:54,598 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/hmm_out/all_aa.gz
+2026-05-12 11:16:54,598 - INFO - Cleaned up 1 temporary file(s)

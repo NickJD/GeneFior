@@ -47,6 +47,37 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
         "minimap2": "minimap2db",
     }
     tool_tags = {tool: tool_tags[tool] for tool in tools if tool in tool_tags}  # Filter tags based on provided tools
+
+    # ---------- HMMER early discovery (handled separately, not via tool_tags loop) ----------
+    # Accept any of the common directory names for protein/dna HMM databases.
+    # Also detect any annotations CSV in the same directory.
+    hmmer_flat: Dict[str, str] = {}
+    base_dir_path = Path(base_dir)
+    _hmmer_protein_dirs = ('hmmer', 'hmmer_protein', 'hmm', 'hmm_protein')
+    _hmmer_dna_dirs = ('hmmer_dna', 'nhmmer', 'hmm_dna')
+    for _dirname, _key in (
+        *[(_d, 'hmmer_protein') for _d in _hmmer_protein_dirs],
+        *[(_d, 'hmmer_dna') for _d in _hmmer_dna_dirs],
+    ):
+        _candidate = base_dir_path / _dirname
+        if _candidate.is_dir():
+            _hmm_files = list(_candidate.glob('*.hmm'))
+            if _hmm_files:
+                hmmer_flat[_key] = str(_hmm_files[0])
+                # Look for an annotations CSV in the same directory
+                _csv_files = list(_candidate.glob('*.csv'))
+                if _csv_files and 'hmmer_annotations' not in hmmer_flat:
+                    hmmer_flat['hmmer_annotations'] = str(_csv_files[0])
+            break  # only use first matching directory per mode
+    # Also check the root base_dir itself for a .hmm file (flat layout)
+    if 'hmmer_protein' not in hmmer_flat and ('hmmer_protein' in (tools or []) or 'all' in (tools or [])):
+        _root_hmm = list(base_dir_path.glob('*.hmm'))
+        if _root_hmm:
+            hmmer_flat['hmmer_protein'] = str(_root_hmm[0])
+            _root_csv = list(base_dir_path.glob('*.csv'))
+            if _root_csv and 'hmmer_annotations' not in hmmer_flat:
+                hmmer_flat['hmmer_annotations'] = str(_root_csv[0])
+    # ---------- end HMMER discovery ----------
     # Initialise the result dictionary
     databases = {}
     # Iterate over subdirectories in the base directory
@@ -126,5 +157,10 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
                 # Only set if we have a truthy path
                 if path_val:
                     flat[tool_key] = path_val
+
+    # Merge HMMER results (only keys not already set by the loop above)
+    for k, v in hmmer_flat.items():
+        if k not in flat and v:
+            flat[k] = v
 
     return flat

@@ -1,0 +1,60 @@
+2026-05-04 13:54:48,116 - INFO - Database tool availability (per selected database):
+2026-05-04 13:54:48,117 - INFO -   user-provided-db: BLASTn: Yes; BLASTx: Yes; BLASTp: Yes; DIAMOND: Yes
+2026-05-04 13:54:48,117 - INFO - ======================================================================
+2026-05-04 13:54:48,117 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 13:54:48,117 - INFO - Started at: 2026-05-04 13:54:48
+2026-05-04 13:54:48,117 - INFO - ======================================================================
+2026-05-04 13:54:48,117 - INFO - Threads: 4
+2026-05-04 13:54:48,117 - INFO - Database(s) chosen:
+2026-05-04 13:54:48,117 - INFO -   User-Provided: resfinder
+2026-05-04 13:54:48,117 - INFO - Sequence type: Genes-FASTA (full-length gene FASTA). Read-mappers (bowtie2, bwa, minimap2) will be skipped by the workflow.
+2026-05-04 13:54:48,117 - INFO -   Genes declared as: DNA — will run BLASTn and translated protein searches (BLASTx / DIAMOND blastx).
+2026-05-04 13:54:48,117 - INFO -  Tool(s) chosen (note: read-mappers will be skipped for Genes-FASTA):
+2026-05-04 13:54:48,117 - INFO -   BLASTn: Yes
+2026-05-04 13:54:48,117 - INFO -   BLASTx: Yes
+2026-05-04 13:54:48,117 - INFO -   BLASTp: No
+2026-05-04 13:54:48,117 - INFO -   DIAMOND: Yes
+2026-05-04 13:54:48,117 - INFO -   Bowtie2: No
+2026-05-04 13:54:48,117 - INFO -   BWA: No
+2026-05-04 13:54:48,117 - INFO -   Minimap2: No
+2026-05-04 13:54:48,117 - INFO -   HMMER-Protein: No
+2026-05-04 13:54:48,117 - INFO -   HMMER-DNA: No
+2026-05-04 13:54:48,117 - INFO - Min query coverage: 40.0%
+2026-05-04 13:54:48,117 - INFO - Min query identity: 80.0%
+2026-05-04 13:54:48,117 - INFO - Min detection coverage: 80.0%
+2026-05-04 13:54:48,117 - INFO - Min detection identity: 80.0%
+2026-05-04 13:54:48,117 - INFO - Run DNA mode: True
+2026-05-04 13:54:48,117 - INFO - Run Protein mode: True
+2026-05-04 13:54:48,117 - INFO - Sensitivity parameters: default - None
+2026-05-04 13:54:48,117 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 13:54:48,117 - INFO - ======================================================================
+2026-05-04 13:54:48,117 - INFO - GeneFíor I/O processing...
+2026-05-04 13:54:48,117 - INFO - ======================================================================
+2026-05-04 13:54:48,117 - INFO - Input type: Genes-FASTA
+2026-05-04 13:54:48,117 - INFO - Input file: /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb.fa (2.97 MB)
+2026-05-04 13:54:48,117 - INFO - Copying Genes-FASTA to temp directory...
+2026-05-04 13:54:48,117 - INFO - Copying /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb.fa to temp directory /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna...
+2026-05-04 13:54:48,117 - INFO - File size: 2.97 MB
+2026-05-04 13:54:48,119 - INFO - Successfully copied to: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa
+2026-05-04 13:54:48,119 - INFO - Genes-FASTA will be read from temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa
+2026-05-04 13:54:48,119 - INFO - Output directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna
+2026-05-04 13:54:48,119 - INFO - Temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna
+2026-05-04 13:54:48,119 - INFO - Files tracked for cleanup: 1
+2026-05-04 13:54:48,119 - INFO -   - /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa
+2026-05-04 13:54:48,119 - INFO - ======================================================================
+2026-05-04 13:54:48,119 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 13:54:48,119 - INFO - Genes-input mode enabled: treating input as full-length gene FASTA(s). Skipping read-mappers.
+2026-05-04 13:54:48,119 - INFO - Using user-specified genes_type: dna
+2026-05-04 13:54:48,119 - INFO - Detected gene FASTA type: DNA. Will run BLASTn and translated protein searches (BLASTx/DIAMOND blastx).
+2026-05-04 13:54:48,119 - INFO - 
+### Processing User-provided-db Database ###
+2026-05-04 13:54:48,119 - INFO - Parameters for user-provided-db - BLASTn: blastn -query /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40 -perc_identity 80.0
+2026-05-04 13:54:48,119 - INFO - gz_input=False, fasta=/home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa
+2026-05-04 13:54:54,454 - INFO - Filtered user-provided-db - BLASTn output /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/raw_outputs/user-provided-db_blastn_results.tsv: kept 202816/202819 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 13:55:10,327 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTn: 3212
+2026-05-04 13:55:10,327 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTn: 202816
+2026-05-04 13:55:10,327 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTn: 202816
+2026-05-04 13:55:10,327 - INFO - Detected 3212 genes in USER-PROVIDED-DB using BLASTn
+2026-05-04 13:55:10,335 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/tool_stats/user-provided-db_BLASTn_stats.tsv
+2026-05-04 13:55:10,343 - INFO - Parameters for user-provided-db - BLASTx: blastx -query /home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa -task blastx-fast -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 13:55:10,343 - INFO - gz_input=False, fasta=/home/nickd/Git/GeneFior/test_data/outputs/out_genes_dna/all_blastdb.fa

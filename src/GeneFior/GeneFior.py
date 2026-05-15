@@ -106,8 +106,9 @@ Examples:
     # When using Genes-FASTA, require the user to state whether sequences are DNA or AA
     required_group.add_argument('--genes-type', choices=['dna', 'aa'], dest='genes_type', default=None,
                                    help='(Required when -st Genes-FASTA) Specify whether provided genes FASTA contains DNA (dna) or amino-acid sequences (aa)')
-    required_group.add_argument('--db-path', dest='user_db_path', type=str, required=True,
-                          help='Path to the directory containing user-provided databases in correct format (see build_databases.sh) (can supply multiple paths separated by commas)')
+    required_group.add_argument('--db-path', dest='user_db_path', type=str, required=False, default=None,
+                          help='Path to the directory containing user-provided databases in correct format (see build_databases.sh) (can supply multiple paths separated by commas). '
+                               'Not required when --hmmer-only is used with --hmmer-db and/or --hmmer-dna-db.')
     required_group.add_argument('-o', '--output', required=True,
                         help='Output directory for results')
 
@@ -125,8 +126,9 @@ Examples:
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
     tool_group.add_argument('--tools', nargs='+',
-                            choices=['blastn', 'blastx', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2', 'all'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=['diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
+                            choices=['blastn', 'blastx', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2',
+                                     'hmmer_protein', 'hmmer_dna', 'all'],
+                            default=['diamond', 'bowtie2', 'bwa', 'minimap2'],
                             help='Specify which tools to run - "all" will run all tools'
                                  ' (default: all except blastx/p as they can be slow!!)')
 
@@ -189,6 +191,43 @@ Examples:
     tool_params_group.add_argument('--min-bitscore', type=float, default=None,
                                    help='Minimum bitscore threshold to apply to BLAST/DIAMOND hits (if not set, no bitscore filtering is applied)')
 
+    # HMMER-specific arguments
+    hmmer_group = parser.add_argument_group('HMMER Parameters')
+    hmmer_group.add_argument('--hmmer-only', dest='hmmer_only', action='store_true', default=False,
+                             help='Run ONLY HMMER searches (hmmer_protein and/or hmmer_dna). '
+                                  'When set, --db-path is not required — provide the HMM database(s) via '
+                                  '--hmmer-db and/or --hmmer-dna-db. All other alignment tools are disabled.')
+    hmmer_group.add_argument('--hmmer-db', dest='hmmer_db', default=None,
+                             help='Path to a protein HMM database file (.hmm) for hmmsearch. '
+                                  'Enables HMMER protein search even if "hmmer_protein" is not listed in --tools. '
+                                  'When used with --hmmer-only, this is the sole database required. '
+                                  'Example: /path/to/biorisk.hmm')
+    hmmer_group.add_argument('--hmmer-dna-db', dest='hmmer_dna_db', default=None,
+                             help='Path to a DNA HMM database file (.hmm) for nhmmer. '
+                                  'Enables HMMER DNA search even if "hmmer_dna" is not listed in --tools. '
+                                  'When used with --hmmer-only, this is the sole database required.')
+    hmmer_group.add_argument('--hmmer-annotations', dest='hmmer_annotations', default=None,
+                             help='Path to a CSV file mapping HMM profile IDs to descriptions '
+                                  '(columns: ID, Description, Must flag). Used with --hmmer-db to annotate '
+                                  'detected genes. Example: /path/to/biorisk_annotations.csv')
+    hmmer_group.add_argument('--hmmer-evalue', dest='hmmer_evalue', type=float, default=None,
+                             help='E-value threshold specifically for HMMER (hmmsearch / nhmmer). '
+                                  'Overrides the global -e/--evalue for HMMER only, allowing different '
+                                  'stringency for HMMER vs BLAST/DIAMOND. If unset, falls back to -e if '
+                                  'that is set, otherwise uses HMMER\'s own default (E=10, very permissive). '
+                                  'Recommended: 1e-5 for Genes-FASTA, 1e-3 for read inputs. '
+                                  'Not used when --hmmer-threshold-mode is tc/ga/nc.')
+    hmmer_group.add_argument('--hmmer-threshold-mode', dest='hmmer_threshold_mode',
+                             choices=['evalue', 'tc', 'ga', 'nc'],
+                             default='evalue',
+                             help='Threshold mode for HMMER: "evalue" (default) uses the E-value threshold '
+                                  '(-e or --hmmer-evalue). "tc" / "ga" / "nc" use the per-profile trusted / '
+                                  'gathering / noise cutoff scores embedded in the HMM database '
+                                  '(--cut_tc / --cut_ga / --cut_nc flags passed to hmmsearch/nhmmer). '
+                                  'Recommended: "tc" when your HMM database was built with per-profile '
+                                  'TC scores (e.g. ibbis biorisk.hmm). When using tc/ga/nc the --hmmer-evalue '
+                                  'threshold is ignored and E-value post-filtering is disabled.')
+
     # Runtime parameters
     runtime_group = parser.add_argument_group('Runtime Parameters')
     runtime_group.add_argument('-t', '--threads', type=int, default=4,
@@ -215,6 +254,26 @@ Examples:
                             help='Show program version and exit')
 
     options = parser.parse_args()
+
+    # --hmmer-only special case: restrict tools to HMMER only and make --db-path optional
+    if getattr(options, 'hmmer_only', False):
+        if not getattr(options, 'hmmer_db', None) and not getattr(options, 'hmmer_dna_db', None):
+            print("Error: --hmmer-only requires at least one of --hmmer-db or --hmmer-dna-db to be specified", file=sys.stderr)
+            sys.exit(1)
+        # Override tools to HMMER only
+        options.tools = []
+        if getattr(options, 'hmmer_db', None):
+            options.tools.append('hmmer_protein')
+        if getattr(options, 'hmmer_dna_db', None):
+            options.tools.append('hmmer_dna')
+        # Provide a dummy db-path placeholder so downstream code doesn't fail
+        if not getattr(options, 'user_db_path', None):
+            options.user_db_path = '__hmmer_only__'
+    else:
+        # Normal path: --db-path is required
+        if not getattr(options, 'user_db_path', None):
+            print("Error: --db-path is required unless --hmmer-only is specified", file=sys.stderr)
+            sys.exit(1)
 
     # Enforce genes_type when sequence_type is Genes-FASTA
     if getattr(options, 'sequence_type', None) == 'Genes-FASTA' and getattr(options, 'genes_type', None) is None:
@@ -277,14 +336,50 @@ Examples:
                 # Non-Genes inputs: include all DNA/protein/mapping tools
                 options.tools = ['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2']
 
+        # If --hmmer-db is provided, ensure hmmer_protein is in tools (auto-enable)
+        if getattr(options, 'hmmer_db', None) and 'hmmer_protein' not in options.tools:
+            options.tools = list(options.tools) + ['hmmer_protein']
+        if getattr(options, 'hmmer_dna_db', None) and 'hmmer_dna' not in options.tools:
+            options.tools = list(options.tools) + ['hmmer_dna']
+
         # Initialise database variables to avoid UnboundLocalError
         user_dbs = None
         # Load database from provided path
-        if not hasattr(options, 'user_db_path') or not os.path.isdir(options.user_db_path):
+        if getattr(options, 'hmmer_only', False) and options.user_db_path == '__hmmer_only__':
+            # HMMER-only mode: no conventional database directory needed.
+            # HMM files will be injected below via --hmmer-db / --hmmer-dna-db.
+            user_dbs = {}
+        elif not hasattr(options, 'user_db_path') or not os.path.isdir(options.user_db_path):
             print("Error: Please provide a valid directory path for user-provided databases using --db-path",
                   file=sys.stderr)
             sys.exit(1)
-        user_dbs = gather_databases(options.user_db_path, options.tools)
+        else:
+            user_dbs = gather_databases(options.user_db_path, options.tools)
+
+        # Inject HMM databases provided via --hmmer-db / --hmmer-dna-db / --hmmer-annotations
+        if getattr(options, 'hmmer_db', None):
+            if os.path.isfile(options.hmmer_db):
+                user_dbs['hmmer_protein'] = options.hmmer_db
+            else:
+                logger.warning(f"--hmmer-db path not found or not a file: {options.hmmer_db}; ignoring.")
+        if getattr(options, 'hmmer_dna_db', None):
+            if os.path.isfile(options.hmmer_dna_db):
+                user_dbs['hmmer_dna'] = options.hmmer_dna_db
+            else:
+                logger.warning(f"--hmmer-dna-db path not found or not a file: {options.hmmer_dna_db}; ignoring.")
+        if getattr(options, 'hmmer_annotations', None):
+            if os.path.isfile(options.hmmer_annotations):
+                user_dbs['hmmer_annotations'] = options.hmmer_annotations
+            else:
+                logger.warning(f"--hmmer-annotations path not found: {options.hmmer_annotations}; ignoring.")
+        elif user_dbs.get('hmmer_protein') and 'hmmer_annotations' not in user_dbs:
+            # Auto-detect annotations CSV in the same directory as the HMM file
+            import glob as _glob
+            _hmm_dir = os.path.dirname(user_dbs['hmmer_protein'])
+            _csv_candidates = _glob.glob(os.path.join(_hmm_dir, '*.csv'))
+            if _csv_candidates:
+                user_dbs['hmmer_annotations'] = _csv_candidates[0]
+                logger.info(f"  Auto-detected HMMER annotations: {_csv_candidates[0]}")
 
         databases = {
             'user-provided-db': user_dbs
@@ -375,6 +470,8 @@ Examples:
         logger.info("=" * 70)
         logger.info("Genefíor - The Gene Detection toolkit: " + GENEFIOR_VERSION)
         logger.info("Started at: " + start_time.strftime("%Y-%m-%d %H:%M:%S"))
+        if getattr(options, 'hmmer_only', False):
+            logger.info("Mode: HMMER-ONLY — all other alignment tools are disabled.")
         logger.info("=" * 70)
         ###
         # Log input files (handle new FASTA/FASTQ possibilities)
@@ -395,7 +492,7 @@ Examples:
 
         logger.info(f"Threads: {options.threads}")
         logger.info(f"Database(s) chosen:")
-        logger.info(f"  User-Provided: {os.path.basename(os.path.normpath(options.user_db_path)) if 'user-provided-db' in databases and getattr(options, 'user_db_path', None) else 'No'}")
+        logger.info(f"  User-Provided: {os.path.basename(os.path.normpath(options.user_db_path)) if 'user-provided-db' in databases and getattr(options, 'user_db_path', None) and options.user_db_path != '__hmmer_only__' else ('N/A (HMMER-only mode)' if getattr(options, 'hmmer_only', False) else 'No')}")
 
         # If user selected Genes-FASTA input, clarify that read-mappers will be skipped
         if getattr(options, 'sequence_type', None) == 'Genes-FASTA':
@@ -418,6 +515,8 @@ Examples:
             logger.info(f"  Bowtie2: {'Present (will be SKIPPED)' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Present (will be SKIPPED)' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Present (will be SKIPPED)' if 'minimap2' in options.tools else 'No'}")
+            logger.info(f"  HMMER-Protein: {'Yes' if 'hmmer_protein' in options.tools or user_dbs.get('hmmer_protein') else 'No'}")
+            logger.info(f"  HMMER-DNA: {'Yes' if 'hmmer_dna' in options.tools or user_dbs.get('hmmer_dna') else 'No'}")
         else:
             logger.info(f" Tool(s) chosen:")
             logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
@@ -427,6 +526,8 @@ Examples:
             logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
+            logger.info(f"  HMMER-Protein: {'Yes' if 'hmmer_protein' in options.tools or user_dbs.get('hmmer_protein') else 'No'}")
+            logger.info(f"  HMMER-DNA: {'Yes' if 'hmmer_dna' in options.tools or user_dbs.get('hmmer_dna') else 'No'}")
 
         # logger.info(f"E-value threshold: {evalue}")
         logger.info(f"Min query coverage: {options.query_min_coverage}%")
@@ -451,6 +552,19 @@ Examples:
             f"{tool}: {params}" for tool, params in tool_sensitivity_params.items()
         ) if tool_sensitivity_params else "None"
         logger.info(f"Sensitivity parameters: {options.sensitivity} - {params_str}")
+        # Log HMMER-specific threshold configuration
+        _hmmer_tmode = getattr(options, 'hmmer_threshold_mode', 'evalue')
+        _hmmer_ev = getattr(options, 'hmmer_evalue', None)
+        if 'hmmer_protein' in getattr(options, 'tools', []) or 'hmmer_dna' in getattr(options, 'tools', []):
+            logger.info(f"HMMER threshold mode: {_hmmer_tmode}")
+            if _hmmer_tmode == 'evalue':
+                _ev_display = _hmmer_ev if _hmmer_ev is not None else (
+                    getattr(options, 'evalue', None) if getattr(options, 'evalue', None) is not None
+                    else "HMMER default (E=10) — consider setting --hmmer-evalue for tighter control"
+                )
+                logger.info(f"  HMMER E-value: {_ev_display}")
+            else:
+                logger.info(f"  HMMER using per-profile {_hmmer_tmode.upper()} cutoffs (--cut_{_hmmer_tmode}); E-value post-filtering disabled")
         #logger.info("=" * 70)
         # Compute max_fasta_chunk_bytes early so batch/sample loop can reuse it
         max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 200.0))
@@ -564,7 +678,9 @@ Examples:
                         chunk_jobs=sample_opts.chunk_jobs,
                         chunk_threads_per_job=sample_opts.chunk_threads_per_job,
                         preserve_chunks=sample_opts.preserve_chunks,
-                        max_fasta_chunk_bytes=max_fasta_chunk_bytes
+                        max_fasta_chunk_bytes=max_fasta_chunk_bytes,
+                        hmmer_evalue=getattr(options, 'hmmer_evalue', None),
+                        hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
                     )
 
                     results = workflow.run_workflow(sample_opts)
@@ -605,16 +721,12 @@ Examples:
             input_fastq=options.input_fastq,
             output_dir=options.output,
             databases=databases,
-            # resfinder_dbs=resfinder_dbs,
-            # card_dbs=card_dbs,
             threads=options.threads,
             tool_sensitivity_params=tool_sensitivity_params,
             evalue=options.evalue,
             min_bitscore=options.min_bitscore,
             extra_tool_params=tool_extra_params,
             blastx_task=options.blastx_task,
-            #max_target_seqs=options.max_target_seqs,
-            #evalue=options.evalue,
             query_min_coverage=options.query_min_coverage,
             query_min_identity=options.query_min_identity,
             detection_min_coverage=options.detection_min_coverage,
@@ -633,7 +745,9 @@ Examples:
             chunk_jobs=options.chunk_jobs,
             chunk_threads_per_job=options.chunk_threads_per_job,
             preserve_chunks=options.preserve_chunks,
-            max_fasta_chunk_bytes=max_fasta_chunk_bytes
+            max_fasta_chunk_bytes=max_fasta_chunk_bytes,
+            hmmer_evalue=getattr(options, 'hmmer_evalue', None),
+            hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
         )
 
         ###

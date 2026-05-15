@@ -1,6 +1,13 @@
---- /var/folders/y_/p9fxs7c92t93sf12wkkm7nt40000gq/T/checksums_old.XXXXXX.7sDq44OCM4	2026-04-20 12:18:43
-+++ /var/folders/y_/p9fxs7c92t93sf12wkkm7nt40000gq/T/checksums_new.XXXXXX.2ZxU2d6Us6	2026-04-20 12:18:43
-@@ -1,2 +1,2 @@
--7406e05b2364d22ed5ee112988f6e38275843caa18e9c2bfe951aa4bb230db6e  ./run_parameters.json
-+390f14c32f11956795a2fd47db58da588b70e1c0f94df76c177beb684af097ca  ./run_parameters.json
+--- /tmp/checksums_old.BSzTQ7	2026-05-04 14:00:55.332206039 +0200
++++ /tmp/checksums_new.U3FL42	2026-05-04 14:00:55.326206009 +0200
+@@ -1,2 +1,9 @@
+-390f14c32f11956795a2fd47db58da588b70e1c0f94df76c177beb684af097ca  ./run_parameters.json
++4cce17c0c526c5445e72cd6b6d6364f4dc96b59120316bc7cc0fea6f9381696e  ./raw_outputs/user-provided-db_bowtie2_results.sam
++516ffcb69f7a2b233d50340a8dc45fceb29ebf43b8fbefcdf3126a1f3e868f8c  ./run_parameters.json
++5934d59701e4b13226b883e68bc1931f547a0aa0f804cdd2c4a5a94fd0e50b8b  ./raw_outputs/user-provided-db_bowtie2_summary.txt
++5a2edd8e73d9855dda4539772193bd0de104ae35ecfe54048f4b2a681c26bbd6  ./raw_outputs/user-provided-db_bowtie2_results_sorted.bam
++6ee65f6f2ad9cc6f3e300684cbae862f18a5cf82d875f86dbc119fbff03bf860  ./user-provided-db_detection_matrix.tsv
++7469a671c613ceb771adb1aee2d2b51c125fbcb83cd1f44b4dfe884cf0c02340  ./raw_outputs/user-provided-db_bowtie2_results.bam
++97b160526f39403d29144b234361ba52d0e170f9ce89459fc9ef263e4223df6f  ./raw_outputs/user-provided-db_bowtie2_results_sorted.bam.bai
  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw_outputs/user-provided-db_blastx_results.tsv
++f256120bef95e2ec354c6166e425648eaf8f0822423f48f97c7c33229cd98b7f  ./tool_stats/user-provided-db_Bowtie2_stats.tsv

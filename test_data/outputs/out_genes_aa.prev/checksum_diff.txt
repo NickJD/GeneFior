@@ -1,0 +1,11 @@
+--- /tmp/checksums_old.btvZy3	2026-05-04 13:48:59.474421295 +0200
++++ /tmp/checksums_new.bVDzN0	2026-05-04 13:48:59.469421266 +0200
+@@ -1,2 +1,6 @@
+-3eaf64382f85726489049677fbbfe314645e022501e96a4ef6e7dcb3b6f68472  ./run_parameters.json
+-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw_outputs/user-provided-db_blastp_results.tsv
++066642c12cfb4b322a1cadfb7c00e9c762a2a8a5a7b496035d6ee51bc3d49e8f  ./raw_outputs/user-provided-db_blastp_results.tsv
++66d30c19c82cfd3a2856ffb143eaf3101eac30051ccd73c89e29404642091bca  ./tool_stats/user-provided-db_BLASTp_stats.tsv
++7469b7b211442daa7d701d444b169d49685db06da95d2b243032388dda785a51  ./run_parameters.json
++839f7525be66eb2a12cb888974a06d18b94c570d2563d15c23ec9b2a225a626b  ./tool_stats/user-provided-db_DIAMOND-BLASTP_stats.tsv
++e58681011d1ffbcb9a10e57cf3b8dc558f8bdb8cc4541ca539749ab083476155  ./user-provided-db_detection_matrix.tsv
++e8830c7764e181c6ee14aed1e26691cf69c90ca9fa295cd337875a87105431d5  ./raw_outputs/user-provided-db_diamond_results.tsv

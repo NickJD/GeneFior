@@ -1,75 +1,241 @@
-2026-04-20 12:18:43,253 - INFO - Database tool availability (per selected database):
-2026-04-20 12:18:43,253 - INFO -   user-provided-db: BLASTn: Yes; BLASTx: Yes; BLASTp: Yes; DIAMOND: No
-2026-04-20 12:18:43,253 - INFO - ======================================================================
-2026-04-20 12:18:43,253 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
-2026-04-20 12:18:43,253 - INFO - Started at: 2026-04-20 12:18:43
-2026-04-20 12:18:43,253 - INFO - ======================================================================
-2026-04-20 12:18:43,253 - INFO - Threads: 4
-2026-04-20 12:18:43,253 - INFO - Database(s) chosen:
-2026-04-20 12:18:43,253 - INFO -   User-Provided: resfinder
-2026-04-20 12:18:43,253 - INFO -  Tool(s) chosen:
-2026-04-20 12:18:43,253 - INFO -   BLASTn: Yes
-2026-04-20 12:18:43,253 - INFO -   BLASTx: Yes
-2026-04-20 12:18:43,253 - INFO -   BLASTp: No
-2026-04-20 12:18:43,253 - INFO -   DIAMOND: Yes
-2026-04-20 12:18:43,253 - INFO -   Bowtie2: Yes
-2026-04-20 12:18:43,253 - INFO -   BWA: Yes
-2026-04-20 12:18:43,253 - INFO -   Minimap2: Yes
-2026-04-20 12:18:43,253 - INFO - Min query coverage: 40.0%
-2026-04-20 12:18:43,254 - INFO - Min query identity: 80.0%
-2026-04-20 12:18:43,254 - INFO - Min detection coverage: 80.0%
-2026-04-20 12:18:43,254 - INFO - Min detection identity: 80.0%
-2026-04-20 12:18:43,254 - INFO - Run DNA mode: True
-2026-04-20 12:18:43,254 - INFO - Run Protein mode: True
-2026-04-20 12:18:43,254 - INFO - Sensitivity parameters: default - None
-2026-04-20 12:18:43,254 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
-2026-04-20 12:18:43,254 - INFO - ======================================================================
-2026-04-20 12:18:43,254 - INFO - GeneFíor I/O processing...
-2026-04-20 12:18:43,254 - INFO - ======================================================================
-2026-04-20 12:18:43,254 - INFO - Input type: Single-FASTA
-2026-04-20 12:18:43,254 - INFO - Input file: /Users/nicholas/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz (5.58 MB)
-2026-04-20 12:18:43,254 - INFO - Copying FASTA to temp directory...
-2026-04-20 12:18:43,254 - INFO - Copying /Users/nicholas/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz to temp directory /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta...
-2026-04-20 12:18:43,254 - INFO - File size: 5.58 MB
-2026-04-20 12:18:43,258 - INFO - Successfully copied to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,258 - INFO - FASTA will be read from temp directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,258 - INFO - Output directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
-2026-04-20 12:18:43,258 - INFO - Temp directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
-2026-04-20 12:18:43,259 - INFO - Files tracked for cleanup: 1
-2026-04-20 12:18:43,259 - INFO -   - /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,259 - INFO - ======================================================================
-2026-04-20 12:18:43,259 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
-2026-04-20 12:18:43,259 - INFO - 
+2026-05-04 14:00:55,394 - INFO - Database tool availability (per selected database):
+2026-05-04 14:00:55,394 - INFO -   user-provided-db: BLASTn: Yes; BLASTx: Yes; BLASTp: Yes; DIAMOND: Yes
+2026-05-04 14:00:55,394 - INFO - ======================================================================
+2026-05-04 14:00:55,394 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 14:00:55,394 - INFO - Started at: 2026-05-04 14:00:55
+2026-05-04 14:00:55,394 - INFO - ======================================================================
+2026-05-04 14:00:55,394 - INFO - Threads: 4
+2026-05-04 14:00:55,394 - INFO - Database(s) chosen:
+2026-05-04 14:00:55,394 - INFO -   User-Provided: resfinder
+2026-05-04 14:00:55,394 - INFO -  Tool(s) chosen:
+2026-05-04 14:00:55,394 - INFO -   BLASTn: Yes
+2026-05-04 14:00:55,394 - INFO -   BLASTx: Yes
+2026-05-04 14:00:55,394 - INFO -   BLASTp: No
+2026-05-04 14:00:55,394 - INFO -   DIAMOND: Yes
+2026-05-04 14:00:55,394 - INFO -   Bowtie2: Yes
+2026-05-04 14:00:55,394 - INFO -   BWA: Yes
+2026-05-04 14:00:55,394 - INFO -   Minimap2: Yes
+2026-05-04 14:00:55,394 - INFO -   HMMER-Protein: No
+2026-05-04 14:00:55,394 - INFO -   HMMER-DNA: No
+2026-05-04 14:00:55,394 - INFO - Min query coverage: 40.0%
+2026-05-04 14:00:55,394 - INFO - Min query identity: 80.0%
+2026-05-04 14:00:55,394 - INFO - Min detection coverage: 80.0%
+2026-05-04 14:00:55,394 - INFO - Min detection identity: 80.0%
+2026-05-04 14:00:55,394 - INFO - Run DNA mode: True
+2026-05-04 14:00:55,395 - INFO - Run Protein mode: True
+2026-05-04 14:00:55,395 - INFO - Sensitivity parameters: default - None
+2026-05-04 14:00:55,395 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:00:55,395 - INFO - ======================================================================
+2026-05-04 14:00:55,395 - INFO - GeneFíor I/O processing...
+2026-05-04 14:00:55,395 - INFO - ======================================================================
+2026-05-04 14:00:55,395 - INFO - Input type: Single-FASTA
+2026-05-04 14:00:55,395 - INFO - Input file: /home/nickd/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz (5.58 MB)
+2026-05-04 14:00:55,395 - INFO - Copying FASTA to temp directory...
+2026-05-04 14:00:55,395 - INFO - Copying /home/nickd/Git/GeneFior/test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz to temp directory /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta...
+2026-05-04 14:00:55,395 - INFO - File size: 5.58 MB
+2026-05-04 14:00:55,400 - INFO - Successfully copied to: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:00:55,400 - INFO - FASTA will be read from temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:00:55,400 - INFO - Output directory: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-05-04 14:00:55,400 - INFO - Temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-05-04 14:00:55,400 - INFO - Files tracked for cleanup: 1
+2026-05-04 14:00:55,400 - INFO -   - /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:00:55,400 - INFO - ======================================================================
+2026-05-04 14:00:55,400 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:00:55,400 - INFO - 
 ### Processing User-provided-db Database ###
-2026-04-20 12:18:43,259 - INFO - Parameters for user-provided-db - BLASTn: blastn -query - -db /Users/nicholas/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40 -perc_identity 80.0
-2026-04-20 12:18:43,259 - INFO - gz_input=True, fasta=/Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,266 - INFO - user-provided-db - BLASTn stderr: stdbuf: blastn: No such file or directory
-2026-04-20 12:18:43,266 - ERROR - user-provided-db - BLASTn failed with return code 2
-2026-04-20 12:18:43,266 - INFO - Parameters for user-provided-db - BLASTx: blastx -query - -task blastx-fast -db /Users/nicholas/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
-2026-04-20 12:18:43,266 - INFO - gz_input=True, fasta=/Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,272 - INFO - user-provided-db - BLASTx stderr: stdbuf: blastx: No such file or directory
-2026-04-20 12:18:43,272 - ERROR - user-provided-db - BLASTx failed with return code 2
-2026-04-20 12:18:43,272 - INFO - No detections found for user-provided-db - No matrix generated.
-2026-04-20 12:18:43,272 - INFO - 
+2026-05-04 14:00:55,401 - INFO - Parameters for user-provided-db - BLASTn: blastn -query - -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40 -perc_identity 80.0
+2026-05-04 14:00:55,401 - INFO - gz_input=True, fasta=/home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:01:01,851 - INFO - Filtered user-provided-db - BLASTn output /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_blastn_results.tsv: kept 972/996 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 14:01:02,033 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTn: 100000
+2026-05-04 14:01:02,034 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTn: 972
+2026-05-04 14:01:02,034 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTn: 972
+2026-05-04 14:01:02,034 - INFO - Detected 14 genes in USER-PROVIDED-DB using BLASTn
+2026-05-04 14:01:02,034 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats/user-provided-db_BLASTn_stats.tsv
+2026-05-04 14:01:02,034 - INFO - Parameters for user-provided-db - BLASTx: blastx -query - -task blastx-fast -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 14:01:02,034 - INFO - gz_input=True, fasta=/home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:43:58,701 - INFO - Filtered user-provided-db - BLASTx output /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_blastx_results.tsv: kept 1544/43705 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 14:43:58,714 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTx: 100000
+2026-05-04 14:43:58,715 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTx: 1544
+2026-05-04 14:43:58,715 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTx: 1544
+2026-05-04 14:43:58,715 - INFO - Detected 12 genes in USER-PROVIDED-DB using BLASTx
+2026-05-04 14:43:58,715 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats/user-provided-db_BLASTx_stats.tsv
+2026-05-04 14:43:58,715 - INFO - Checking if input FASTA ` /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz ` is gzipped and not broken...
+2026-05-04 14:43:58,799 - INFO - Input FASTA ` /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz ` appears to be a valid gzip file.
+2026-05-04 14:43:58,799 - INFO - Running user-provided-db - DIAMOND-BLASTX...
+2026-05-04 14:43:58,799 - INFO - Parameters for user-provided-db - DIAMOND-BLASTX: diamond blastx -q /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz -d /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_diamond_results.tsv -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen --header --id 80.0 --query-cover 40.0 -p 4
+2026-05-04 14:44:00,377 - INFO - user-provided-db - DIAMOND-BLASTX completed successfully
+2026-05-04 14:44:00,377 - INFO - user-provided-db - DIAMOND-BLASTX stderr:
+diamond v2.1.9.163 (C) Max Planck Society for the Advancement of Science, Benjamin Buchfink, University of Tuebingen
+Documentation, support and updates available at http://www.diamondsearch.org
+Please cite: http://dx.doi.org/10.1038/s41592-021-01101-x Nature Methods (2021)
+
+#CPU threads: 4
+Scoring parameters: (Matrix=BLOSUM62 Lambda=0.267 K=0.041 Penalties=11/1)
+Temporary directory: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs
+#Target sequences to report alignments for: 25
+Opening the database...  [0.001s]
+Database: /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd (type: Diamond database, sequences: 3212, letters: 996607)
+Block size = 2000000000
+Opening the input file...  [0.05s]
+Opening the output file...  [0s]
+Loading query sequences...  [0.207s]
+Masking queries...  [0.476s]
+Algorithm: Double-indexed
+Building query histograms...  [0.127s]
+Seeking in database...  [0s]
+Loading reference sequences...  [0s]
+Masking reference...  [0.009s]
+Initializing temporary storage...  [0s]
+Building reference histograms...  [0.006s]
+Allocating buffers...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 1/4.
+Building reference seed array...  [0.002s]
+Building query seed array...  [0.051s]
+Computing hash join...  [0.007s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.001s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 2/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.057s]
+Computing hash join...  [0.007s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 3/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.062s]
+Computing hash join...  [0.009s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.002s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 4/4.
+Building reference seed array...  [0.006s]
+Building query seed array...  [0.065s]
+Computing hash join...  [0.007s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 1/4.
+Building reference seed array...  [0.002s]
+Building query seed array...  [0.045s]
+Computing hash join...  [0.006s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 2/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.053s]
+Computing hash join...  [0.006s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 3/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.057s]
+Computing hash join...  [0.006s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 4/4.
+Building reference seed array...  [0.002s]
+Building query seed array...  [0.047s]
+Computing hash join...  [0.013s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.001s]
+Deallocating memory...  [0s]
+Deallocating buffers...  [0.004s]
+Clearing query masking...  [0.006s]
+Computing alignments... Loading trace points...  [0.004s]
+Sorting trace points...  [0s]
+Computing alignments...  [0.096s]
+Deallocating buffers...  [0s]
+Loading trace points...  [0s]
+ [0.105s]
+Deallocating reference...  [0s]
+Loading reference sequences...  [0s]
+Deallocating buffers...  [0s]
+Deallocating queries...  [0.007s]
+Loading query sequences...  [0s]
+Closing the input file...  [0s]
+Closing the output file...  [0s]
+Closing the database...  [0s]
+Cleaning up...  [0s]
+Total time = 1.554s
+Reported 1108 pairwise alignments, 1108 HSPs.
+158 queries aligned.
+2026-05-04 14:44:00,397 - INFO - Total reads processed in USER-PROVIDED-DB using DIAMOND-BLASTX: 100000
+2026-05-04 14:44:00,398 - INFO - Reads that returned a hit in USER-PROVIDED-DB using DIAMOND-BLASTX: 1108
+2026-05-04 14:44:00,398 - INFO - Reads passing thresholds in USER-PROVIDED-DB using DIAMOND-BLASTX: 1108
+2026-05-04 14:44:00,398 - INFO - Detected 12 genes in USER-PROVIDED-DB using DIAMOND-BLASTX
+2026-05-04 14:44:00,399 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats/user-provided-db_DIAMOND-BLASTX_stats.tsv
+2026-05-04 14:44:00,399 - INFO - Running user-provided-db - Bowtie2...
+2026-05-04 14:44:00,399 - INFO - Parameters for user-provided-db - Bowtie2: bowtie2 -f -U /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz -x /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/bowtie2/all_bowtie2db -S /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results.sam -p 4 --no-unal --met-file /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_summary.txt
+2026-05-04 14:44:01,536 - INFO - user-provided-db - Bowtie2 completed successfully
+2026-05-04 14:44:01,536 - INFO - user-provided-db - Bowtie2 stderr:
+100000 reads; of these:
+  100000 (100.00%) were unpaired; of these:
+    99872 (99.87%) aligned 0 times
+    17 (0.02%) aligned exactly 1 time
+    111 (0.11%) aligned >1 times
+0.13% overall alignment rate
+2026-05-04 14:44:01,536 - INFO - Running user-provided-db - SAM to BAM conversion...
+2026-05-04 14:44:01,536 - INFO - Parameters for user-provided-db - SAM to BAM conversion: samtools view -bS /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results.sam -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results.bam
+2026-05-04 14:44:01,555 - INFO - user-provided-db - SAM to BAM conversion completed successfully
+2026-05-04 14:44:01,555 - INFO - Running user-provided-db - BAM sorting...
+2026-05-04 14:44:01,555 - INFO - Parameters for user-provided-db - BAM sorting: samtools sort /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results.bam -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:44:01,565 - INFO - user-provided-db - BAM sorting completed successfully
+2026-05-04 14:44:01,565 - INFO - Running user-provided-db - BAM indexing...
+2026-05-04 14:44:01,565 - INFO - Parameters for user-provided-db - BAM indexing: samtools index /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:44:01,568 - INFO - user-provided-db - BAM indexing completed successfully
+2026-05-04 14:44:01,578 - INFO - Reads that returned a hit in USER-PROVIDED-DB using Bowtie2: 128
+2026-05-04 14:44:01,578 - INFO - Reads passing thresholds in USER-PROVIDED-DB using Bowtie2: 128
+2026-05-04 14:44:01,578 - INFO - Detected 0 genes in USER-PROVIDED-DB using Bowtie2
+2026-05-04 14:44:01,578 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats/user-provided-db_Bowtie2_stats.tsv
+2026-05-04 14:44:01,578 - INFO - Running user-provided-db - BWA...
+2026-05-04 14:44:01,578 - INFO - Parameters for user-provided-db - BWA: bwa mem -t 4 -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results.sam /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/bwa/all_bwadb /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:44:02,746 - INFO - user-provided-db - BWA completed successfully
+2026-05-04 14:44:02,746 - INFO - user-provided-db - BWA stderr:
+[M::bwa_idx_load_from_disk] read 0 ALT contigs
+[M::process] read 100000 sequences (15100000 bp)...
+[M::mem_process_seqs] Processed 100000 reads in 4.071 CPU sec, 1.019 real sec
+[main] Version: 0.7.17-r1188
+[main] CMD: bwa mem -t 4 -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results.sam /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/bwa/all_bwadb /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+[main] Real time: 1.164 sec; CPU: 4.194 sec
+2026-05-04 14:44:02,746 - INFO - Running user-provided-db - SAM to BAM conversion...
+2026-05-04 14:44:02,746 - INFO - Parameters for user-provided-db - SAM to BAM conversion: samtools view -bS /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results.sam -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results.bam
+2026-05-04 14:44:02,911 - INFO - user-provided-db - SAM to BAM conversion completed successfully
+2026-05-04 14:44:02,912 - INFO - Running user-provided-db - BAM sorting...
+2026-05-04 14:44:02,912 - INFO - Parameters for user-provided-db - BAM sorting: samtools sort /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results.bam -o /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results_sorted.bam
+2026-05-04 14:44:03,108 - INFO - user-provided-db - BAM sorting completed successfully
+2026-05-04 14:44:03,108 - INFO - Running user-provided-db - BAM indexing...
+2026-05-04 14:44:03,108 - INFO - Parameters for user-provided-db - BAM indexing: samtools index /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs/user-provided-db_bwa_results_sorted.bam
+2026-05-04 14:44:03,139 - INFO - user-provided-db - BAM indexing completed successfully
+2026-05-04 14:44:03,193 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BWA: 165
+2026-05-04 14:44:03,194 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BWA: 159
+2026-05-04 14:44:03,194 - INFO - Detected 0 genes in USER-PROVIDED-DB using BWA
+2026-05-04 14:44:03,194 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats/user-provided-db_BWA_stats.tsv
+2026-05-04 14:44:03,194 - INFO - Generated detection matrix: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/user-provided-db_detection_matrix.tsv
+2026-05-04 14:44:03,194 - INFO -   Total genes detected: 15
+2026-05-04 14:44:03,194 - INFO -   Tools used: 5
+2026-05-04 14:44:03,194 - INFO - 
 ======================================================================
-2026-04-20 12:18:43,272 - INFO - PIPELINE SUMMARY
-2026-04-20 12:18:43,272 - INFO - ======================================================================
-2026-04-20 12:18:43,273 - INFO - 
+2026-05-04 14:44:03,194 - INFO - PIPELINE SUMMARY
+2026-05-04 14:44:03,194 - INFO - ======================================================================
+2026-05-04 14:44:03,194 - INFO - 
 USER-PROVIDED-DB:
-2026-04-20 12:18:43,273 - INFO -   ✗ BLASTn-DNA.................... 0 genes detected
-2026-04-20 12:18:43,273 - INFO -   ✗ BLASTx-AA..................... 0 genes detected
-2026-04-20 12:18:43,273 - INFO - ======================================================================
-2026-04-20 12:18:43,273 - INFO - Detection matrices saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta
-2026-04-20 12:18:43,273 - INFO - Tool statistics saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats
-2026-04-20 12:18:43,273 - INFO - Raw outputs saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs
-2026-04-20 12:18:43,273 - INFO - ======================================================================
-2026-04-20 12:18:43,273 - INFO - Tool failure - BLASTn-DNA (database: user-provided-db): detected 0 genes
-2026-04-20 12:18:43,273 - WARNING -   -> BLASTn-DNA failed for user-provided-db
-2026-04-20 12:18:43,273 - INFO - Tool failure - BLASTx-AA (database: user-provided-db): detected 0 genes
-2026-04-20 12:18:43,273 - WARNING -   -> BLASTx-AA failed for user-provided-db
-2026-04-20 12:18:43,273 - WARNING - All tools failed (no external alignment executables found or all tool runs returned error). Continuing without hard failure.
-2026-04-20 12:18:43,273 - INFO - Cleaning up temporary files...
-2026-04-20 12:18:43,273 - INFO - ======================================================================
-2026-04-20 12:18:43,273 - INFO - Removed temporary file: /Users/nicholas/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
-2026-04-20 12:18:43,273 - INFO - Cleaned up 1 temporary file(s)
-2026-04-20 12:18:43,273 - INFO - GeneFíor completed in 0:00:00.021730.
+2026-05-04 14:44:03,195 - INFO -   ✓ BLASTn-DNA.................... 14 genes detected
+2026-05-04 14:44:03,195 - INFO -   ✓ BLASTx-AA..................... 12 genes detected
+2026-05-04 14:44:03,195 - INFO -   ✓ DIAMOND-AA.................... 12 genes detected
+2026-05-04 14:44:03,195 - INFO -   ✓ Bowtie2-DNA................... 0 genes detected
+2026-05-04 14:44:03,195 - INFO -   ✓ BWA-DNA....................... 0 genes detected
+2026-05-04 14:44:03,195 - INFO - ======================================================================
+2026-05-04 14:44:03,195 - INFO - Detection matrices saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta
+2026-05-04 14:44:03,195 - INFO - Tool statistics saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/tool_stats
+2026-05-04 14:44:03,195 - INFO - Raw outputs saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/raw_outputs
+2026-05-04 14:44:03,195 - INFO - ======================================================================
+2026-05-04 14:44:03,195 - INFO - Cleaning up temporary files...
+2026-05-04 14:44:03,195 - INFO - ======================================================================
+2026-05-04 14:44:03,195 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_fasta/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:44:03,195 - INFO - Cleaned up 1 temporary file(s)
+2026-05-04 14:44:03,195 - INFO - GeneFíor completed in 0:43:07.802532.

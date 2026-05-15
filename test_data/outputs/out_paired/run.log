@@ -1,70 +1,106 @@
-2026-04-20 12:18:15,814 - INFO - Database tool availability (per selected database):
-2026-04-20 12:18:15,814 - INFO -   user-provided-db: BLASTn: No; BLASTx: Yes; BLASTp: Yes; DIAMOND: No
-2026-04-20 12:18:15,814 - INFO - ======================================================================
-2026-04-20 12:18:15,814 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
-2026-04-20 12:18:15,814 - INFO - Started at: 2026-04-20 12:18:15
-2026-04-20 12:18:15,814 - INFO - ======================================================================
-2026-04-20 12:18:15,814 - INFO - Threads: 4
-2026-04-20 12:18:15,815 - INFO - Database(s) chosen:
-2026-04-20 12:18:15,815 - INFO -   User-Provided: resfinder
-2026-04-20 12:18:15,815 - INFO -  Tool(s) chosen:
-2026-04-20 12:18:15,815 - INFO -   BLASTn: No
-2026-04-20 12:18:15,815 - INFO -   BLASTx: No
-2026-04-20 12:18:15,815 - INFO -   BLASTp: No
-2026-04-20 12:18:15,815 - INFO -   DIAMOND: No
-2026-04-20 12:18:15,815 - INFO -   Bowtie2: Yes
-2026-04-20 12:18:15,815 - INFO -   BWA: No
-2026-04-20 12:18:15,815 - INFO -   Minimap2: No
-2026-04-20 12:18:15,815 - INFO - Min query coverage: 40.0%
-2026-04-20 12:18:15,815 - INFO - Min query identity: 80.0%
-2026-04-20 12:18:15,815 - INFO - Min detection coverage: 80.0%
-2026-04-20 12:18:15,815 - INFO - Min detection identity: 80.0%
-2026-04-20 12:18:15,815 - INFO - Run DNA mode: True
-2026-04-20 12:18:15,815 - INFO - Run Protein mode: True
-2026-04-20 12:18:15,815 - INFO - Sensitivity parameters: default - None
-2026-04-20 12:18:15,815 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
-2026-04-20 12:18:15,815 - INFO - ======================================================================
-2026-04-20 12:18:15,815 - INFO - GeneFíor I/O processing...
-2026-04-20 12:18:15,815 - INFO - ======================================================================
-2026-04-20 12:18:15,815 - INFO - Input type: Paired-FASTQ
-2026-04-20 12:18:15,815 - INFO - Validated paired FASTQ files:
-2026-04-20 12:18:15,815 - INFO -   R1: /Users/nicholas/Git/GeneFior/test_data/Paired-FASTQ/Test_R1.fastq.gz (30.18 MB)
-2026-04-20 12:18:15,815 - INFO -   R2: /Users/nicholas/Git/GeneFior/test_data/Paired-FASTQ/Test_R2.fastq.gz (30.36 MB)
-2026-04-20 12:18:15,841 - WARNING - FASTQ read IDs are not unique after first space. Creating/modifying FASTQ files with /1 and /2 suffixes...
-2026-04-20 12:18:15,841 - INFO - Creating modified FASTQ files: /Users/nicholas/Git/GeneFior/test_data/Paired-FASTQ/Test_R1.fastq.gz -> /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz ; /Users/nicholas/Git/GeneFior/test_data/Paired-FASTQ/Test_R2.fastq.gz -> /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
-2026-04-20 12:18:43,091 - INFO - No BLAST-based tools, keeping FASTQ format
-2026-04-20 12:18:43,091 - INFO - Output directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired
-2026-04-20 12:18:43,091 - INFO - Temp directory: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired
-2026-04-20 12:18:43,091 - INFO - Files tracked for cleanup: 2
-2026-04-20 12:18:43,091 - INFO -   - /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz
-2026-04-20 12:18:43,091 - INFO -   - /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
-2026-04-20 12:18:43,091 - INFO - ======================================================================
-2026-04-20 12:18:43,091 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
-2026-04-20 12:18:43,092 - INFO - 
+2026-05-04 14:00:49,985 - INFO - Database tool availability (per selected database):
+2026-05-04 14:00:49,985 - INFO -   user-provided-db: BLASTn: No; BLASTx: Yes; BLASTp: Yes; DIAMOND: No
+2026-05-04 14:00:49,985 - INFO - ======================================================================
+2026-05-04 14:00:49,985 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 14:00:49,985 - INFO - Started at: 2026-05-04 14:00:49
+2026-05-04 14:00:49,985 - INFO - ======================================================================
+2026-05-04 14:00:49,985 - INFO - Threads: 4
+2026-05-04 14:00:49,985 - INFO - Database(s) chosen:
+2026-05-04 14:00:49,985 - INFO -   User-Provided: resfinder
+2026-05-04 14:00:49,985 - INFO -  Tool(s) chosen:
+2026-05-04 14:00:49,985 - INFO -   BLASTn: No
+2026-05-04 14:00:49,985 - INFO -   BLASTx: No
+2026-05-04 14:00:49,985 - INFO -   BLASTp: No
+2026-05-04 14:00:49,985 - INFO -   DIAMOND: No
+2026-05-04 14:00:49,985 - INFO -   Bowtie2: Yes
+2026-05-04 14:00:49,985 - INFO -   BWA: No
+2026-05-04 14:00:49,985 - INFO -   Minimap2: No
+2026-05-04 14:00:49,985 - INFO -   HMMER-Protein: No
+2026-05-04 14:00:49,985 - INFO -   HMMER-DNA: No
+2026-05-04 14:00:49,985 - INFO - Min query coverage: 40.0%
+2026-05-04 14:00:49,985 - INFO - Min query identity: 80.0%
+2026-05-04 14:00:49,985 - INFO - Min detection coverage: 80.0%
+2026-05-04 14:00:49,985 - INFO - Min detection identity: 80.0%
+2026-05-04 14:00:49,985 - INFO - Run DNA mode: True
+2026-05-04 14:00:49,985 - INFO - Run Protein mode: True
+2026-05-04 14:00:49,986 - INFO - Sensitivity parameters: default - None
+2026-05-04 14:00:49,986 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:00:49,986 - INFO - ======================================================================
+2026-05-04 14:00:49,986 - INFO - GeneFíor I/O processing...
+2026-05-04 14:00:49,986 - INFO - ======================================================================
+2026-05-04 14:00:49,986 - INFO - Input type: Paired-FASTQ
+2026-05-04 14:00:49,986 - INFO - Validated paired FASTQ files:
+2026-05-04 14:00:49,986 - INFO -   R1: /home/nickd/Git/GeneFior/test_data/Paired-FASTQ/Test_R1.fastq.gz (30.18 MB)
+2026-05-04 14:00:49,986 - INFO -   R2: /home/nickd/Git/GeneFior/test_data/Paired-FASTQ/Test_R2.fastq.gz (30.36 MB)
+2026-05-04 14:00:50,011 - WARNING - FASTQ read IDs are not unique after first space. Creating/modifying FASTQ files with /1 and /2 suffixes...
+2026-05-04 14:00:50,011 - INFO - Creating modified FASTQ files: /home/nickd/Git/GeneFior/test_data/Paired-FASTQ/Test_R1.fastq.gz -> /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz ; /home/nickd/Git/GeneFior/test_data/Paired-FASTQ/Test_R2.fastq.gz -> /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:00:53,004 - INFO - No BLAST-based tools, keeping FASTQ format
+2026-05-04 14:00:53,004 - INFO - Output directory: /home/nickd/Git/GeneFior/test_data/outputs/out_paired
+2026-05-04 14:00:53,004 - INFO - Temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_paired
+2026-05-04 14:00:53,004 - INFO - Files tracked for cleanup: 2
+2026-05-04 14:00:53,004 - INFO -   - /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz
+2026-05-04 14:00:53,004 - INFO -   - /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:00:53,004 - INFO - ======================================================================
+2026-05-04 14:00:53,004 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:00:53,005 - INFO - 
 ### Processing User-provided-db Database ###
-2026-04-20 12:18:43,092 - INFO - Parameters for user-provided-db - BLASTx: blastx -query  -task blastx-fast -db /Users/nicholas/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
-2026-04-20 12:18:43,092 - INFO - gz_input=False, fasta=
-2026-04-20 12:18:43,097 - INFO - user-provided-db - BLASTx stderr: stdbuf: blastx: No such file or directory
-2026-04-20 12:18:43,097 - ERROR - user-provided-db - BLASTx failed with return code 2
-2026-04-20 12:18:43,097 - INFO - No detections found for user-provided-db - No matrix generated.
-2026-04-20 12:18:43,097 - INFO - 
+2026-05-04 14:00:53,005 - INFO - Parameters for user-provided-db - BLASTx: blastx -query  -task blastx-fast -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 14:00:53,005 - INFO - gz_input=False, fasta=
+2026-05-04 14:00:53,033 - INFO - user-provided-db - BLASTx stderr: Command line argument error: Argument "query". File is not accessible
+2026-05-04 14:00:53,033 - ERROR - user-provided-db - BLASTx failed with return code 1
+2026-05-04 14:00:53,033 - INFO - Running user-provided-db - Bowtie2...
+2026-05-04 14:00:53,033 - INFO - Parameters for user-provided-db - Bowtie2: bowtie2 -1 /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz -2 /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz -x /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/bowtie2/all_bowtie2db -S /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results.sam -p 4 --no-unal --met-file /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_summary.txt
+2026-05-04 14:00:55,206 - INFO - user-provided-db - Bowtie2 completed successfully
+2026-05-04 14:00:55,206 - INFO - user-provided-db - Bowtie2 stderr:
+407114 reads; of these:
+  407114 (100.00%) were paired; of these:
+    406684 (99.89%) aligned concordantly 0 times
+    33 (0.01%) aligned concordantly exactly 1 time
+    397 (0.10%) aligned concordantly >1 times
+    ----
+    406684 pairs aligned concordantly 0 times; of these:
+      17 (0.00%) aligned discordantly 1 time
+    ----
+    406667 pairs aligned 0 times concordantly or discordantly; of these:
+      813334 mates make up the pairs; of these:
+        813055 (99.97%) aligned 0 times
+        18 (0.00%) aligned exactly 1 time
+        261 (0.03%) aligned >1 times
+0.14% overall alignment rate
+2026-05-04 14:00:55,206 - INFO - Running user-provided-db - SAM to BAM conversion...
+2026-05-04 14:00:55,206 - INFO - Parameters for user-provided-db - SAM to BAM conversion: samtools view -bS /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results.sam -o /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results.bam
+2026-05-04 14:00:55,235 - INFO - user-provided-db - SAM to BAM conversion completed successfully
+2026-05-04 14:00:55,235 - INFO - Running user-provided-db - BAM sorting...
+2026-05-04 14:00:55,235 - INFO - Parameters for user-provided-db - BAM sorting: samtools sort /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results.bam -o /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:00:55,249 - INFO - user-provided-db - BAM sorting completed successfully
+2026-05-04 14:00:55,249 - INFO - Running user-provided-db - BAM indexing...
+2026-05-04 14:00:55,249 - INFO - Parameters for user-provided-db - BAM indexing: samtools index /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:00:55,253 - INFO - user-provided-db - BAM indexing completed successfully
+2026-05-04 14:00:55,282 - INFO - Reads that returned a hit in USER-PROVIDED-DB using Bowtie2: 1173
+2026-05-04 14:00:55,282 - INFO - Reads passing thresholds in USER-PROVIDED-DB using Bowtie2: 1173
+2026-05-04 14:00:55,282 - INFO - Detected 5 genes in USER-PROVIDED-DB using Bowtie2
+2026-05-04 14:00:55,282 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/tool_stats/user-provided-db_Bowtie2_stats.tsv
+2026-05-04 14:00:55,283 - INFO - Generated detection matrix: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/user-provided-db_detection_matrix.tsv
+2026-05-04 14:00:55,283 - INFO -   Total genes detected: 5
+2026-05-04 14:00:55,283 - INFO -   Tools used: 1
+2026-05-04 14:00:55,283 - INFO - 
 ======================================================================
-2026-04-20 12:18:43,097 - INFO - PIPELINE SUMMARY
-2026-04-20 12:18:43,097 - INFO - ======================================================================
-2026-04-20 12:18:43,097 - INFO - 
+2026-05-04 14:00:55,283 - INFO - PIPELINE SUMMARY
+2026-05-04 14:00:55,283 - INFO - ======================================================================
+2026-05-04 14:00:55,283 - INFO - 
 USER-PROVIDED-DB:
-2026-04-20 12:18:43,097 - INFO -   ✗ BLASTx-AA..................... 0 genes detected
-2026-04-20 12:18:43,097 - INFO - ======================================================================
-2026-04-20 12:18:43,097 - INFO - Detection matrices saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired
-2026-04-20 12:18:43,097 - INFO - Tool statistics saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/tool_stats
-2026-04-20 12:18:43,097 - INFO - Raw outputs saved to: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/raw_outputs
-2026-04-20 12:18:43,098 - INFO - ======================================================================
-2026-04-20 12:18:43,098 - INFO - Tool failure - BLASTx-AA (database: user-provided-db): detected 0 genes
-2026-04-20 12:18:43,098 - WARNING -   -> BLASTx-AA failed for user-provided-db
-2026-04-20 12:18:43,098 - WARNING - All tools failed (no external alignment executables found or all tool runs returned error). Continuing without hard failure.
-2026-04-20 12:18:43,098 - INFO - Cleaning up temporary files...
-2026-04-20 12:18:43,098 - INFO - ======================================================================
-2026-04-20 12:18:43,098 - INFO - Removed temporary file: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz
-2026-04-20 12:18:43,099 - INFO - Removed temporary file: /Users/nicholas/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
-2026-04-20 12:18:43,099 - INFO - Cleaned up 2 temporary file(s)
-2026-04-20 12:18:43,099 - INFO - GeneFíor completed in 0:00:27.285693.
+2026-05-04 14:00:55,283 - INFO -   ✗ BLASTx-AA..................... 0 genes detected
+2026-05-04 14:00:55,283 - INFO -   ✓ Bowtie2-DNA................... 5 genes detected
+2026-05-04 14:00:55,283 - INFO - ======================================================================
+2026-05-04 14:00:55,283 - INFO - Detection matrices saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_paired
+2026-05-04 14:00:55,283 - INFO - Tool statistics saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/tool_stats
+2026-05-04 14:00:55,283 - INFO - Raw outputs saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/raw_outputs
+2026-05-04 14:00:55,283 - INFO - ======================================================================
+2026-05-04 14:00:55,283 - INFO - Tool failure - BLASTx-AA (database: user-provided-db): detected 0 genes
+2026-05-04 14:00:55,283 - WARNING -   -> BLASTx-AA failed for user-provided-db
+2026-05-04 14:00:55,283 - INFO - Cleaning up temporary files...
+2026-05-04 14:00:55,283 - INFO - ======================================================================
+2026-05-04 14:00:55,287 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R1_R1_modified.fastq.gz
+2026-05-04 14:00:55,291 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_paired/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:00:55,291 - INFO - Cleaned up 2 temporary file(s)
+2026-05-04 14:00:55,292 - INFO - GeneFíor completed in 0:00:05.307450.

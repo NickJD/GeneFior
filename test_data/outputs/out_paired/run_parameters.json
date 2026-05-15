@@ -10,6 +10,7 @@
   "detection_min_num_reads": 1,
   "sensitivity": "default",
   "evalue": null,
+  "min_bitscore": null,
   "tool_sensitivity_params": {},
   "tool_extra_params": {},
   "sequence_type": "Paired-FASTQ",

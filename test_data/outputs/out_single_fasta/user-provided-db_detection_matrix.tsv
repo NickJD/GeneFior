@@ -1,0 +1,16 @@
+Gene	BLASTn	BLASTx	BWA	Bowtie2	DIAMOND-BLASTX	Total_Detections
+aph(3')-III_1_M26832	1	1	0	0	1	3
+aph(3')-IIIa_1_AF330699	1	1	0	0	1	3
+aph(3')-IIIa_2_AJ490186	1	1	0	0	1	3
+aph(3')-IIIa_3_AB247327	1	1	0	0	1	3
+erm(F)_1_M14730	1	0	0	0	0	1
+erm(F)_3_M17808	1	0	0	0	0	1
+erm(F)_4_M62487	1	0	0	0	0	1
+tet(O)_1_M18896	1	1	0	0	1	3
+tet(O)_2_M20925	1	1	0	0	1	3
+tet(O)_3_Y07780	1	1	0	0	1	3
+tet(O/32/O)_5_FP929050	0	1	0	0	1	2
+tet(Q)_1_L33696	1	1	0	0	1	3
+tet(Q)_2_X58717	1	1	0	0	1	3
+tet(Q)_3_U73497	1	1	0	0	1	3
+tet(Q)_4_Z21523	1	1	0	0	1	3

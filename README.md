@@ -12,6 +12,7 @@ Please see GeneFior.pdf for a draft publication.
     - bwa >=0.8.09
     - minimap2 >=2.30
     - mmseqs2 >=18-8cc5c
+    - hmmer >=3.4
     - seqtk >=1.4
     - pigz >=2.8
 

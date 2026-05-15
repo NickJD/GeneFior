@@ -197,7 +197,8 @@ def check_read_id_uniqueness(r1_path, r2_path, logger, sample_size=10000):
     return needs_suffix
 
 def requires_fasta_conversion(tools):
-    return any(tool in ('blastn', 'blastx', 'diamond', 'all') for tool in (tools or []))
+    # BLAST/DIAMOND tools need FASTA; hmmer_protein (hmmsearch) also searches a FASTA target file.
+    return any(tool in ('blastn', 'blastx', 'diamond', 'all', 'hmmer_protein') for tool in (tools or []))
 
 
 # Module-level canonical constants for extensions and suffixes

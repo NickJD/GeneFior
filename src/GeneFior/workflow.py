@@ -54,8 +54,10 @@ class Workflow:
                  chunk_jobs: Optional[int] = None,
                  chunk_threads_per_job: Optional[int] = None,
                    preserve_chunks: bool = False,
-                    extra_tool_params: Dict[str, str] = None,
-                    genes_type: Optional[str] = None):
+                     extra_tool_params: Dict[str, str] = None,
+                     genes_type: Optional[str] = None,
+                     hmmer_evalue: Optional[float] = None,
+                     hmmer_threshold_mode: str = 'evalue'):
 
                  
         ### Handle input FASTA and FASTQ
@@ -135,6 +137,13 @@ class Workflow:
         self.min_bitscore = float(min_bitscore) if min_bitscore is not None else None
         # Arbitrary extra parameters to append to specific tools (dict: tool -> param string)
         self.extra_tool_params = extra_tool_params or {}
+        # HMMER-specific E-value (overrides global evalue for HMMER only).
+        # If None, falls back to self.evalue; if both are None HMMER uses its own default (E=10).
+        self.hmmer_evalue = float(hmmer_evalue) if hmmer_evalue is not None else None
+        # Threshold mode for HMMER: 'evalue' | 'tc' | 'ga' | 'nc'
+        # When 'tc'/'ga'/'nc', per-profile cutoffs are passed to hmmsearch/nhmmer
+        # and E-value post-filtering is disabled.
+        self.hmmer_threshold_mode = hmmer_threshold_mode or 'evalue'
         # The input type is indicated via self.sequence_type. If it equals
         # 'Genes-FASTA' the pipeline treats inputs as full-length gene FASTA(s)
         # (and will skip read-mappers). The optional `genes_type` parameter,
@@ -206,6 +215,10 @@ class Workflow:
             db_name: defaultdict(lambda: defaultdict(GeneStats))
             for db_name in self.databases.keys()
         }
+
+        # Cache for HMMER annotations: {db_name: {gene_id: {'description': str, 'must_flag': bool}}}
+        # Populated lazily when run_hmmer is called and a 'hmmer_annotations' path is present in db_paths.
+        self.hmmer_annotations: Dict[str, Dict[str, dict]] = {}
 
     def check_gzip(self,fasta_path_str):
         self.logger.info(f"Checking if input FASTA ` {self.input_fasta} ` is gzipped and not broken...")
@@ -1723,6 +1736,208 @@ class Workflow:
 
 
 
+    def _load_hmmer_annotations(self, annotations_path: str) -> dict:
+        """Load HMMER annotations CSV with columns: ID, Description, Must flag.
+
+        Returns a dict mapping gene_id -> {'description': str, 'must_flag': bool}.
+        """
+        annotations = {}
+        try:
+            with open(annotations_path, 'r', newline='', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    gene_id = row.get('ID', '').strip()
+                    if not gene_id:
+                        continue
+                    description = row.get('Description', '').strip()
+                    # Accept various capitalisation variants of 'Must flag'
+                    must_raw = (
+                        row.get('Must flag', row.get('Must Flag', row.get('must_flag', row.get('must flag', ''))))
+                    ).strip()
+                    must_flag = must_raw.upper() in ('TRUE', 'YES', '1')
+                    annotations[gene_id] = {'description': description, 'must_flag': must_flag}
+            self.logger.info(f"  Loaded {len(annotations)} HMMER annotations from {annotations_path}")
+        except Exception as e:
+            self.logger.warning(f"Could not load HMMER annotations from {annotations_path}: {e}")
+        return annotations
+
+    def _write_hmmer_annotations_report(self, database: str, tool_name: str):
+        """Write a TSV report mapping detected HMMER gene IDs to their annotations.
+
+        Produces two outputs:
+        - Full annotations TSV (all genes in the annotation file, detected or not)
+        - A console/log warning listing any 'Must Flag' genes that were detected
+        """
+        annotations = self.hmmer_annotations.get(database, {})
+        if not annotations:
+            return
+
+        report_file = self.output_dir / f"{database}_{tool_name}_annotations.tsv"
+        detected_in_tool = {
+            gene for gene, tools in self.detections[database].items()
+            if tools.get(tool_name)
+        }
+
+        try:
+            with open(report_file, 'w', newline='') as f:
+                writer = csv.writer(f, delimiter='\t')
+                writer.writerow(['Gene_ID', 'Description', 'Must_Flag', 'Detected'])
+                for gene_id, info in sorted(annotations.items()):
+                    detected = 1 if gene_id in detected_in_tool else 0
+                    writer.writerow([
+                        gene_id,
+                        info.get('description', ''),
+                        'TRUE' if info.get('must_flag') else 'FALSE',
+                        detected,
+                    ])
+            self.logger.info(f"  HMMER annotations report: {report_file}")
+        except Exception as e:
+            self.logger.warning(f"Could not write HMMER annotations report: {e}")
+
+        # Compute annotation summary counts
+        n_total_detected = len(detected_in_tool)
+        n_annotated_detected = sum(1 for g in detected_in_tool if g in annotations)
+        n_unannotated_detected = n_total_detected - n_annotated_detected
+        n_must_flag_in_db = sum(1 for info in annotations.values() if info.get('must_flag'))
+
+        # Highlight must-flag detections in the log
+        must_flag_detected = sorted([
+            (gid, annotations[gid]['description'])
+            for gid in detected_in_tool
+            if annotations.get(gid, {}).get('must_flag')
+        ])
+        n_must_flag_detected = len(must_flag_detected)
+
+        # Log detection summary in context of annotations
+        self.logger.info(
+            f"  Detection summary [{tool_name}]: {n_total_detected} gene(s) detected in total — "
+            f"{n_annotated_detected} have annotation entries, {n_unannotated_detected} have none; "
+            f"{n_must_flag_detected} of {n_must_flag_in_db} MUST-FLAG gene(s) in the database were detected."
+        )
+
+        if must_flag_detected:
+            self.logger.warning("!" * 70)
+            self.logger.warning(
+                f"  *** MUST-FLAG ALERT: {n_must_flag_detected} of {n_total_detected} detected gene(s) "
+                f"are flagged as high-priority biorisk genes "
+                f"[{database} / {tool_name}] ***"
+            )
+            for gid, desc in must_flag_detected:
+                self.logger.warning(f"    ⚑  {gid}: {desc}")
+            self.logger.warning("!" * 70)
+        else:
+            self.logger.info(f"  No MUST-FLAG biorisk genes detected in {database} [{tool_name}].")
+
+    # Standard genetic code codon table
+    _CODON_TABLE: Dict[str, str] = {
+        'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L',
+        'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
+        'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
+        'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
+        'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
+        'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
+        'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
+        'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
+        'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
+        'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
+        'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
+        'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
+        'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
+        'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
+        'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
+        'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G',
+    }
+
+    @staticmethod
+    def _revcomp(seq: str) -> str:
+        """Return the reverse complement of a DNA sequence."""
+        comp = str.maketrans('ACGTacgt', 'TGCAtgca')
+        return seq.translate(comp)[::-1]
+
+    def _translate_frame(self, dna: str, offset: int, reverse: bool) -> str:
+        """Translate one reading frame. Returns amino-acid string (no stop markers)."""
+        if reverse:
+            dna = self._revcomp(dna)
+        dna = dna[offset:].upper()
+        aa = []
+        table = self._CODON_TABLE
+        for i in range(0, len(dna) - 2, 3):
+            codon = dna[i:i+3]
+            aa.append(table.get(codon, 'X'))
+        return ''.join(aa)
+
+    def _prepare_protein_for_hmmsearch(self, nucleotide_fasta: str, database: str,
+                                       prep_mode: str, min_aa: int = 15) -> str:
+        """Prepare a protein FASTA for hmmsearch from various input types.
+
+        prep_mode:
+          'protein'  - input is already AA; just strip '*' stop markers and decompress if gz
+          'cds_dna'  - input is DNA CDS; translate frame +1 only
+          'reads'    - unassembled reads; 6-frame translate, split on stops, keep >= min_aa aa
+        Returns path to a (possibly temporary) protein FASTA file ready for hmmsearch.
+        """
+        suffix = '.faa'
+        _tmp_fd, _tmp_path = tempfile.mkstemp(
+            suffix=suffix,
+            dir=str(self.temp_directory),
+            prefix=f"hmmer_{database}_prep_",
+        )
+        os.close(_tmp_fd)
+
+        frame_labels = ['+1', '+2', '+3', '-1', '-2', '-3']
+
+        def _iter_fasta(path: str):
+            """Yield (header, seq) pairs from a plain or gzipped FASTA."""
+            opener = gzip.open(path, 'rt') if path.endswith(('.gz', '.gzip')) else open(path, 'r')
+            with opener as fh:
+                header, seq_parts = None, []
+                for line in fh:
+                    line = line.rstrip('\n')
+                    if line.startswith('>'):
+                        if header is not None:
+                            yield header, ''.join(seq_parts)
+                        header = line[1:]
+                        seq_parts = []
+                    else:
+                        seq_parts.append(line)
+                if header is not None:
+                    yield header, ''.join(seq_parts)
+
+        seq_count = 0
+        with open(_tmp_path, 'w') as out_fh:
+            for header, seq in _iter_fasta(nucleotide_fasta):
+                seq_id = header.split()[0]
+
+                if prep_mode == 'protein':
+                    # Already protein — just strip stop-codon asterisks
+                    clean = seq.replace('*', '').strip()
+                    if len(clean) >= min_aa:
+                        out_fh.write(f">{seq_id}\n{clean}\n")
+                        seq_count += 1
+
+                elif prep_mode == 'cds_dna':
+                    # DNA CDS — translate frame +1 only
+                    aa = self._translate_frame(seq, 0, False).rstrip('*').replace('*', '')
+                    if len(aa) >= min_aa:
+                        out_fh.write(f">{seq_id}\n{aa}\n")
+                        seq_count += 1
+
+                else:  # 'reads' — 6-frame translation
+                    for fi, (offset, reverse) in enumerate([(0, False), (1, False), (2, False),
+                                                             (0, True),  (1, True),  (2, True)]):
+                        aa_full = self._translate_frame(seq, offset, reverse)
+                        # Split on stop codons and keep fragments >= min_aa
+                        fragments = aa_full.split('*')
+                        for frag_i, frag in enumerate(fragments):
+                            frag = frag.strip()
+                            if len(frag) >= min_aa:
+                                frag_id = f"{seq_id}|frame={frame_labels[fi]}|frag={frag_i}"
+                                out_fh.write(f">{frag_id}\n{frag}\n")
+                                seq_count += 1
+
+        self.logger.info(f"  HMMER protein prep ({prep_mode}): wrote {seq_count} sequences to {_tmp_path}")
+        return _tmp_path
+
     def run_hmmer(self, db_path: str, database: str, mode: str) -> Tuple[bool, Set[str]]:
         # Run HMMER search.
         if not db_path:
@@ -1733,25 +1948,87 @@ class Workflow:
         domtbl_file = self.raw_dir / f"{database}_{hmmer_cmd}_domtbl.txt"
         tool_name = f"HMMER-{mode.upper()}"
 
+        _tmp_fasta = None
+
+        if mode == 'protein':
+            # Determine prep mode from input type
+            is_genes = getattr(self, 'is_genes_fasta', False)
+            detected_gt = (getattr(self, 'detected_genes_type', None)
+                           or getattr(self, 'genes_type', None))
+            if is_genes and detected_gt == 'protein':
+                prep_mode = 'protein'
+            elif is_genes and detected_gt == 'dna':
+                prep_mode = 'cds_dna'
+            elif is_genes:
+                prep_mode = 'protein'   # unknown genes type — assume protein
+            else:
+                prep_mode = 'reads'     # Paired-FASTQ / Single-FASTA
+
+            self.logger.info(f"  HMMER protein mode: input prep_mode='{prep_mode}'")
+            try:
+                _tmp_path = self._prepare_protein_for_hmmsearch(
+                    str(self.input_fasta), database, prep_mode)
+                fasta_path_for_hmmer = _tmp_path
+                _tmp_fasta = _tmp_path
+            except Exception as e:
+                self.logger.warning(f"  Protein prep for HMMER failed: {e}; falling back to raw input.")
+                fasta_path_for_hmmer = str(self.input_fasta)
+        else:
+            # DNA mode (nhmmer) — decompress gz if needed, pass through otherwise
+            fasta_path_for_hmmer = str(self.input_fasta)
+            if str(self.input_fasta).endswith(('.gz', '.gzip')):
+                try:
+                    _tmp_fd, _tmp_path = tempfile.mkstemp(
+                        suffix='.fna',
+                        dir=str(self.temp_directory),
+                        prefix=f"hmmer_{database}_",
+                    )
+                    os.close(_tmp_fd)
+                    with gzip.open(str(self.input_fasta), 'rt') as gz_in, open(_tmp_path, 'w') as f_out:
+                        for chunk in iter(lambda: gz_in.read(1 << 20), ''):
+                            f_out.write(chunk)
+                    fasta_path_for_hmmer = _tmp_path
+                    _tmp_fasta = _tmp_path
+                    self.logger.debug(f"  Decompressed input FASTA for nhmmer: {_tmp_path}")
+                except Exception as e:
+                    self.logger.warning(f"  Failed to decompress FASTA for nhmmer: {e}; attempting with compressed input.")
+
         cmd = [
             hmmer_cmd,
             '--tblout', str(output_file),
             '--domtblout', str(domtbl_file),
             '--cpu', str(self.threads),
             db_path,
-            str(self.input_fasta)
+            fasta_path_for_hmmer,
         ]
-        # Only add -E (e-value threshold) if user set it explicitly
-        if getattr(self, 'evalue', None) is not None:
-            try:
+
+        # ── HMMER threshold handling ──────────────────────────────────────────────
+        _tmode = getattr(self, 'hmmer_threshold_mode', 'evalue')
+        if _tmode in ('tc', 'ga', 'nc'):
+            # Use per-profile trusted/gathering/noise cutoffs embedded in the HMM database.
+            # This is the gold standard for curated databases (e.g. ibbis biorisk.hmm).
+            # E-value flags are NOT added; parse_hmmer_results will accept all reported hits.
+            cmd.insert(3, f'--cut_{_tmode}')
+            self.logger.info(f"  HMMER threshold mode: per-profile {_tmode.upper()} cutoffs (--cut_{_tmode})")
+        else:
+            # E-value mode: prefer --hmmer-evalue, then global -e, then log a warning
+            _ev = getattr(self, 'hmmer_evalue', None)
+            if _ev is None:
+                _ev = getattr(self, 'evalue', None)
+            if _ev is not None:
                 cmd.insert(3, '-E')
-                cmd.insert(4, str(self.evalue))
-            except Exception:
-                pass
+                cmd.insert(4, str(_ev))
+                self.logger.info(f"  HMMER threshold mode: E-value = {_ev}")
+            else:
+                self.logger.warning(
+                    "  HMMER threshold mode: no explicit E-value set — using HMMER default (E=10, "
+                    "very permissive). Consider --hmmer-evalue 1e-5 for Genes-FASTA, "
+                    "1e-3 for reads, or --hmmer-threshold-mode tc if your HMM database "
+                    "has per-profile trusted cutoffs."
+                )
 
         # Append any user-specified extra parameters for HMMER/nhmmer/hmmsearch
         try:
-            # Check several potential keys the user might provide
             extra = None
             if (self.extra_tool_params or {}).get('hmmer'):
                 extra = (self.extra_tool_params or {}).get('hmmer')
@@ -1763,17 +2040,30 @@ class Workflow:
         except Exception:
             pass
 
+        # Load annotations for this database if available
+        annotations_path = (self.databases.get(database) or {}).get('hmmer_annotations')
+        if annotations_path and database not in self.hmmer_annotations:
+            self.hmmer_annotations[database] = self._load_hmmer_annotations(annotations_path)
+
         success = self.run_command(cmd, f"{database} - {tool_name}")
         detected = set()
         if success:
-            detected = self.parse_hmmer_results(output_file, database, tool_name)
-            # HMMER parsing does not currently produce per-read gene_reads structures
-            # so pass an empty dict to write_tool_stats to avoid AttributeError
+            detected, gene_reads = self.parse_hmmer_results(output_file, domtbl_file, database, tool_name)
             try:
-                self.write_tool_stats(database, tool_name, gene_reads={})
+                self.write_tool_stats(database, tool_name, gene_reads=gene_reads)
             except Exception:
-                # Non-fatal: log and continue
                 self.logger.debug("write_tool_stats failed for HMMER output; continuing")
+            # Write annotations report if annotations were loaded
+            if database in self.hmmer_annotations and self.hmmer_annotations[database]:
+                self._write_hmmer_annotations_report(database, tool_name)
+
+        # Clean up decompressed temp file
+        if _tmp_fasta and not getattr(self, 'no_cleanup', False):
+            try:
+                os.remove(_tmp_fasta)
+            except Exception:
+                pass
+
         return success, detected
 
     def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
@@ -2148,54 +2438,274 @@ class Workflow:
         return detected_genes, gene_reads
 
 
-    def parse_hmmer_results(self, tbl_file: Path, database: str, tool_name: str) -> Set[str]:
-        # Parse HMMER table output and extract genes meeting thresholds.
-        detected_genes = set()
-        if not tbl_file.exists():
-            return detected_genes
+    def parse_hmmer_results(self, tbl_file: Path, domtbl_file: Path,
+                            database: str, tool_name: str) -> Tuple[Set[str], dict]:
+        """Parse HMMER output and extract detected HMM profile names with statistics.
 
-        try:
-            with open(tbl_file, 'r') as f:
-                for line in f:
-                    if line.startswith('#'):
-                        continue
-                    fields = line.strip().split()
-                    if len(fields) < 6:
-                        continue
+        Uses two complementary output files:
 
-                    gene = fields[0]  # target name
-                    evalue = float(fields[4])
-                    score = float(fields[5]) if len(fields) > 5 else 0.0
+        ``--tblout`` (tbl_file) — one row per (target, query) pair at the full-sequence
+        level.  Used only for the final pass/fail E-value decision so we stay consistent
+        with hmmsearch's own per-sequence reporting.
 
-                    # Initialise stats if first hit for this gene
-                    if gene not in self.gene_stats[database][tool_name]:
-                        self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+            Col 0: target name  (input FASTA sequence)
+            Col 2: query name   (HMM profile = the "gene" being detected)
+            Col 4: full-seq E-value
+            Col 5: full-seq bit-score
 
-                    # For HMMER, use score as proxy for coverage/identity
-                    # This is not perfect but HMMER doesn't give direct coverage
-                    self.gene_stats[database][tool_name][gene].add_hit(score, score)
+        ``--domtblout`` (domtbl_file) — one row per domain hit.  Used for statistics
+        because it contains the HMM profile coordinate information needed to compute
+        meaningful profile coverage, sequence counts, etc.
 
-                    # HMMER doesn't directly give coverage/identity like BLAST
-                    # Use E-value as primary filter. If the user did not set an
-                    # explicit e-value threshold, accept all HMMER hits (do not
-                    # filter by e-value here).
-                    try:
-                        if getattr(self, 'evalue', None) is None or evalue <= float(self.evalue):
-                            detected_genes.add(gene)
-                            self.detections[database][gene][tool_name] = True
-                    except Exception:
-                        # On parse/compare errors, be conservative and accept the hit
-                        detected_genes.add(gene)
-                        self.detections[database][gene][tool_name] = True
+            Col 0:  target name       (input sequence)
+            Col 2:  tlen              (target sequence length)
+            Col 3:  query name        (HMM profile)
+            Col 5:  qlen              (profile length in residues)
+            Col 6:  full-seq E-value
+            Col 7:  full-seq bit-score
+            Col 15: hmm_from          (alignment start on profile, 1-based)
+            Col 16: hmm_to            (alignment end on profile, 1-based)
 
-            # finalise statistics
-            for gene in self.gene_stats[database][tool_name]:
-                self.gene_stats[database][tool_name][gene].finalise()
+        Returns
+        -------
+        detected_genes : set[str]
+            HMM profile names that passed the E-value threshold.
+        gene_reads : dict
+            gene_reads[profile]['all']     – all input sequences that matched
+            gene_reads[profile]['passing'] – sequences that passed the E-value filter
+        """
+        detected_genes: Set[str] = set()
+        gene_reads: dict = defaultdict(lambda: {'passing': set(), 'all': set()})
 
-        except Exception as e:
-            self.logger.error(f"Error parsing {tbl_file}: {e}")
+        # Ensure per-database/tool structures exist
+        if database not in self.gene_stats:
+            self.gene_stats[database] = defaultdict(lambda: defaultdict(GeneStats))
+            self.detections.setdefault(database, defaultdict(lambda: defaultdict(bool)))
 
-        return detected_genes #, gene_reads
+        annotations = self.hmmer_annotations.get(database, {})
+
+        # ── Determine whether E-value post-filtering applies ─────────────────────
+        # When using per-profile cutoffs (TC/GA/NC), every hit reported by HMMER
+        # already passed the cutoff, so we accept all rows unconditionally.
+        _tmode = getattr(self, 'hmmer_threshold_mode', 'evalue')
+        _use_profile_cutoffs = (_tmode in ('tc', 'ga', 'nc'))
+
+        # Resolve effective HMMER e-value: prefer hmmer_evalue, then global evalue
+        _hmmer_ev = getattr(self, 'hmmer_evalue', None)
+        if _hmmer_ev is None:
+            _hmmer_ev = getattr(self, 'evalue', None)
+
+        # ── Pass 1: tblout – decide which profiles pass the E-value threshold ──────
+        # One representative row per (target, query) pair.
+        detected_by_evalue: Set[str] = set()
+        seq_best_evalue: dict = {}   # profile -> best (lowest) E-value seen
+        if tbl_file.exists():
+            try:
+                with open(tbl_file, 'r') as f:
+                    for line in f:
+                        if line.startswith('#'):
+                            continue
+                        fields = line.strip().split()
+                        if len(fields) < 6:
+                            continue
+                        gene = fields[2]   # HMM profile name
+                        try:
+                            evalue = float(fields[4])
+                        except ValueError:
+                            continue
+                        # Track best e-value per profile
+                        if gene not in seq_best_evalue or evalue < seq_best_evalue[gene]:
+                            seq_best_evalue[gene] = evalue
+                        # Accept hit: when using profile cutoffs all tblout rows already passed;
+                        # otherwise apply the effective e-value threshold (or accept all if unset).
+                        try:
+                            if _use_profile_cutoffs or _hmmer_ev is None or evalue <= float(_hmmer_ev):
+                                detected_by_evalue.add(gene)
+                        except Exception:
+                            detected_by_evalue.add(gene)
+            except Exception as e:
+                self.logger.error(f"Error parsing {tbl_file}: {e}")
+
+        # Fetch per-domain and gene-level thresholds from the workflow instance.
+        # These mirror the same thresholds used by parse_blast_results so that
+        # HMMER detection is gated consistently.
+        #
+        #   query_min_coverage  – minimum % of the INPUT SEQUENCE covered by the
+        #                         domain alignment  (col ali_to - ali_from / tlen)
+        #   query_min_identity  – minimum alignment accuracy (col 21, acc * 100) as
+        #                         the closest HMMER equivalent to BLAST %identity
+        #   detection_min_coverage – minimum % of the HMM PROFILE covered by the
+        #                            union of all domain alignments (gene_coverage)
+        _q_min_cov = float(getattr(self, 'query_min_coverage', 0.0))
+        _q_min_id  = float(getattr(self, 'query_min_identity',  0.0))
+        _d_min_cov = float(getattr(self, 'detection_min_coverage', 0.0))
+
+        # ── Pass 2: domtblout – gather per-domain alignment stats ─────────────────
+        # Multiple domain rows can exist per (target, query) pair; each row gives
+        # per-domain alignment coordinates used for profile-coverage statistics.
+        #
+        # domtblout column layout (0-based):
+        #   0  target_name   – input sequence name
+        #   2  tlen          – input sequence length  (residues)
+        #   3  query_name    – HMM profile name
+        #   5  qlen          – profile length (residues)
+        #   6  E-value       – full-sequence E-value
+        #   7  score         – full-sequence bit-score
+        #  15  hmm_from      – domain alignment start on the profile (1-based)
+        #  16  hmm_to        – domain alignment end   on the profile (1-based)
+        #  17  ali_from      – domain alignment start on the target  (1-based)
+        #  18  ali_to        – domain alignment end   on the target  (1-based)
+        #  21  acc           – mean posterior probability of aligned residues (0–1)
+        if domtbl_file and domtbl_file.exists():
+            try:
+                with open(domtbl_file, 'r') as f:
+                    for line in f:
+                        if line.startswith('#'):
+                            continue
+                        fields = line.strip().split()
+                        # Need at least 22 columns (index 0–21)
+                        if len(fields) < 22:
+                            continue
+                        target_name = fields[0]
+                        gene        = fields[3]   # HMM profile name
+                        try:
+                            tlen     = int(fields[2])    # input sequence length
+                            qlen     = int(fields[5])    # profile length (residues)
+                            score    = float(fields[7])  # full-seq bit-score
+                            hmm_from = int(fields[15])   # profile alignment start
+                            hmm_to   = int(fields[16])   # profile alignment end
+                            ali_from = int(fields[17])   # target alignment start
+                            ali_to   = int(fields[18])   # target alignment end
+                            acc      = float(fields[21]) # alignment accuracy (0–1)
+                        except (ValueError, IndexError):
+                            continue
+
+                        # ── Per-domain query-level filters ──────────────────────
+                        # 1. Query-sequence coverage: how much of the input sequence
+                        #    is spanned by this domain (analogous to HSP query cov).
+                        query_seq_cov = (abs(ali_to - ali_from) + 1) / tlen * 100 if tlen > 0 else 0.0
+                        passes_q_cov = (_q_min_cov <= 0.0 or query_seq_cov >= _q_min_cov)
+
+                        # 2. Alignment accuracy as a proxy for %identity.
+                        #    acc ranges 0–1; compare against query_min_identity/100.
+                        passes_q_id = (_q_min_id <= 0.0 or (acc * 100.0) >= _q_min_id)
+
+                        domain_passes = passes_q_cov and passes_q_id
+
+                        # Always count in gene_reads['all'] for any hit (mirrors
+                        # how BLAST 'all' includes any sequence that maps at all).
+                        gene_reads[gene]['all'].add(target_name)
+
+                        if not domain_passes:
+                            # Domain is too poor quality to contribute to stats
+                            continue
+
+                        # Initialise GeneStats on first qualifying hit
+                        if gene not in self.gene_stats[database][tool_name]:
+                            self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+
+                        # Use HMM profile coordinates + bit-score for coverage/identity stats
+                        self.gene_stats[database][tool_name][gene].add_hit(
+                            hmm_from, hmm_to, score, qlen
+                        )
+
+                        # 'passing' = domain passed quality filters AND the full-sequence
+                        # E-value threshold from Pass 1
+                        if gene in detected_by_evalue:
+                            gene_reads[gene]['passing'].add(target_name)
+
+            except Exception as e:
+                self.logger.error(f"Error parsing {domtbl_file}: {e}")
+
+        else:
+            # domtblout not available – fall back to tblout-only (no position data)
+            self.logger.debug("  domtblout not found; using tblout only (no profile coverage or per-domain quality filtering)")
+            if tbl_file.exists():
+                try:
+                    with open(tbl_file, 'r') as f:
+                        for line in f:
+                            if line.startswith('#'):
+                                continue
+                            fields = line.strip().split()
+                            if len(fields) < 6:
+                                continue
+                            target_name = fields[0]
+                            gene        = fields[2]
+                            try:
+                                score = float(fields[5])
+                            except ValueError:
+                                score = 0.0
+                            if gene not in self.gene_stats[database][tool_name]:
+                                self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
+                            self.gene_stats[database][tool_name][gene].add_hit(1, 1, score)
+                            gene_reads[gene]['all'].add(target_name)
+                            if gene in detected_by_evalue:
+                                gene_reads[gene]['passing'].add(target_name)
+                except Exception as e:
+                    self.logger.error(f"Error in tblout fallback: {e}")
+
+        # ── Finalise per-gene statistics ──────────────────────────────────────────
+        for gene in self.gene_stats[database][tool_name]:
+            self.gene_stats[database][tool_name][gene].finalise()
+
+        # ── Gene-level detection gate ─────────────────────────────────────────────
+        # A profile is only reported as detected when ALL of the following hold:
+        #   1. Full-sequence E-value passes (from Pass 1)
+        #   2. Profile coverage (% of HMM model covered) >= detection_min_coverage
+        #
+        # Note: detection_min_identity is intentionally NOT applied here because
+        # stats.avg_identity stores bit-scores (not %identity) for HMMER; applying
+        # a percentage threshold against bit-scores would be meaningless.
+        # Users can control sensitivity via --hmmer-evalue/-e and --d-min-cov instead.
+        #
+        # detection_min_num_reads IS applied here (for reads-mode inputs where
+        # multiple sequences must support a detection for it to count).
+        _d_min_reads = int(getattr(self, 'detection_min_num_reads', 1))
+        _is_reads_mode = not getattr(self, 'is_genes_fasta', False)
+
+        for gene in detected_by_evalue:
+            stats = self.gene_stats[database][tool_name].get(gene)
+            passes_d_cov = True
+            passes_d_reads = True
+
+            if stats is not None and _d_min_cov > 0.0 and stats.gene_length > 0:
+                passes_d_cov = stats.gene_coverage >= _d_min_cov
+
+            # Apply min-reads gate for reads input (not for full-length gene FASTA)
+            if _is_reads_mode and _d_min_reads > 1 and stats is not None:
+                passes_d_reads = stats.num_sequences >= _d_min_reads
+
+            if passes_d_cov and passes_d_reads:
+                detected_genes.add(gene)
+                self.detections[database][gene][tool_name] = True
+                if annotations and gene in annotations:
+                    desc = annotations[gene].get('description', '')
+                    flag = ' [MUST FLAG]' if annotations[gene].get('must_flag') else ''
+                    self.logger.debug(
+                        f"  HMMER detected: {gene} – {desc}{flag} "
+                        f"(best E={seq_best_evalue.get(gene, '?'):.2e}, "
+                        f"profile_cov={stats.gene_coverage if stats else 0:.1f}%, "
+                        f"seqs={stats.num_sequences if stats else 0})"
+                    )
+            else:
+                reasons = []
+                if not passes_d_cov:
+                    reasons.append(f"profile_cov={stats.gene_coverage if stats else 0:.1f}% < {_d_min_cov:.1f}%")
+                if not passes_d_reads:
+                    reasons.append(f"seqs={stats.num_sequences if stats else 0} < min_reads={_d_min_reads}")
+                self.logger.debug(
+                    f"  HMMER filtered: {gene} ({'; '.join(reasons)})"
+                )
+
+        # Convert sets → lists for write_tool_stats
+        gene_reads_lists = {
+            gene: {
+                'all':     list(v['all']),
+                'passing': list(v['passing']),
+            }
+            for gene, v in gene_reads.items()
+        }
+        return detected_genes, gene_reads_lists
 
     def write_tool_stats(self, database: str, tool_name: str, gene_reads: dict = None):
         """Write detailed statistics for a specific tool to TSV.
@@ -2397,14 +2907,17 @@ class Workflow:
                 results[db_name]['Minimap2-DNA'] = self.run_minimap2(
                     db_paths['minimap2'], db_name, options.minimap2_preset)
 
-            # Uncomment the following lines if HMMER support is added
-            # if self.run_dna and db_paths.get('hmmer_dna'):
-            #     results[db_name]['HMMER-DNA'] = self.run_hmmer(
-            #         db_paths['hmmer_dna'], db_name, 'dna')
-            #
-            # if self.run_protein and db_paths.get('hmmer_protein'):
-            #     results[db_name]['HMMER-PROTEIN'] = self.run_hmmer(
-            #         db_paths['hmmer_protein'], db_name, 'protein')
+            # HMMER protein search (hmmsearch) – runs against protein HMM profiles.
+            # Requires protein sequences as input; suited for biorisk detection and
+            # any other protein-family HMM database.
+            if self.run_protein and db_paths.get('hmmer_protein'):
+                results[db_name]['HMMER-PROTEIN'] = self.run_hmmer(
+                    db_paths['hmmer_protein'], db_name, 'protein')
+
+            # HMMER DNA search (nhmmer) – runs against nucleotide HMM profiles.
+            if self.run_dna and db_paths.get('hmmer_dna'):
+                results[db_name]['HMMER-DNA'] = self.run_hmmer(
+                    db_paths['hmmer_dna'], db_name, 'dna')
 
             self.generate_detection_matrix(db_name)
 
@@ -2441,7 +2954,17 @@ class Workflow:
 
                     status = "✓" if success else "✗"
                     gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
-                    self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected")
+                    # Append MUST-FLAG count for HMMER tools when annotations are present
+                    must_flag_suffix = ""
+                    if 'HMMER' in tool and isinstance(genes, set):
+                        try:
+                            _ann = self.hmmer_annotations.get(db_name, {})
+                            _mf = sum(1 for g in genes if _ann.get(g, {}).get('must_flag'))
+                            if _mf > 0:
+                                must_flag_suffix = f"  ⚑  {_mf} MUST-FLAG"
+                        except Exception:
+                            pass
+                    self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected{must_flag_suffix}")
         # for db_name in self.databases.keys():
         #     if results[db_name]:
         #         self.logger.info(f"\n{db_name.upper()}:")

@@ -92,8 +92,9 @@ Examples:
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
     tool_group.add_argument('--tools', nargs='+',
-                            choices=['blastn', 'blastx', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2', 'all'], #, 'hmmer_dna', 'hmmer_protein'],
-                            default=['diamond', 'bowtie2', 'bwa', 'minimap2'], #, 'hmmer_dna','hmmer_protein'],
+                            choices=['blastn', 'blastx', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2',
+                                     'hmmer_protein', 'hmmer_dna', 'all'],
+                            default=['diamond', 'bowtie2', 'bwa', 'minimap2'],
                             help='Specify which tools to run - "all" will run all tools'
                                  ' (default: all except blastx/p as they can be slow!!)')
 
@@ -166,7 +167,18 @@ Examples:
     tool_params_group.add_argument('--min-bitscore', type=float, default=None,
                                    help='Minimum bitscore threshold to apply to BLAST/DIAMOND hits (if not set, no bitscore filtering is applied)')
 
-    # Runtime parameters
+    # HMMER-specific arguments
+    hmmer_group = parser.add_argument_group('HMMER Parameters')
+    hmmer_group.add_argument('--hmmer-db', dest='hmmer_db', default=None,
+                             help='Path to a protein HMM database file (.hmm) for hmmsearch. '
+                                  'Enables HMMER protein search even if "hmmer_protein" is not listed in --tools. '
+                                  'Example: /path/to/biorisk.hmm')
+    hmmer_group.add_argument('--hmmer-dna-db', dest='hmmer_dna_db', default=None,
+                             help='Path to a DNA HMM database file (.hmm) for nhmmer.')
+    hmmer_group.add_argument('--hmmer-annotations', dest='hmmer_annotations', default=None,
+                             help='Path to a CSV file mapping HMM profile IDs to descriptions '
+                                  '(columns: ID, Description, Must flag). '
+                                  'Example: /path/to/biorisk_annotations.csv')
     runtime_group = parser.add_argument_group('Runtime Parameters')
     runtime_group.add_argument('-t', '--threads', type=int, default=4,
                               help='Number of threads to use (default: 4)')
@@ -255,6 +267,12 @@ Examples:
             else:
                 options.tools = ['blastn', 'blastx', 'blastp', 'diamond', 'bowtie2', 'bwa', 'minimap2']
 
+        # If --hmmer-db is provided, ensure hmmer_protein is in tools (auto-enable)
+        if getattr(options, 'hmmer_db', None) and 'hmmer_protein' not in options.tools:
+            options.tools = list(options.tools) + ['hmmer_protein']
+        if getattr(options, 'hmmer_dna_db', None) and 'hmmer_dna' not in options.tools:
+            options.tools = list(options.tools) + ['hmmer_dna']
+
         # Initialise database variables to avoid UnboundLocalError
         resfinder_dbs = None
         card_dbs = None
@@ -294,6 +312,40 @@ Examples:
                       file=sys.stderr)
                 sys.exit(1)
             user_dbs = gather_databases(options.user_db_path, options.tools)
+
+        # Inject HMM databases provided via --hmmer-db / --hmmer-dna-db / --hmmer-annotations
+        # For AMRfior these are applied to every active database (or a dedicated entry
+        # if no per-database HMM mapping is desired). Here we create/update user_dbs.
+        _hmmer_protein_path = getattr(options, 'hmmer_db', None)
+        _hmmer_dna_path = getattr(options, 'hmmer_dna_db', None)
+        _hmmer_ann_path = getattr(options, 'hmmer_annotations', None)
+
+        if _hmmer_protein_path or _hmmer_dna_path:
+            if user_dbs is None:
+                user_dbs = {}
+            if _hmmer_protein_path:
+                if os.path.isfile(_hmmer_protein_path):
+                    user_dbs['hmmer_protein'] = _hmmer_protein_path
+                else:
+                    logger.warning(f"--hmmer-db path not found: {_hmmer_protein_path}; ignoring.")
+            if _hmmer_dna_path:
+                if os.path.isfile(_hmmer_dna_path):
+                    user_dbs['hmmer_dna'] = _hmmer_dna_path
+                else:
+                    logger.warning(f"--hmmer-dna-db path not found: {_hmmer_dna_path}; ignoring.")
+            if _hmmer_ann_path:
+                if os.path.isfile(_hmmer_ann_path):
+                    user_dbs['hmmer_annotations'] = _hmmer_ann_path
+                else:
+                    logger.warning(f"--hmmer-annotations path not found: {_hmmer_ann_path}; ignoring.")
+            elif user_dbs.get('hmmer_protein') and 'hmmer_annotations' not in user_dbs:
+                # Auto-detect annotations CSV in the same directory as the HMM file
+                import glob as _glob
+                _hmm_dir = os.path.dirname(user_dbs['hmmer_protein'])
+                _csv_candidates = _glob.glob(os.path.join(_hmm_dir, '*.csv'))
+                if _csv_candidates:
+                    user_dbs['hmmer_annotations'] = _csv_candidates[0]
+                    logger.info(f"  Auto-detected HMMER annotations: {_csv_candidates[0]}")
 
         databases = {
             'resfinder': resfinder_dbs,
@@ -416,6 +468,10 @@ Examples:
             logger.info(f"  Bowtie2: {'Present (will be SKIPPED)' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Present (will be SKIPPED)' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Present (will be SKIPPED)' if 'minimap2' in options.tools else 'No'}")
+            _hmmer_prot_active = 'hmmer_protein' in options.tools or (user_dbs or {}).get('hmmer_protein')
+            _hmmer_dna_active = 'hmmer_dna' in options.tools or (user_dbs or {}).get('hmmer_dna')
+            logger.info(f"  HMMER-Protein: {'Yes' if _hmmer_prot_active else 'No'}")
+            logger.info(f"  HMMER-DNA: {'Yes' if _hmmer_dna_active else 'No'}")
         else:
             logger.info(f" Tool(s) chosen:")
             logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
@@ -425,6 +481,10 @@ Examples:
             logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
+            _hmmer_prot_active = 'hmmer_protein' in options.tools or (user_dbs or {}).get('hmmer_protein')
+            _hmmer_dna_active = 'hmmer_dna' in options.tools or (user_dbs or {}).get('hmmer_dna')
+            logger.info(f"  HMMER-Protein: {'Yes' if _hmmer_prot_active else 'No'}")
+            logger.info(f"  HMMER-DNA: {'Yes' if _hmmer_dna_active else 'No'}")
 
         # logger.info(f"E-value threshold: {evalue}")
         logger.info(f"Min query coverage: {options.query_min_coverage}%")

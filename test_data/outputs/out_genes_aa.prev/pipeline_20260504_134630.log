@@ -1,0 +1,186 @@
+2026-05-04 13:46:30,150 - INFO - Database tool availability (per selected database):
+2026-05-04 13:46:30,150 - INFO -   user-provided-db: BLASTn: No; BLASTx: Yes; BLASTp: Yes; DIAMOND: Yes
+2026-05-04 13:46:30,150 - INFO - ======================================================================
+2026-05-04 13:46:30,150 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 13:46:30,150 - INFO - Started at: 2026-05-04 13:46:30
+2026-05-04 13:46:30,150 - INFO - ======================================================================
+2026-05-04 13:46:30,150 - INFO - Threads: 4
+2026-05-04 13:46:30,150 - INFO - Database(s) chosen:
+2026-05-04 13:46:30,150 - INFO -   User-Provided: resfinder
+2026-05-04 13:46:30,150 - INFO - Sequence type: Genes-FASTA (full-length gene FASTA). Read-mappers (bowtie2, bwa, minimap2) will be skipped by the workflow.
+2026-05-04 13:46:30,150 - INFO -   Genes declared as: AMINO-ACID (aa) — protein searches will be preferred (BLASTp / DIAMOND blastp when available).
+2026-05-04 13:46:30,150 - INFO -  Tool(s) chosen (note: read-mappers will be skipped for Genes-FASTA):
+2026-05-04 13:46:30,150 - INFO -   BLASTn: No
+2026-05-04 13:46:30,150 - INFO -   BLASTx: No
+2026-05-04 13:46:30,150 - INFO -   BLASTp: Yes
+2026-05-04 13:46:30,150 - INFO -   DIAMOND: Yes
+2026-05-04 13:46:30,150 - INFO -   Bowtie2: No
+2026-05-04 13:46:30,150 - INFO -   BWA: No
+2026-05-04 13:46:30,150 - INFO -   Minimap2: No
+2026-05-04 13:46:30,150 - INFO -   HMMER-Protein: No
+2026-05-04 13:46:30,150 - INFO -   HMMER-DNA: No
+2026-05-04 13:46:30,150 - INFO - Min query coverage: 40.0%
+2026-05-04 13:46:30,150 - INFO - Min query identity: 80.0%
+2026-05-04 13:46:30,150 - INFO - Min detection coverage: 80.0%
+2026-05-04 13:46:30,150 - INFO - Min detection identity: 80.0%
+2026-05-04 13:46:30,150 - INFO - Run DNA mode: False
+2026-05-04 13:46:30,150 - INFO - Run Protein mode: True
+2026-05-04 13:46:30,150 - INFO - Sensitivity parameters: default - None
+2026-05-04 13:46:30,151 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 13:46:30,151 - INFO - ======================================================================
+2026-05-04 13:46:30,151 - INFO - GeneFíor I/O processing...
+2026-05-04 13:46:30,151 - INFO - ======================================================================
+2026-05-04 13:46:30,151 - INFO - Input type: Genes-FASTA
+2026-05-04 13:46:30,151 - INFO - Input file: /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb.fa (1.03 MB)
+2026-05-04 13:46:30,151 - INFO - Copying Genes-FASTA to temp directory...
+2026-05-04 13:46:30,151 - INFO - Copying /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb.fa to temp directory /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa...
+2026-05-04 13:46:30,151 - INFO - File size: 1.03 MB
+2026-05-04 13:46:30,151 - INFO - Successfully copied to: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa
+2026-05-04 13:46:30,151 - INFO - Genes-FASTA will be read from temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa
+2026-05-04 13:46:30,151 - INFO - Output directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa
+2026-05-04 13:46:30,151 - INFO - Temp directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa
+2026-05-04 13:46:30,151 - INFO - Files tracked for cleanup: 1
+2026-05-04 13:46:30,151 - INFO -   - /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa
+2026-05-04 13:46:30,151 - INFO - ======================================================================
+2026-05-04 13:46:30,151 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 13:46:30,152 - INFO - Genes-input mode enabled: treating input as full-length gene FASTA(s). Skipping read-mappers.
+2026-05-04 13:46:30,152 - INFO - Using user-specified genes_type: protein
+2026-05-04 13:46:30,152 - INFO - Detected gene FASTA type: protein. Will run protein searches (BLASTp/DIAMOND blastp).
+2026-05-04 13:46:30,152 - INFO - 
+### Processing User-provided-db Database ###
+2026-05-04 13:46:30,152 - INFO - Parameters for user-provided-db - BLASTp: blastp -query /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa -db /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 13:46:30,152 - INFO - gz_input=False, fasta=/home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa
+2026-05-04 13:48:48,687 - INFO - Filtered user-provided-db - BLASTp output /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/raw_outputs/user-provided-db_blastp_results.tsv: kept 214300/933337 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 13:48:53,893 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTp: 3212
+2026-05-04 13:48:53,893 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTp: 214300
+2026-05-04 13:48:53,893 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTp: 214300
+2026-05-04 13:48:53,893 - INFO - Detected 3212 genes in USER-PROVIDED-DB using BLASTp
+2026-05-04 13:48:53,901 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/tool_stats/user-provided-db_BLASTp_stats.tsv
+2026-05-04 13:48:53,910 - INFO - Running user-provided-db - DIAMOND-BLASTP...
+2026-05-04 13:48:53,910 - INFO - Parameters for user-provided-db - DIAMOND-BLASTP: diamond blastp -q /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa -d /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd -o /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/raw_outputs/user-provided-db_diamond_results.tsv -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen --header --id 80.0 --query-cover 40.0 -p 4
+2026-05-04 13:48:57,879 - INFO - user-provided-db - DIAMOND-BLASTP completed successfully
+2026-05-04 13:48:57,879 - INFO - user-provided-db - DIAMOND-BLASTP stderr:
+diamond v2.1.9.163 (C) Max Planck Society for the Advancement of Science, Benjamin Buchfink, University of Tuebingen
+Documentation, support and updates available at http://www.diamondsearch.org
+Please cite: http://dx.doi.org/10.1038/s41592-021-01101-x Nature Methods (2021)
+
+#CPU threads: 4
+Scoring parameters: (Matrix=BLOSUM62 Lambda=0.267 K=0.041 Penalties=11/1)
+Temporary directory: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/raw_outputs
+#Target sequences to report alignments for: 25
+Opening the database...  [0.001s]
+Database: /home/nickd/Git/GeneFior/test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd (type: Diamond database, sequences: 3212, letters: 996607)
+Block size = 2000000000
+Opening the input file...  [0s]
+Opening the output file...  [0s]
+Loading query sequences...  [0.002s]
+Masking queries...  [0.009s]
+Algorithm: Double-indexed
+Building query histograms...  [0.006s]
+Seeking in database...  [0s]
+Loading reference sequences...  [0.001s]
+Masking reference...  [0.012s]
+Initializing temporary storage...  [0s]
+Building reference histograms...  [0.006s]
+Allocating buffers...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 1/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.002s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.406s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 2/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.003s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.238s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 3/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.003s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.223s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 1/2, index chunk 4/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.002s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.201s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 1/4.
+Building reference seed array...  [0.002s]
+Building query seed array...  [0.002s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.302s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 2/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.003s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.222s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 3/4.
+Building reference seed array...  [0.003s]
+Building query seed array...  [0.003s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.196s]
+Deallocating memory...  [0s]
+Processing query block 1, reference block 1/1, shape 2/2, index chunk 4/4.
+Building reference seed array...  [0.002s]
+Building query seed array...  [0.002s]
+Computing hash join...  [0s]
+Masking low complexity seeds...  [0s]
+Searching alignments...  [0.211s]
+Deallocating memory...  [0s]
+Deallocating buffers...  [0s]
+Clearing query masking...  [0s]
+Computing alignments... Loading trace points...  [0.08s]
+Sorting trace points...  [0.017s]
+Computing alignments...  [1.721s]
+Deallocating buffers...  [0.007s]
+Loading trace points...  [0s]
+ [1.839s]
+Deallocating reference...  [0s]
+Loading reference sequences...  [0s]
+Deallocating buffers...  [0s]
+Deallocating queries...  [0s]
+Loading query sequences...  [0s]
+Closing the input file...  [0s]
+Closing the output file...  [0.003s]
+Closing the database...  [0s]
+Cleaning up...  [0s]
+Total time = 3.963s
+Reported 54006 pairwise alignments, 54006 HSPs.
+3210 queries aligned.
+2026-05-04 13:48:59,360 - INFO - Total reads processed in USER-PROVIDED-DB using DIAMOND-BLASTP: 3212
+2026-05-04 13:48:59,360 - INFO - Reads that returned a hit in USER-PROVIDED-DB using DIAMOND-BLASTP: 54006
+2026-05-04 13:48:59,360 - INFO - Reads passing thresholds in USER-PROVIDED-DB using DIAMOND-BLASTP: 54006
+2026-05-04 13:48:59,360 - INFO - Detected 3207 genes in USER-PROVIDED-DB using DIAMOND-BLASTP
+2026-05-04 13:48:59,369 - INFO -   Stats file: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/tool_stats/user-provided-db_DIAMOND-BLASTP_stats.tsv
+2026-05-04 13:48:59,376 - INFO - Generated detection matrix: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/user-provided-db_detection_matrix.tsv
+2026-05-04 13:48:59,376 - INFO -   Total genes detected: 3212
+2026-05-04 13:48:59,376 - INFO -   Tools used: 2
+2026-05-04 13:48:59,376 - INFO - 
+======================================================================
+2026-05-04 13:48:59,376 - INFO - PIPELINE SUMMARY
+2026-05-04 13:48:59,376 - INFO - ======================================================================
+2026-05-04 13:48:59,376 - INFO - 
+USER-PROVIDED-DB:
+2026-05-04 13:48:59,376 - INFO -   ✓ BLASTp-AA..................... 3212 genes detected
+2026-05-04 13:48:59,376 - INFO -   ✓ DIAMOND-AA.................... 3207 genes detected
+2026-05-04 13:48:59,376 - INFO - ======================================================================
+2026-05-04 13:48:59,376 - INFO - Detection matrices saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa
+2026-05-04 13:48:59,376 - INFO - Tool statistics saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/tool_stats
+2026-05-04 13:48:59,376 - INFO - Raw outputs saved to: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/raw_outputs
+2026-05-04 13:48:59,376 - INFO - ======================================================================
+2026-05-04 13:48:59,376 - INFO - Cleaning up temporary files...
+2026-05-04 13:48:59,376 - INFO - ======================================================================
+2026-05-04 13:48:59,376 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_genes_aa/all_aa_blastdb.fa
+2026-05-04 13:48:59,376 - INFO - Cleaned up 1 temporary file(s)

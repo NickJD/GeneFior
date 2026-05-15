@@ -1,0 +1,25 @@
+{
+  "tools": [
+    "blastn",
+    "blastx",
+    "diamond",
+    "bowtie2",
+    "bwa",
+    "minimap2"
+  ],
+  "query_min_coverage": 40.0,
+  "query_min_identity": 80.0,
+  "detection_min_coverage": 80.0,
+  "detection_min_identity": 80.0,
+  "detection_min_base_depth": 1.0,
+  "detection_min_num_reads": 1,
+  "sensitivity": "default",
+  "evalue": null,
+  "min_bitscore": null,
+  "tool_sensitivity_params": {},
+  "tool_extra_params": {},
+  "sequence_type": "Single-FASTA",
+  "genes_type": null,
+  "report_fasta": null,
+  "threads": 4
+}

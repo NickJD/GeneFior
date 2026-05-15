@@ -1,0 +1,105 @@
+2026-05-04 14:07:17,413 - INFO - Database tool availability (per selected database):
+2026-05-04 14:07:17,413 - INFO -   user-provided-db: BLASTn: No; BLASTx: Yes; BLASTp: Yes; DIAMOND: No
+2026-05-04 14:07:17,413 - INFO - ======================================================================
+2026-05-04 14:07:17,413 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 14:07:17,413 - INFO - Started at: 2026-05-04 14:07:17
+2026-05-04 14:07:17,414 - INFO - ======================================================================
+2026-05-04 14:07:17,414 - INFO - Threads: 4
+2026-05-04 14:07:17,414 - INFO - Database(s) chosen:
+2026-05-04 14:07:17,414 - INFO -   User-Provided: resfinder
+2026-05-04 14:07:17,414 - INFO -  Tool(s) chosen:
+2026-05-04 14:07:17,414 - INFO -   BLASTn: No
+2026-05-04 14:07:17,414 - INFO -   BLASTx: No
+2026-05-04 14:07:17,414 - INFO -   BLASTp: No
+2026-05-04 14:07:17,414 - INFO -   DIAMOND: No
+2026-05-04 14:07:17,414 - INFO -   Bowtie2: Yes
+2026-05-04 14:07:17,414 - INFO -   BWA: No
+2026-05-04 14:07:17,414 - INFO -   Minimap2: No
+2026-05-04 14:07:17,414 - INFO -   HMMER-Protein: No
+2026-05-04 14:07:17,414 - INFO -   HMMER-DNA: No
+2026-05-04 14:07:17,414 - INFO - Min query coverage: 40.0%
+2026-05-04 14:07:17,414 - INFO - Min query identity: 80.0%
+2026-05-04 14:07:17,414 - INFO - Min detection coverage: 80.0%
+2026-05-04 14:07:17,414 - INFO - Min detection identity: 80.0%
+2026-05-04 14:07:17,414 - INFO - Run DNA mode: True
+2026-05-04 14:07:17,414 - INFO - Run Protein mode: True
+2026-05-04 14:07:17,414 - INFO - Sensitivity parameters: default - None
+2026-05-04 14:07:17,414 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:07:17,414 - INFO - ======================================================================
+2026-05-04 14:07:17,414 - INFO - GeneFíor I/O processing...
+2026-05-04 14:07:17,414 - INFO - ======================================================================
+2026-05-04 14:07:17,414 - INFO - Input type: Paired-FASTQ
+2026-05-04 14:07:17,414 - INFO - Validated paired FASTQ files:
+2026-05-04 14:07:17,414 - INFO -   R1: test_data/Paired-FASTQ/Test_R1.fastq.gz (30.18 MB)
+2026-05-04 14:07:17,414 - INFO -   R2: test_data/Paired-FASTQ/Test_R2.fastq.gz (30.36 MB)
+2026-05-04 14:07:17,438 - WARNING - FASTQ read IDs are not unique after first space. Creating/modifying FASTQ files with /1 and /2 suffixes...
+2026-05-04 14:07:17,439 - INFO - Creating modified FASTQ files: test_data/Paired-FASTQ/Test_R1.fastq.gz -> test_data/outputs/out_paired_new/Test_R1_R1_modified.fastq.gz ; test_data/Paired-FASTQ/Test_R2.fastq.gz -> test_data/outputs/out_paired_new/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:07:20,373 - INFO - No BLAST-based tools, keeping FASTQ format
+2026-05-04 14:07:20,373 - INFO - Output directory: test_data/outputs/out_paired_new
+2026-05-04 14:07:20,373 - INFO - Temp directory: test_data/outputs/out_paired_new
+2026-05-04 14:07:20,373 - INFO - Files tracked for cleanup: 2
+2026-05-04 14:07:20,373 - INFO -   - test_data/outputs/out_paired_new/Test_R1_R1_modified.fastq.gz
+2026-05-04 14:07:20,373 - INFO -   - test_data/outputs/out_paired_new/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:07:20,373 - INFO - ======================================================================
+2026-05-04 14:07:20,373 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:07:20,374 - INFO - 
+### Processing User-provided-db Database ###
+2026-05-04 14:07:20,374 - INFO - Parameters for user-provided-db - BLASTx: blastx -query  -task blastx-fast -db test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 14:07:20,374 - INFO - gz_input=False, fasta=
+2026-05-04 14:07:20,400 - INFO - user-provided-db - BLASTx stderr: Command line argument error: Argument "query". File is not accessible
+2026-05-04 14:07:20,401 - ERROR - user-provided-db - BLASTx failed with return code 1
+2026-05-04 14:07:20,401 - INFO - Running user-provided-db - Bowtie2...
+2026-05-04 14:07:20,401 - INFO - Parameters for user-provided-db - Bowtie2: bowtie2 -1 test_data/outputs/out_paired_new/Test_R1_R1_modified.fastq.gz -2 test_data/outputs/out_paired_new/Test_R2_R2_modified.fastq.gz -x test_data/tmp_user_dbs/resfinder/bowtie2/all_bowtie2db -S test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results.sam -p 4 --no-unal --met-file test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_summary.txt
+2026-05-04 14:07:22,446 - INFO - user-provided-db - Bowtie2 completed successfully
+2026-05-04 14:07:22,446 - INFO - user-provided-db - Bowtie2 stderr:
+407114 reads; of these:
+  407114 (100.00%) were paired; of these:
+    406684 (99.89%) aligned concordantly 0 times
+    33 (0.01%) aligned concordantly exactly 1 time
+    397 (0.10%) aligned concordantly >1 times
+    ----
+    406684 pairs aligned concordantly 0 times; of these:
+      17 (0.00%) aligned discordantly 1 time
+    ----
+    406667 pairs aligned 0 times concordantly or discordantly; of these:
+      813334 mates make up the pairs; of these:
+        813055 (99.97%) aligned 0 times
+        18 (0.00%) aligned exactly 1 time
+        261 (0.03%) aligned >1 times
+0.14% overall alignment rate
+2026-05-04 14:07:22,446 - INFO - Running user-provided-db - SAM to BAM conversion...
+2026-05-04 14:07:22,446 - INFO - Parameters for user-provided-db - SAM to BAM conversion: samtools view -bS test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results.sam -o test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results.bam
+2026-05-04 14:07:22,468 - INFO - user-provided-db - SAM to BAM conversion completed successfully
+2026-05-04 14:07:22,469 - INFO - Running user-provided-db - BAM sorting...
+2026-05-04 14:07:22,469 - INFO - Parameters for user-provided-db - BAM sorting: samtools sort test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results.bam -o test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:07:22,483 - INFO - user-provided-db - BAM sorting completed successfully
+2026-05-04 14:07:22,483 - INFO - Running user-provided-db - BAM indexing...
+2026-05-04 14:07:22,483 - INFO - Parameters for user-provided-db - BAM indexing: samtools index test_data/outputs/out_paired_new/raw_outputs/user-provided-db_bowtie2_results_sorted.bam
+2026-05-04 14:07:22,487 - INFO - user-provided-db - BAM indexing completed successfully
+2026-05-04 14:07:22,516 - INFO - Reads that returned a hit in USER-PROVIDED-DB using Bowtie2: 1173
+2026-05-04 14:07:22,516 - INFO - Reads passing thresholds in USER-PROVIDED-DB using Bowtie2: 1173
+2026-05-04 14:07:22,516 - INFO - Detected 5 genes in USER-PROVIDED-DB using Bowtie2
+2026-05-04 14:07:22,517 - INFO -   Stats file: test_data/outputs/out_paired_new/tool_stats/user-provided-db_Bowtie2_stats.tsv
+2026-05-04 14:07:22,517 - INFO - Generated detection matrix: test_data/outputs/out_paired_new/user-provided-db_detection_matrix.tsv
+2026-05-04 14:07:22,517 - INFO -   Total genes detected: 5
+2026-05-04 14:07:22,517 - INFO -   Tools used: 1
+2026-05-04 14:07:22,517 - INFO - 
+======================================================================
+2026-05-04 14:07:22,517 - INFO - PIPELINE SUMMARY
+2026-05-04 14:07:22,517 - INFO - ======================================================================
+2026-05-04 14:07:22,517 - INFO - 
+USER-PROVIDED-DB:
+2026-05-04 14:07:22,517 - INFO -   ✗ BLASTx-AA..................... 0 genes detected
+2026-05-04 14:07:22,517 - INFO -   ✓ Bowtie2-DNA................... 5 genes detected
+2026-05-04 14:07:22,517 - INFO - ======================================================================
+2026-05-04 14:07:22,517 - INFO - Detection matrices saved to: test_data/outputs/out_paired_new
+2026-05-04 14:07:22,517 - INFO - Tool statistics saved to: test_data/outputs/out_paired_new/tool_stats
+2026-05-04 14:07:22,517 - INFO - Raw outputs saved to: test_data/outputs/out_paired_new/raw_outputs
+2026-05-04 14:07:22,517 - INFO - ======================================================================
+2026-05-04 14:07:22,517 - INFO - Tool failure - BLASTx-AA (database: user-provided-db): detected 0 genes
+2026-05-04 14:07:22,517 - WARNING -   -> BLASTx-AA failed for user-provided-db
+2026-05-04 14:07:22,517 - INFO - Cleaning up temporary files...
+2026-05-04 14:07:22,517 - INFO - ======================================================================
+2026-05-04 14:07:22,521 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_paired_new/Test_R1_R1_modified.fastq.gz
+2026-05-04 14:07:22,526 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_paired_new/Test_R2_R2_modified.fastq.gz
+2026-05-04 14:07:22,526 - INFO - Cleaned up 2 temporary file(s)

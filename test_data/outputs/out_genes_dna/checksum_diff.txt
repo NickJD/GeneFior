@@ -1,7 +1,13 @@
---- /var/folders/y_/p9fxs7c92t93sf12wkkm7nt40000gq/T/checksums_old.XXXXXX.BnOBDje46V	2026-04-20 12:18:15
-+++ /var/folders/y_/p9fxs7c92t93sf12wkkm7nt40000gq/T/checksums_new.XXXXXX.WBdrbDHAEN	2026-04-20 12:18:15
-@@ -1,3 +1,3 @@
--2375fb7dafc3f05c0887a4a257941745840dae57a3496cf71ca6d878659f307d  ./run_parameters.json
-+0a86ae553247432be8ce0781f639d81a21ea56efa78dbbb65bc26a4646ca7464  ./run_parameters.json
- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw_outputs/user-provided-db_blastn_results.tsv
- e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw_outputs/user-provided-db_blastx_results.tsv
+--- /tmp/checksums_old.EL6sqf	2026-05-04 14:00:49.927179160 +0200
++++ /tmp/checksums_new.C01tGm	2026-05-04 14:00:49.892178986 +0200
+@@ -1,5 +1,8 @@
+ 213f977fd42da02ff67201522dbb95bdfb17969877814613ed4c2967e4514715  ./tool_stats/user-provided-db_BLASTn_stats.tsv
+-3f0b7829a5ca890f7f6cca942163c50ae09d6e5b89f4a9337d74e990d7238450  ./all_blastdb.fa
+ 4e033c91bc39d7fb89a4f49ca13d1c4c392990cbb0925b21c7df15cb268aec53  ./run_parameters.json
++524d943bcb1a0a3106bc65ff7e737b013f3e36f4f8d5bb831440d8f2ae9fd0fc  ./raw_outputs/user-provided-db_blastx_results.tsv
++67b69f90c2d00c27afb664d33cb30df494ad7de3e9c2f2abfed40055c9ff56cf  ./raw_outputs/user-provided-db_diamond_results.tsv
++98d442bca67045ff13a5590f258753252b70ead3828a448dba51c517f10a28cb  ./user-provided-db_detection_matrix.tsv
++9bb865262428f7f354223ad9ca6063b5ae2bf2b879b173ffd0fcf0f9a780a8ef  ./tool_stats/user-provided-db_BLASTx_stats.tsv
+ b0cdf5fadca9a141ad75dff33159631c8622f6019fed691e79d6c67539d054f1  ./raw_outputs/user-provided-db_blastn_results.tsv
+-b694ac4f6eab228cf53728b9cbb7f563c96f5a924f9afdae024578125f94e8ef  ./raw_outputs/user-provided-db_blastx_results.tsv
++ce18dc0d51114785fbc7043acc69919337255b1b36be198bd694d8c7a9271f48  ./tool_stats/user-provided-db_DIAMOND-BLASTX_stats.tsv

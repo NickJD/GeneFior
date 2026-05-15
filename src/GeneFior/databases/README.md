@@ -239,7 +239,7 @@ GeneFíor expects specific naming patterns. **Prefix is YOUR DNA/AA filename - S
 
 ### Complete Automation Script - 'Should' work
 
-Save this as `build_GeneFior_database.sh`:
+Save this as `build_database.sh`:
 
 ```bash
 #!/bin/bash
