@@ -42,6 +42,9 @@ genefior-gene-stats = "GeneFior.GeneFior_Gene_Stats:main"
 GeneFior-Combine = "GeneFior.GeneFior_Combine:main"
 GeneFior-combine = "GeneFior.GeneFior_Combine:main"
 genefior-combine = "GeneFior.GeneFior_Combine:main"
+GeneFior-Reconstruct = "GeneFior.GeneFior_Reconstruct:main"
+GeneFior-reconstruct = "GeneFior.GeneFior_Reconstruct:main"
+genefior-reconstruct = "GeneFior.GeneFior_Reconstruct:main"
 
 [tool.setuptools]
 include-package-data = true

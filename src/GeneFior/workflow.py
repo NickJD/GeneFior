@@ -57,7 +57,8 @@ class Workflow:
                      extra_tool_params: Dict[str, str] = None,
                      genes_type: Optional[str] = None,
                      hmmer_evalue: Optional[float] = None,
-                     hmmer_threshold_mode: str = 'evalue'):
+                     hmmer_threshold_mode: str = 'evalue',
+                     hmmer_must_flag: bool = True):
 
                  
         ### Handle input FASTA and FASTQ
@@ -219,6 +220,17 @@ class Workflow:
         # Cache for HMMER annotations: {db_name: {gene_id: {'description': str, 'must_flag': bool}}}
         # Populated lazily when run_hmmer is called and a 'hmmer_annotations' path is present in db_paths.
         self.hmmer_annotations: Dict[str, Dict[str, dict]] = {}
+
+        # Metadata about each loaded annotation file, keyed by db_name.
+        # Currently tracks: has_must_flag (bool) — whether the source CSV contained a
+        # 'Must flag' column at all.  Used to suppress irrelevant columns/alerts for
+        # databases that have no concept of must-flagging.
+        self.hmmer_annotations_meta: Dict[str, dict] = {}
+
+        # When False the must-flag override is completely disabled: must-flag genes that
+        # fail coverage/min-reads gates are treated identically to all other genes and
+        # the MUST-FLAG ALERT log block is suppressed.  True by default.
+        self.hmmer_must_flag = hmmer_must_flag
 
     def check_gzip(self,fasta_path_str):
         self.logger.info(f"Checking if input FASTA ` {self.input_fasta} ` is gzipped and not broken...")
@@ -704,6 +716,9 @@ class Workflow:
                     except Exception:
                         continue
 
+                    # Stage-1 query coverage — span-based, valid for all search modes.
+                    # qstart/qend are always in the query's own coordinate system (NT for blastn
+                    # and blastx; AA for blastp), so qlen and the span are in the same unit.
                     query_coverage = ((abs(qend - qstart) + 1) / qlen) * 100 if qlen else 0.0
 
                     if identity >= getattr(self, 'query_min_identity', 0.0) and query_coverage >= getattr(self, 'query_min_coverage', 0.0):
@@ -754,7 +769,7 @@ class Workflow:
                     pass
                 return False
 
-            self.logger.info(f"Filtered {tool_name} output {output_file}: kept {kept}/{total} hits (identity>={self.detection_min_identity}, qcov>={self.query_min_coverage}%)")
+            self.logger.info(f"Filtered {tool_name} output {output_file}: kept {kept}/{total} hits (identity>={self.query_min_identity}, qcov>={self.query_min_coverage}%)")
             return True
 
         except FileNotFoundError:
@@ -1736,41 +1751,76 @@ class Workflow:
 
 
 
-    def _load_hmmer_annotations(self, annotations_path: str) -> dict:
-        """Load HMMER annotations CSV with columns: ID, Description, Must flag.
+    # Column name variants accepted for the optional must-flag field.
+    _MUST_FLAG_COL_VARIANTS = ('Must flag', 'Must Flag', 'must_flag', 'must flag', 'MUST FLAG', 'MustFlag')
 
-        Returns a dict mapping gene_id -> {'description': str, 'must_flag': bool}.
+    def _load_hmmer_annotations(self, annotations_path: str) -> Tuple[dict, dict]:
+        """Load a HMMER annotations CSV.
+
+        The CSV must have an ``ID`` column (gene/profile name) and optionally a
+        ``Description`` column and a ``Must flag`` column (case/space-insensitive).
+
+        The ``Must flag`` column is **optional** — databases that have no concept
+        of priority flagging simply omit it and the feature is transparently disabled.
+
+        Returns
+        -------
+        annotations : dict
+            {gene_id: {'description': str, 'must_flag': bool}}
+        meta : dict
+            Metadata about the loaded file.  Currently:
+              has_must_flag (bool) — whether the source CSV contained a must-flag column.
         """
-        annotations = {}
+        annotations: dict = {}
+        meta: dict = {'has_must_flag': False}
         try:
             with open(annotations_path, 'r', newline='', encoding='utf-8-sig') as f:
                 reader = csv.DictReader(f)
+                # Detect must-flag column once using the actual CSV fieldnames
+                mf_col = None
+                if reader.fieldnames:
+                    for candidate in self._MUST_FLAG_COL_VARIANTS:
+                        if candidate in reader.fieldnames:
+                            mf_col = candidate
+                            break
+                meta['has_must_flag'] = mf_col is not None
+
                 for row in reader:
                     gene_id = row.get('ID', '').strip()
                     if not gene_id:
                         continue
                     description = row.get('Description', '').strip()
-                    # Accept various capitalisation variants of 'Must flag'
-                    must_raw = (
-                        row.get('Must flag', row.get('Must Flag', row.get('must_flag', row.get('must flag', ''))))
-                    ).strip()
-                    must_flag = must_raw.upper() in ('TRUE', 'YES', '1')
+                    if mf_col is not None:
+                        must_flag = row.get(mf_col, '').strip().upper() in ('TRUE', 'YES', '1')
+                    else:
+                        must_flag = False
                     annotations[gene_id] = {'description': description, 'must_flag': must_flag}
-            self.logger.info(f"  Loaded {len(annotations)} HMMER annotations from {annotations_path}")
+
+            n_must = sum(1 for v in annotations.values() if v['must_flag'])
+            flag_note = f", {n_must} must-flag" if meta['has_must_flag'] else " (no must-flag column)"
+            self.logger.info(f"  Loaded {len(annotations)} HMMER annotations from {annotations_path}{flag_note}")
         except Exception as e:
             self.logger.warning(f"Could not load HMMER annotations from {annotations_path}: {e}")
-        return annotations
+        return annotations, meta
 
     def _write_hmmer_annotations_report(self, database: str, tool_name: str):
         """Write a TSV report mapping detected HMMER gene IDs to their annotations.
 
-        Produces two outputs:
-        - Full annotations TSV (all genes in the annotation file, detected or not)
-        - A console/log warning listing any 'Must Flag' genes that were detected
+        Produces:
+        - A full annotations TSV (all genes in the annotation file, detected or not).
+        - Console/log warnings when any 'Must Flag' genes are detected.
+
+        The 'Must_Flag' column is only included in the TSV — and must-flag alerts are
+        only emitted — when the source annotation CSV actually contained a must-flag
+        column.  This makes the method universally usable for any HMM database, not
+        only the ibbis biorisk database.
         """
         annotations = self.hmmer_annotations.get(database, {})
         if not annotations:
             return
+
+        meta = self.hmmer_annotations_meta.get(database, {})
+        has_must_flag = meta.get('has_must_flag', False)
 
         report_file = self.output_dir / f"{database}_{tool_name}_annotations.tsv"
         detected_in_tool = {
@@ -1781,15 +1831,20 @@ class Workflow:
         try:
             with open(report_file, 'w', newline='') as f:
                 writer = csv.writer(f, delimiter='\t')
-                writer.writerow(['Gene_ID', 'Description', 'Must_Flag', 'Detected'])
+                # Only include Must_Flag column when the source CSV had one
+                headers = ['Gene_ID', 'Description']
+                if has_must_flag:
+                    headers.append('Must_Flag')
+                headers.append('Detected')
+                writer.writerow(headers)
+
                 for gene_id, info in sorted(annotations.items()):
                     detected = 1 if gene_id in detected_in_tool else 0
-                    writer.writerow([
-                        gene_id,
-                        info.get('description', ''),
-                        'TRUE' if info.get('must_flag') else 'FALSE',
-                        detected,
-                    ])
+                    row = [gene_id, info.get('description', '')]
+                    if has_must_flag:
+                        row.append('TRUE' if info.get('must_flag') else 'FALSE')
+                    row.append(detected)
+                    writer.writerow(row)
             self.logger.info(f"  HMMER annotations report: {report_file}")
         except Exception as e:
             self.logger.warning(f"Could not write HMMER annotations report: {e}")
@@ -1798,35 +1853,45 @@ class Workflow:
         n_total_detected = len(detected_in_tool)
         n_annotated_detected = sum(1 for g in detected_in_tool if g in annotations)
         n_unannotated_detected = n_total_detected - n_annotated_detected
-        n_must_flag_in_db = sum(1 for info in annotations.values() if info.get('must_flag'))
 
-        # Highlight must-flag detections in the log
-        must_flag_detected = sorted([
-            (gid, annotations[gid]['description'])
-            for gid in detected_in_tool
-            if annotations.get(gid, {}).get('must_flag')
-        ])
-        n_must_flag_detected = len(must_flag_detected)
-
-        # Log detection summary in context of annotations
-        self.logger.info(
-            f"  Detection summary [{tool_name}]: {n_total_detected} gene(s) detected in total — "
-            f"{n_annotated_detected} have annotation entries, {n_unannotated_detected} have none; "
-            f"{n_must_flag_detected} of {n_must_flag_in_db} MUST-FLAG gene(s) in the database were detected."
+        # Build base summary line
+        summary = (
+            f"  Detection summary [{tool_name}]: {n_total_detected} gene(s) detected — "
+            f"{n_annotated_detected} have annotation entries, {n_unannotated_detected} have none"
         )
 
-        if must_flag_detected:
-            self.logger.warning("!" * 70)
-            self.logger.warning(
-                f"  *** MUST-FLAG ALERT: {n_must_flag_detected} of {n_total_detected} detected gene(s) "
-                f"are flagged as high-priority biorisk genes "
-                f"[{database} / {tool_name}] ***"
-            )
-            for gid, desc in must_flag_detected:
-                self.logger.warning(f"    ⚑  {gid}: {desc}")
-            self.logger.warning("!" * 70)
+        if has_must_flag:
+            n_must_flag_in_db = sum(1 for info in annotations.values() if info.get('must_flag'))
+            must_flag_detected = sorted([
+                (gid, annotations[gid]['description'])
+                for gid in detected_in_tool
+                if annotations.get(gid, {}).get('must_flag')
+            ])
+            n_must_flag_detected = len(must_flag_detected)
+            mf_enabled = getattr(self, 'hmmer_must_flag', True)
+            summary += f"; {n_must_flag_detected} of {n_must_flag_in_db} must-flag gene(s) detected"
+            if not mf_enabled:
+                summary += " [must-flag override DISABLED]"
+            self.logger.info(summary + ".")
+
+            if must_flag_detected and mf_enabled:
+                self.logger.warning("!" * 70)
+                self.logger.warning(
+                    f"  *** MUST-FLAG ALERT: {n_must_flag_detected} of {n_total_detected} detected gene(s) "
+                    f"are flagged as high-priority genes [{database} / {tool_name}] ***"
+                )
+                for gid, desc in must_flag_detected:
+                    self.logger.warning(f"    ⚑  {gid}: {desc}")
+                self.logger.warning("!" * 70)
+            elif must_flag_detected and not mf_enabled:
+                self.logger.info(
+                    f"  {n_must_flag_detected} must-flag gene(s) detected "
+                    f"(must-flag override is disabled — no threshold bypass applied)."
+                )
+            else:
+                self.logger.info(f"  No must-flag genes detected in {database} [{tool_name}].")
         else:
-            self.logger.info(f"  No MUST-FLAG biorisk genes detected in {database} [{tool_name}].")
+            self.logger.info(summary + ".")
 
     # Standard genetic code codon table
     _CODON_TABLE: Dict[str, str] = {
@@ -2043,7 +2108,9 @@ class Workflow:
         # Load annotations for this database if available
         annotations_path = (self.databases.get(database) or {}).get('hmmer_annotations')
         if annotations_path and database not in self.hmmer_annotations:
-            self.hmmer_annotations[database] = self._load_hmmer_annotations(annotations_path)
+            _ann, _meta = self._load_hmmer_annotations(annotations_path)
+            self.hmmer_annotations[database] = _ann
+            self.hmmer_annotations_meta[database] = _meta
 
         success = self.run_command(cmd, f"{database} - {tool_name}")
         detected = set()
@@ -2145,34 +2212,33 @@ class Workflow:
                     except Exception:
                         bitscore = None
 
-                    try:
-                        alignment_len = int(fields[3])
-                    except Exception:
-                        alignment_len = None
-
-
                     # Store gene length if available
                     if slen is not None:
                         gene_lengths[gene] = max(gene_lengths.get(gene, 0), slen)
 
-                    # Determine whether this is a translated search (blastx / diamond blastx)
-                    tool_name_l = tool_name.lower() if isinstance(tool_name, str) else ''
-                    is_translated_search = ('blastx' in tool_name_l)
-
-                    # Compute query coverage. Prefer alignment_len/qlen when available.
-                    # For translated searches alignment_len is in amino-acids while qlen is in nucleotides;
-                    # multiply alignment_len by 3 to convert to nucleotides before comparison.
+                    # Query coverage: fraction of the query sequence spanned by this HSP.
+                    #
+                    # Formula: (abs(qend - qstart) + 1) / qlen  — used for ALL search modes.
+                    #
+                    # AA vs DNA coordinate handling
+                    # ─────────────────────────────
+                    # BLAST/DIAMOND always reports qstart/qend in the *query's own coordinate
+                    # system*, regardless of the search type:
+                    #
+                    #   blastn          — qstart/qend in nucleotides; qlen in nucleotides
+                    #   blastx          — qstart/qend in nucleotides; qlen in nucleotides
+                    #                     (query is DNA even though the database is protein)
+                    #   blastp / diamond-blastp — qstart/qend in amino acids; qlen in amino acids
+                    #
+                    # Because the numerator and denominator are always in the same unit, the
+                    # span formula is self-consistent for every mode with no conversion needed.
+                    # No is_translated_search flag is required here.
+                    #
+                
                     query_coverage = 0.0
                     try:
-                        if alignment_len is not None and qlen and qlen > 0:
-                            if is_translated_search:
-                                aligned_nt = alignment_len * 3
-                                query_coverage = (aligned_nt / float(qlen)) * 100.0
-                            else:
-                                query_coverage = (alignment_len / float(qlen)) * 100.0
-                        elif qstart is not None and qend is not None and qlen and qlen > 0:
-                            aln_span = (abs(qend - qstart) + 1)
-                            query_coverage = (aln_span / float(qlen)) * 100.0
+                        if qstart is not None and qend is not None and qlen and qlen > 0:
+                            query_coverage = (abs(qend - qstart) + 1) / float(qlen) * 100.0
                     except Exception:
                         query_coverage = 0.0
 
@@ -2214,8 +2280,12 @@ class Workflow:
             stats = self.gene_stats[database][tool_name][gene]
             stats.finalise()
 
-            # Gene is detected if gene meets thresholds
+            # Gene is detected if it meets all gene-level thresholds.
+            # avg_identity is the mean read identity across all qualifying reads; it is
+            # checked against detection_min_identity (the gene-level identity gate),
+            # which is separate from query_min_identity (the per-read/HSP gate used above).
             if (stats.gene_coverage >= self.detection_min_coverage and
+                    stats.avg_identity >= self.detection_min_identity and
                     stats.base_depth_hit >= self.detection_min_base_depth and
                     stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
@@ -2335,20 +2405,26 @@ class Workflow:
                         aligned_positions.update(range(ref_pos, ref_pos + length))
                         ref_pos += length
                         alignment_length += length
-                        query_aligned_bases += length  # these bases exist in both the read AND the gene
-                    elif op == 'I':  # insertion to reference
+                        # M/=/X consume both query and reference: unambiguously "aligned"
+                        query_aligned_bases += length
+                    elif op == 'I':
+                        # Insertion into reference: consumes query bases but no reference
+                        # positions. We count these toward query_aligned_bases so that the
+                        # BAM query-coverage formula matches the BLAST span-based approach
+                        # (qend - qstart + 1 spans insertion positions in query coords too).
+                        # Omitting I would make BAM systematically more conservative than
+                        # BLAST/DIAMOND for insertion-bearing alignments.
                         alignment_length += length
-                        # consumes query bases, but they have no reference counterpart
-                        # — do NOT count toward query_aligned_bases
-                    elif op == 'D':  # deletion from reference
+                        query_aligned_bases += length
+                    elif op == 'D':
+                        # Deletion from reference: consumes reference positions but no query
+                        # bases — does not advance query_aligned_bases.
                         ref_pos += length
                         alignment_length += length
-                        # consumes reference positions but no query bases
-                        # — do NOT count toward query_aligned_bases
                     elif op == 'N':
                         ref_pos += length
                     elif op in ('S', 'H'):
-                        # soft/hard clip - do not consume reference (H doesn't appear in SEQ)
+                        # Soft/hard clip: not part of the aligned region — excluded.
                         pass
 
                 if alignment_length == 0:
@@ -2358,11 +2434,14 @@ class Workflow:
                     identity = (matches / alignment_length) * 100.0
 
                 query_length = len(seq) if seq and seq != '*' else 0
-                #query_coverage = (len(aligned_positions) / query_length) * 100.0 if query_length > 0 else 0.0
-                # Per-read query coverage — what proportion of this read overlaps the gene
+                # Per-read query coverage: (M + I bases) / read length, consistent with
+                # the BLAST span-based formula (qend - qstart + 1) / qlen.
                 query_coverage = (query_aligned_bases / query_length) * 100.0 if query_length > 0 else 0.0
 
-                if identity >= self.detection_min_identity and query_coverage >= self.query_min_coverage:
+                # Per-read gate uses query_min_identity (same threshold as BLAST/DIAMOND
+                # per-HSP filtering) so that all tools are consistent.  detection_min_identity
+                # is reserved for the gene-level avg-identity gate applied after finalise().
+                if identity >= self.query_min_identity and query_coverage >= self.query_min_coverage:
                     if gene not in self.gene_stats[database][tool_name]:
                         self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
                     self.gene_stats[database][tool_name][gene].add_positions(aligned_positions, identity, gene_len)
@@ -2417,8 +2496,12 @@ class Workflow:
             stats = self.gene_stats[database][tool_name][gene]
             stats.finalise()
 
-            # Gene is detected if gene meets thresholds
+            # Gene is detected if it meets all gene-level thresholds.
+            # avg_identity (mean of per-read identities for qualifying reads) is checked
+            # against detection_min_identity here — the per-read gate above already used
+            # query_min_identity to screen out low-quality reads before they contributed.
             if (stats.gene_coverage >= self.detection_min_coverage and
+                    stats.avg_identity >= self.detection_min_identity and
                     stats.base_depth_hit >= self.detection_min_base_depth and
                     stats.num_sequences >= self.detection_min_num_reads):
                 detected_genes.add(gene)
@@ -2675,18 +2758,39 @@ class Workflow:
             if _is_reads_mode and _d_min_reads > 1 and stats is not None:
                 passes_d_reads = stats.num_sequences >= _d_min_reads
 
+            # Determine whether this gene is must-flagged.  This is only possible when
+            # an annotations file with a 'Must flag' column was loaded for this database.
+            is_must_flag = bool(annotations.get(gene, {}).get('must_flag'))
+
             if passes_d_cov and passes_d_reads:
                 detected_genes.add(gene)
                 self.detections[database][gene][tool_name] = True
                 if annotations and gene in annotations:
                     desc = annotations[gene].get('description', '')
-                    flag = ' [MUST FLAG]' if annotations[gene].get('must_flag') else ''
+                    flag = ' [MUST FLAG]' if is_must_flag else ''
                     self.logger.debug(
                         f"  HMMER detected: {gene} – {desc}{flag} "
                         f"(best E={seq_best_evalue.get(gene, '?'):.2e}, "
                         f"profile_cov={stats.gene_coverage if stats else 0:.1f}%, "
                         f"seqs={stats.num_sequences if stats else 0})"
                     )
+            elif is_must_flag and getattr(self, 'hmmer_must_flag', True):
+                # Must-flag genes override the coverage/min-reads gates: they are always
+                # reported when they pass the E-value filter so that high-priority genes
+                # are never silently dropped due to low coverage or read depth.
+                detected_genes.add(gene)
+                self.detections[database][gene][tool_name] = True
+                reasons = []
+                if not passes_d_cov:
+                    reasons.append(f"profile_cov={stats.gene_coverage if stats else 0:.1f}% < {_d_min_cov:.1f}%")
+                if not passes_d_reads:
+                    reasons.append(f"seqs={stats.num_sequences if stats else 0} < min_reads={_d_min_reads}")
+                desc = annotations[gene].get('description', '')
+                self.logger.warning(
+                    f"  ⚑  MUST-FLAG override: {gene} – {desc} reported despite threshold failure "
+                    f"({'; '.join(reasons) if reasons else 'unknown reason'}) "
+                    f"(best E={seq_best_evalue.get(gene, '?'):.2e})"
+                )
             else:
                 reasons = []
                 if not passes_d_cov:
@@ -2959,9 +3063,11 @@ class Workflow:
                     if 'HMMER' in tool and isinstance(genes, set):
                         try:
                             _ann = self.hmmer_annotations.get(db_name, {})
-                            _mf = sum(1 for g in genes if _ann.get(g, {}).get('must_flag'))
-                            if _mf > 0:
-                                must_flag_suffix = f"  ⚑  {_mf} MUST-FLAG"
+                            _meta = self.hmmer_annotations_meta.get(db_name, {})
+                            if _meta.get('has_must_flag'):
+                                _mf = sum(1 for g in genes if _ann.get(g, {}).get('must_flag'))
+                                if _mf > 0:
+                                    must_flag_suffix = f"  ⚑  {_mf} must-flag"
                         except Exception:
                             pass
                     self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected{must_flag_suffix}")

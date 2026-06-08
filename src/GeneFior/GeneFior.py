@@ -227,6 +227,13 @@ Examples:
                                   'Recommended: "tc" when your HMM database was built with per-profile '
                                   'TC scores (e.g. ibbis biorisk.hmm). When using tc/ga/nc the --hmmer-evalue '
                                   'threshold is ignored and E-value post-filtering is disabled.')
+    hmmer_group.add_argument('--no-must-flag', dest='no_must_flag', action='store_true', default=False,
+                             help='Disable the must-flag override for HMMER results. '
+                                  'By default, genes marked "Must flag" in the annotations CSV are always '
+                                  'reported even if they fail the coverage or min-reads thresholds. '
+                                  'Setting this flag turns off that behaviour so must-flag genes are subject '
+                                  'to the same detection gates as all other genes and no MUST-FLAG ALERT '
+                                  'is emitted in the log.')
 
     # Runtime parameters
     runtime_group = parser.add_argument_group('Runtime Parameters')
@@ -565,6 +572,8 @@ Examples:
                 logger.info(f"  HMMER E-value: {_ev_display}")
             else:
                 logger.info(f"  HMMER using per-profile {_hmmer_tmode.upper()} cutoffs (--cut_{_hmmer_tmode}); E-value post-filtering disabled")
+            _mf_status = "ENABLED" if not getattr(options, 'no_must_flag', False) else "DISABLED (--no-must-flag)"
+            logger.info(f"  HMMER must-flag override: {_mf_status}")
         #logger.info("=" * 70)
         # Compute max_fasta_chunk_bytes early so batch/sample loop can reuse it
         max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 200.0))
@@ -638,7 +647,8 @@ Examples:
                         'sequence_type': getattr(sample_opts, 'sequence_type', None),
                         'genes_type': ('protein' if getattr(sample_opts, 'genes_type', None) == 'aa' else getattr(sample_opts, 'genes_type', None)),
                         'report_fasta': getattr(options, 'report_fasta', None),
-                        'threads': getattr(options, 'threads', None)
+                        'threads': getattr(options, 'threads', None),
+                        'hmmer_must_flag': not getattr(options, 'no_must_flag', False),
                     }
                     with open(os.path.join(sample_out, 'run_parameters.json'), 'w') as pf:
                         json.dump(params, pf, indent=2)
@@ -681,6 +691,7 @@ Examples:
                         max_fasta_chunk_bytes=max_fasta_chunk_bytes,
                         hmmer_evalue=getattr(options, 'hmmer_evalue', None),
                         hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
+                        hmmer_must_flag=not getattr(options, 'no_must_flag', False),
                     )
 
                     results = workflow.run_workflow(sample_opts)
@@ -748,6 +759,7 @@ Examples:
             max_fasta_chunk_bytes=max_fasta_chunk_bytes,
             hmmer_evalue=getattr(options, 'hmmer_evalue', None),
             hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
+            hmmer_must_flag=not getattr(options, 'no_must_flag', False),
         )
 
         ###
@@ -771,7 +783,8 @@ Examples:
                     'sequence_type': getattr(options, 'sequence_type', None),
                 'genes_type': ('protein' if getattr(options, 'genes_type', None) == 'aa' else getattr(options, 'genes_type', None)),
                 'report_fasta': getattr(options, 'report_fasta', None),
-                'threads': getattr(options, 'threads', None)
+                'threads': getattr(options, 'threads', None),
+                'hmmer_must_flag': not getattr(options, 'no_must_flag', False),
             }
             with open(os.path.join(outdir, 'run_parameters.json'), 'w') as pf:
                 json.dump(params, pf, indent=2)

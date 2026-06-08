@@ -74,7 +74,8 @@ class GeneStats:
                 total_depth = sum(self.position_depths.values())
                 # Average depth across ALL gene positions (including uncovered = 0)
                 self.base_depth = total_depth / self.gene_length
-                # Average depth across positions with at least one read mapped
-                covered_depth = sum(depth for pos, depth in self.position_depths.items() if depth > 0)
-                self.base_depth_hit = covered_depth / len(self.position_depths)
+                # Average depth across covered positions only.
+                # Every entry in position_depths is > 0 by construction, so
+                # total_depth is also the sum across covered positions alone.
+                self.base_depth_hit = total_depth / len(self.position_depths)
 
