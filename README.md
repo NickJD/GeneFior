@@ -32,7 +32,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.8.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+GeneFíor v0.9.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -135,7 +135,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.8.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.9.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -251,7 +251,7 @@ Sensitivity presets provide convenient combinations of parameters for different 
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.8.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.9.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -302,7 +302,7 @@ Examples:
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.8.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.9.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -351,7 +351,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.8.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.9.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit
