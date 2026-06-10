@@ -58,7 +58,8 @@ class Workflow:
                      genes_type: Optional[str] = None,
                      hmmer_evalue: Optional[float] = None,
                      hmmer_threshold_mode: str = 'evalue',
-                     hmmer_must_flag: bool = True):
+                     hmmer_must_flag: bool = True,
+                     tools: Optional[List[str]] = None):
 
                  
         ### Handle input FASTA and FASTQ
@@ -231,6 +232,18 @@ class Workflow:
         # fail coverage/min-reads gates are treated identically to all other genes and
         # the MUST-FLAG ALERT log block is suppressed.  True by default.
         self.hmmer_must_flag = hmmer_must_flag
+        # User-selected tools list (e.g. ['bowtie2', 'bwa']).
+        # When provided, only the listed tools are run regardless of what databases
+        # are available.  When None (not provided by caller) all available tools run
+        # (legacy behaviour preserved for backwards compatibility).
+        self.tools = list(tools) if tools is not None else None
+
+    def _tool_enabled(self, tool_name: str) -> bool:
+        """Return True if `tool_name` is in the user-selected tools list.
+        If no tools list was provided (self.tools is None) every tool is allowed."""
+        if self.tools is None:
+            return True
+        return tool_name in self.tools
 
     def check_gzip(self,fasta_path_str):
         self.logger.info(f"Checking if input FASTA ` {self.input_fasta} ` is gzipped and not broken...")
@@ -2970,7 +2983,7 @@ class Workflow:
             self.logger.info(f"\n### Processing {db_name.capitalize()} Database ###")
 
             # BLASTn for DNA queries
-            if self.run_dna and db_paths.get('blastn'):
+            if self.run_dna and self._tool_enabled('blastn') and db_paths.get('blastn'):
                 results[db_name]['BLASTn-DNA'] = self.run_blast(
                     db_paths['blastn'], db_name, 'blastn')
 
@@ -2980,17 +2993,17 @@ class Workflow:
                 # BLASTp when available; otherwise fall back to BLASTx.
                 if getattr(self, 'is_genes_fasta', False) and getattr(self, 'detected_genes_type', None) == 'protein':
                     # prefer blastp if available
-                    if db_paths.get('blastp'):
+                    if self._tool_enabled('blastp') and db_paths.get('blastp'):
                         results[db_name]['BLASTp-AA'] = self.run_blast(db_paths['blastp'], db_name, 'blastp')
-                    elif db_paths.get('blastx'):
+                    elif self._tool_enabled('blastx') and db_paths.get('blastx'):
                         self.logger.warning(f"No BLASTp available for {db_name}; falling back to BLASTx (may be suboptimal for protein queries)")
                         results[db_name]['BLASTx-AA'] = self.run_blast(db_paths['blastx'], db_name, 'blastx')
                 else:
-                    if db_paths.get('blastx'):
+                    if self._tool_enabled('blastx') and db_paths.get('blastx'):
                         results[db_name]['BLASTx-AA'] = self.run_blast(db_paths['blastx'], db_name, 'blastx')
 
             # DIAMOND: choose blastp for protein queries, blastx for nucleotide queries
-            if self.run_protein and db_paths.get('diamond'):
+            if self.run_protein and self._tool_enabled('diamond') and db_paths.get('diamond'):
                 if getattr(self, 'is_genes_fasta', False) and getattr(self, 'detected_genes_type', None) == 'protein':
                     results[db_name]['DIAMOND-AA'] = self.run_diamond(db_paths['diamond'], db_name, query_mode='blastp')
                 else:
@@ -2999,27 +3012,27 @@ class Workflow:
             # Skip read-mappers entirely when the user has indicated the input
             # are full-length gene FASTA(s). In that case we only run BLAST/DIAMOND/HMMER
             # style searches appropriate for full-length sequences.
-            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and db_paths.get('bowtie2'):
+            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and self._tool_enabled('bowtie2') and db_paths.get('bowtie2'):
                 results[db_name]['Bowtie2-DNA'] = self.run_bowtie2(
                     db_paths['bowtie2'], db_name)
 
-            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and db_paths.get('bwa'):
+            if (not getattr(self, 'is_genes_fasta', False)) and self.run_dna and self._tool_enabled('bwa') and db_paths.get('bwa'):
                 results[db_name]['BWA-DNA'] = self.run_bwa(
                     db_paths['bwa'], db_name)
 
-            if (not getattr(self, 'is_genes_fasta', False)) and db_paths.get('minimap2'):
+            if (not getattr(self, 'is_genes_fasta', False)) and self._tool_enabled('minimap2') and db_paths.get('minimap2'):
                 results[db_name]['Minimap2-DNA'] = self.run_minimap2(
                     db_paths['minimap2'], db_name, options.minimap2_preset)
 
             # HMMER protein search (hmmsearch) – runs against protein HMM profiles.
             # Requires protein sequences as input; suited for biorisk detection and
             # any other protein-family HMM database.
-            if self.run_protein and db_paths.get('hmmer_protein'):
+            if self.run_protein and self._tool_enabled('hmmer_protein') and db_paths.get('hmmer_protein'):
                 results[db_name]['HMMER-PROTEIN'] = self.run_hmmer(
                     db_paths['hmmer_protein'], db_name, 'protein')
 
             # HMMER DNA search (nhmmer) – runs against nucleotide HMM profiles.
-            if self.run_dna and db_paths.get('hmmer_dna'):
+            if self.run_dna and self._tool_enabled('hmmer_dna') and db_paths.get('hmmer_dna'):
                 results[db_name]['HMMER-DNA'] = self.run_hmmer(
                     db_paths['hmmer_dna'], db_name, 'dna')
 

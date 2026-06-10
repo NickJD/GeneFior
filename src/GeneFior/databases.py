@@ -117,21 +117,47 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
                             databases[category_name][tool] = str(matching_files[0])
                 continue
             if category_name == "bwa":
-                # Special handling for bwa category
+                # Special handling for bwa category.
+                # BWA index files share a common base name with single-part extensions
+                # (.amb, .ann, .bwt, .pac, .sa).  Use .amb (always present) so
+                # with_suffix('') reliably yields the correct basename, e.g.:
+                #   VFDB_setA_nt.fas_bwadb.amb  ->  VFDB_setA_nt.fas_bwadb
                 for tool, tag in tool_tags.items():
                     if tool == "bwa":
-                        matching_files = list(category_dir.rglob(f"*{tag}*"))
-                        if matching_files:
-                            databases[category_name][tool] = str(matching_files[0].with_suffix(''))
+                        # Prefer .amb as the anchor file; fall back to any bwadb file
+                        anchor_files = list(category_dir.rglob(f"*{tag}.amb"))
+                        if not anchor_files:
+                            anchor_files = sorted(category_dir.rglob(f"*{tag}*"))
+                        if anchor_files:
+                            databases[category_name][tool] = str(
+                                Path(anchor_files[0]).with_suffix('')
+                            )
                 continue
             if category_name == "bowtie2":
-                # Special handling for bowtie2 category
+                # Special handling for bowtie2 category.
+                # Bowtie2 index files are named <base>.1.bt2, <base>.2.bt2,
+                # <base>.rev.1.bt2, etc.  The previous code used split('.')[0]
+                # which incorrectly discarded everything after the first dot in the
+                # filename (e.g. VFDB_setA_nt.fas_bowtie2db -> VFDB_setA_nt).
+                # Instead, locate the .1.bt2 primary index file and strip that
+                # known suffix to recover the exact basename bowtie2 expects.
                 for tool, tag in tool_tags.items():
                     if tool == "bowtie2":
-                        matching_files = list(category_dir.rglob(f"*{tag}*"))
-                        if matching_files: # Not clean
-                            matching_file = str(matching_files[0].with_suffix('')).split('.')[0]
-                            databases[category_name][tool] = matching_file
+                        # Primary index always ends in <tag>.1.bt2
+                        primary_files = list(category_dir.rglob(f"*{tag}.1.bt2"))
+                        if not primary_files:
+                            # Fallback: any .bt2 file – derive base via tag position
+                            primary_files = sorted(category_dir.rglob(f"*{tag}*.bt2"))
+                        if primary_files:
+                            base = str(primary_files[0])
+                            if base.endswith('.1.bt2'):
+                                # Clean strip: remove the '.1.bt2' suffix
+                                databases[category_name][tool] = base[:-len('.1.bt2')]
+                            else:
+                                # Fallback: find the tag in the path and cut there
+                                tag_end = base.rfind(tag)
+                                if tag_end != -1:
+                                    databases[category_name][tool] = base[:tag_end + len(tag)]
                 continue
             if category_name == "minimap2":
                 # Special handling for minimap2 category

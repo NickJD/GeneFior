@@ -692,6 +692,7 @@ Examples:
                         hmmer_evalue=getattr(options, 'hmmer_evalue', None),
                         hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
                         hmmer_must_flag=not getattr(options, 'no_must_flag', False),
+                        tools=options.tools,
                     )
 
                     results = workflow.run_workflow(sample_opts)
@@ -760,6 +761,7 @@ Examples:
             hmmer_evalue=getattr(options, 'hmmer_evalue', None),
             hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
             hmmer_must_flag=not getattr(options, 'no_must_flag', False),
+            tools=options.tools,
         )
 
         ###
