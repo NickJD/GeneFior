@@ -128,7 +128,7 @@ def run(options, workflow, logger):
     logger.info(f"Output directory: {options.output}")
     logger.info(f"Detection thresholds:")
     logger.info(f"  Query min coverage: {options.query_min_coverage}%")
-    logger.info(f"  Query min id: {options.query_min_id}%")
+    logger.info(f"  Query min id: {options.query_min_identity}%")
     logger.info(f"  Gene min coverage: {options.detection_min_coverage}%")
     logger.info(f"  Min identity: {options.detection_min_identity}%")
     logger.info(f"  Min base depth: {options.detection_min_base_depth}×")

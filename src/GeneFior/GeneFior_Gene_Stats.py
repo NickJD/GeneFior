@@ -1098,7 +1098,7 @@ Examples:
     parser.add_argument('--all-genes', action='store_true', default=False,
                         help='Include all genes found in raw outputs (default: only genes listed as detected in detection_matrix.tsv)')
     parser.add_argument('--databases', nargs='+', required=True,
-                        choices=['resfinder', 'card', 'ncbi'],
+                        choices=['resfinder', 'card', 'ncbi', 'user-provided-db'],
                         help='Database(s) to interrogate')
     parser.add_argument('--tools', nargs='+', required=True,
                         choices=['blastn', 'blastx', 'diamond', 'bowtie2', 'bwa', 'minimap2', 'all'],

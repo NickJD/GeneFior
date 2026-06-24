@@ -160,12 +160,20 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
                                     databases[category_name][tool] = base[:tag_end + len(tag)]
                 continue
             if category_name == "minimap2":
-                # Special handling for minimap2 category
+                # Special handling for minimap2 category.
+                # A minimap2 index is a single file (e.g. VFDB_setA_nt.fas_minimap2db or .mmi).
+                # Do NOT call with_suffix('') – if the file is named with a compound tag
+                # like ".fas_minimap2db", pathlib treats the whole thing as the suffix and
+                # with_suffix('') would strip it back to just "VFDB_setA_nt".
+                # Pass the full file path as minimap2 accepts the index file directly.
                 for tool, tag in tool_tags.items():
                     if tool == "minimap2":
                         matching_files = list(category_dir.rglob(f"*{tag}"))
+                        if not matching_files:
+                            # Also accept .mmi extension (standard minimap2 index extension)
+                            matching_files = list(category_dir.rglob(f"*{tag}.mmi"))
                         if matching_files:
-                            databases[category_name][tool] = str(matching_files[0].with_suffix(''))
+                            databases[category_name][tool] = str(matching_files[0])
                 continue
 
     # Normalise category keys to expected names if present
