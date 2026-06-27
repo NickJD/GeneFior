@@ -10,6 +10,166 @@ import time
 import tempfile
 import subprocess
 
+
+def diamond_mode_label(sequence_type, genes_type=None):
+    """Return the concrete DIAMOND mode used for the supplied input type."""
+    if sequence_type == 'Genes-FASTA' and genes_type in ('aa', 'protein'):
+        return 'DIAMOND-BLASTP'
+    return 'DIAMOND-BLASTX'
+
+
+def sample_temp_directory(base_temp, root_output, sample_output, sample_name,
+                          user_specified=False):
+    """Return an isolated temporary directory for one batch sample."""
+    if not user_specified:
+        return os.path.abspath(sample_output)
+    safe_sample = re.sub(r'[^A-Za-z0-9._-]+', '_', str(sample_name)).strip('._')
+    return os.path.join(
+        os.path.abspath(base_temp or root_output),
+        safe_sample or 'sample',
+    )
+
+
+def workflow_has_success(results):
+    """Return True when at least one database/tool result completed successfully."""
+    for db_results in (results or {}).values():
+        for value in (db_results or {}).values():
+            if isinstance(value, tuple) and value:
+                success = bool(value[0])
+            elif isinstance(value, (set, list, dict)):
+                success = True
+            else:
+                success = bool(value)
+            if success:
+                return True
+    return False
+
+
+def run_fastp_for_paired_reads(options, r1_path, r2_path, logger):
+    """Trim paired FASTQ reads with fastp and return the generated read paths."""
+    fastp_path = shutil.which('fastp')
+    if not fastp_path:
+        message = (
+            "fastp trimming was requested, but the 'fastp' executable was not found "
+            "in PATH. Install fastp or rerun without --fastp-trim."
+        )
+        logger.error(message)
+        raise RuntimeError(message)
+
+    output_dir = os.path.abspath(options.output)
+    temp_root = os.path.abspath(getattr(options, 'temp_directory', None) or output_dir)
+    trim_dir = os.path.join(temp_root, 'fastp_trimmed_reads')
+    if os.path.normcase(temp_root) != os.path.normcase(output_dir):
+        sample_name = re.sub(r'[^A-Za-z0-9._-]+', '_', os.path.basename(output_dir))
+        trim_dir = os.path.join(trim_dir, sample_name or 'sample')
+    report_dir = os.path.join(output_dir, 'fastp')
+    os.makedirs(trim_dir, exist_ok=True)
+    os.makedirs(report_dir, exist_ok=True)
+
+    def _read_stem(path):
+        name = os.path.basename(path)
+        for suffix in ('.fastq.gz', '.fq.gz', '.fastq', '.fq', '.gz'):
+            if name.lower().endswith(suffix):
+                return name[:-len(suffix)]
+        return name
+
+    trimmed_r1 = os.path.join(trim_dir, f"R1_{_read_stem(r1_path)}_fastp_trimmed.fastq.gz")
+    trimmed_r2 = os.path.join(trim_dir, f"R2_{_read_stem(r2_path)}_fastp_trimmed.fastq.gz")
+    json_report = os.path.join(report_dir, 'fastp.json')
+    html_report = os.path.join(report_dir, 'fastp.html')
+
+    generated_paths = (trimmed_r1, trimmed_r2, json_report, html_report)
+    for path in generated_paths:
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError as exc:
+            message = f"Could not replace existing fastp output '{path}': {exc}"
+            logger.error(message)
+            raise RuntimeError(message) from exc
+
+    try:
+        requested_threads = max(1, int(getattr(options, 'threads', 4)))
+    except (TypeError, ValueError):
+        requested_threads = 4
+    fastp_threads = min(requested_threads, 16)
+    if fastp_threads != requested_threads:
+        logger.info(
+            f"fastp will use {fastp_threads} threads (requested {requested_threads}; "
+            "fastp supports at most 16 worker threads)"
+        )
+
+    command = [
+        fastp_path,
+        '--in1', r1_path,
+        '--in2', r2_path,
+        '--out1', trimmed_r1,
+        '--out2', trimmed_r2,
+        '--thread', str(fastp_threads),
+        '--detect_adapter_for_pe',
+        '--json', json_report,
+        '--html', html_report,
+    ]
+
+    logger.info("fastp auto trimming enabled for paired FASTQ input")
+    logger.info(f"Running fastp: {shlex.join(command)}")
+    try:
+        completed = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        message = f"Could not launch fastp: {exc}"
+        logger.error(message)
+        raise RuntimeError(message) from exc
+
+    if completed.returncode != 0:
+        for path in generated_paths:
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)
+            except OSError:
+                pass
+        detail = (completed.stderr or completed.stdout or '').strip()
+        message = f"fastp failed with exit code {completed.returncode}"
+        if detail:
+            message = f"{message}: {detail}"
+        logger.error(message)
+        raise RuntimeError(message)
+
+    missing_outputs = [
+        path for path in (trimmed_r1, trimmed_r2)
+        if not os.path.isfile(path) or os.path.getsize(path) == 0
+    ]
+    if missing_outputs:
+        for path in generated_paths:
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)
+            except OSError:
+                pass
+        message = (
+            "fastp completed without producing valid paired FASTQ output(s): "
+            + ', '.join(missing_outputs)
+        )
+        logger.error(message)
+        raise RuntimeError(message)
+
+    options.fastp_report_json = json_report
+    options.fastp_report_html = html_report
+    options.input_fastq_trimmed = (trimmed_r1, trimmed_r2)
+    logger.info("Downstream analysis will use fastp-trimmed paired reads")
+    for label, path in (('JSON', json_report), ('HTML', html_report)):
+        if os.path.isfile(path):
+            logger.info(f"fastp {label} report: {path}")
+        else:
+            logger.warning(f"fastp did not create its expected {label} report: {path}")
+    return trimmed_r1, trimmed_r2
+
+
 def prepare_fastq_for_alignment(r1_path, r2_path, temp_dir, logger, force: bool = False):
     # Check if FASTQ read IDs need suffixes and create temporary modified files if needed.
 
@@ -997,6 +1157,101 @@ def combine_detection_matrices(output_root, sample_names, logger):
         except Exception as e:
             logger.warning(f"Failed to write informative tools combined matrix for {db}: {e}")
 
+    # Combine evidence-status matrices separately from binary detection calls.
+    db_evidence_files = {}
+    for sample in sample_names:
+        sample_dir = out_root / sample
+        if not sample_dir.is_dir():
+            continue
+        for path in sample_dir.glob('*_evidence_matrix.tsv'):
+            database = path.name.replace('_evidence_matrix.tsv', '')
+            db_evidence_files.setdefault(database, {})[sample] = path
+
+    for database, sample_map in db_evidence_files.items():
+        all_genes = set()
+        sample_statuses = {sample: {} for sample in sample_map}
+        sample_evidence = {sample: {} for sample in sample_map}
+        for sample, path in sample_map.items():
+            try:
+                with open(path, 'r', newline='') as handle:
+                    reader = csv.DictReader(handle, delimiter='\t')
+                    for row in reader:
+                        gene = row.get('Gene', '')
+                        status = row.get('Best_Evidence_Status', 'NOT_DETECTED')
+                        if gene:
+                            all_genes.add(gene)
+                            sample_statuses[sample][gene] = status
+                            evidence_count = row.get(
+                                'Evidence_Detections',
+                                row.get('Evidence_Tools', ''),
+                            )
+                            try:
+                                evidence_present = int(evidence_count) > 0
+                            except (TypeError, ValueError):
+                                evidence_present = status in {
+                                    'EXACT_ALLELE_DETECTED',
+                                    'CANDIDATE_ALLELE_DETECTED',
+                                    'ALLELE_LIKE',
+                                    'FAMILY_DETECTED',
+                                    'MIXED_OR_MOSAIC',
+                                    'PROFILE_DETECTED',
+                                    'DETECTED',
+                                    'LEGACY_RELAXED_DETECTED',
+                                }
+                            sample_evidence[sample][gene] = evidence_present
+            except Exception as e:
+                logger.warning(
+                    f"Failed to read evidence matrix for {sample} ({path}): {e}"
+                )
+
+        ordered_samples = [sample for sample in sample_names if sample in sample_map]
+        combined_evidence = out_root / f"{database}_combined_evidence_matrix.tsv"
+        try:
+            with open(combined_evidence, 'w', newline='') as handle:
+                writer = csv.writer(handle, delimiter='\t')
+                writer.writerow([
+                    'Gene', *ordered_samples,
+                    'Evidence_Samples', 'Candidate_Allele_Samples',
+                    'Exact_Allele_Samples', 'Profile_Samples',
+                    'Strict_Samples',
+                ])
+                for gene in sorted(all_genes):
+                    statuses = [
+                        sample_statuses.get(sample, {}).get(
+                            gene, 'NOT_DETECTED'
+                        )
+                        for sample in ordered_samples
+                    ]
+                    evidence_samples = sum(
+                        sample_evidence.get(sample, {}).get(gene, False)
+                        for sample in ordered_samples
+                    )
+                    exact_samples = sum(
+                        status == 'EXACT_ALLELE_DETECTED'
+                        for status in statuses
+                    )
+                    candidate_samples = sum(
+                        status == 'CANDIDATE_ALLELE_DETECTED'
+                        for status in statuses
+                    )
+                    profile_samples = sum(
+                        status == 'PROFILE_DETECTED'
+                        for status in statuses
+                    )
+                    writer.writerow([
+                        gene, *statuses,
+                        evidence_samples, candidate_samples, exact_samples,
+                        profile_samples, exact_samples + profile_samples,
+                    ])
+            created_files.append(str(combined_evidence))
+            logger.info(
+                f"Combined qualified evidence matrix written: {combined_evidence}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to write combined evidence matrix for {database}: {e}"
+            )
+
     # Write a small README/manifest into the output root describing the created combined files
     try:
         readme_path = out_root / 'combined_detection_matrices_README.txt'
@@ -1011,6 +1266,7 @@ def combine_detection_matrices(output_root, sample_names, logger):
             rh.write('\nFormats:\n')
             rh.write('  - <database>_combined_detection_matrix.tsv: binary presence/absence matrix. Columns: Gene, <sample1>, <sample2>, ..., Total_Samples. Cell=1 indicates the gene was detected in that sample by at least one tool.\n')
             rh.write("  - <database>_combined_detection_matrix_tools.tsv: informative matrix. Each sample cell lists the tool(s) that detected the gene (pipe-separated), or empty if none. Columns: Gene, <sample1>, <sample2>, ..., Total_Samples.\n")
+            rh.write("  - <database>_combined_evidence_matrix.tsv: per-sample threshold-passing evidence status, including ambiguous, mosaic, candidate, and exact calls.\n")
             rh.write('\nIf you prefer Excel (.xlsx) outputs, consider running the combine tool and converting the TSVs to XLSX with your preferred tool.\n')
         logger.info(f"Wrote combined matrices README: {readme_path}")
     except Exception as e:
@@ -1031,12 +1287,27 @@ def handle_all_input_files(options, logger):
 
         # Validate paired FASTQ files
         r1_path, r2_path = validate_paired_fastq(options, logger)
+        options.input_fastq_original = (r1_path, r2_path)
+
+        if getattr(options, 'fastp_trim', False):
+            r1_processing, r2_processing = run_fastp_for_paired_reads(
+                options, r1_path, r2_path, logger
+            )
+            options.temp_files_to_cleanup.extend([r1_processing, r2_processing])
+            alignment_temp_dir = os.path.dirname(r1_processing)
+        else:
+            r1_processing, r2_processing = r1_path, r2_path
+            alignment_temp_dir = options.temp_directory
+            logger.info(
+                "fastp trimming was not requested; non-trimmed reads were used "
+                "for this paired FASTQ analysis"
+            )
 
         # Prepare FASTQ files for alignment tools (add suffixes if needed)
         # Do this BEFORE FASTA conversion so both use the same modified files
         r1_prepared, r2_prepared, needs_cleanup = prepare_fastq_for_alignment(
-            r1_path, r2_path,
-            options.temp_directory,
+            r1_processing, r2_processing,
+            alignment_temp_dir,
             logger,
             getattr(options, 'force_modify_fastq', False)
         )
@@ -1047,7 +1318,6 @@ def handle_all_input_files(options, logger):
 
         # Store both original and prepared paths
         options.input_fastq = (r1_prepared, r2_prepared)
-        options.input_fastq_original = (r1_path, r2_path)
 
         # Check if BLAST-based tools require FASTA conversion
         requires_fasta = requires_fasta_conversion(options.tools)
@@ -1113,6 +1383,11 @@ def handle_all_input_files(options, logger):
     # Handle single FASTA or FASTQ input
     else:
         logger.info(f"Input type: {options.sequence_type}")
+        if getattr(options, 'fastp_trim', False):
+            logger.warning(
+                "fastp trimming was requested, but --fastp-trim only applies to "
+                "Paired-FASTQ input; the input will be used unchanged"
+            )
 
         # Check input file exists and is a file
         # Support '-' as stdin. If '-' is provided and data is piped (not TTY), materialise into temp file.
@@ -1220,6 +1495,9 @@ def handle_all_input_files(options, logger):
 
 
 def cleanup_all_temp_files(options, logger):
+    if getattr(options, 'no_cleanup', False):
+        logger.info("Temporary-file cleanup disabled by --no_cleanup")
+        return
     if hasattr(options, 'temp_files_to_cleanup') and options.temp_files_to_cleanup:
         #logger.info("=" * 70)
         logger.info("Cleaning up temporary files...")
@@ -1234,4 +1512,3 @@ def cleanup_all_temp_files(options, logger):
 # Note: discovery helpers are available as module-level functions:
 #   discover_samples_from_input_dir(...) and discover_samples_from_subdirs(...)
 # Callers should import them directly from GeneFior.utils
-

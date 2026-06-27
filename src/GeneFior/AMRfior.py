@@ -18,6 +18,9 @@ try:
         add_file_handler_for_path,
         remove_file_handler,
         get_max_fasta_chunk_bytes,
+        diamond_mode_label,
+        sample_temp_directory,
+        workflow_has_success,
     )
 
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
@@ -33,6 +36,9 @@ except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
         add_file_handler_for_path,
         remove_file_handler,
         get_max_fasta_chunk_bytes,
+        diamond_mode_label,
+        sample_temp_directory,
+        workflow_has_success,
     )
 
 
@@ -81,13 +87,21 @@ Examples:
     # Output selection
     output_group = parser.add_argument_group('Output selection')
     output_group.add_argument('--report-fasta',
-                            choices=['all', 'detected', 'detected-all'], #, 'hmmer_dna', 'hmmer_protein'],
+                            choices=[
+                                'all', 'detected', 'detected-all',
+                                'evidence', 'evidence-all',
+                                'candidate', 'candidate-all',
+                                'exact', 'exact-all',
+                            ], #, 'hmmer_dna', 'hmmer_protein'],
                             default=None,
                             dest='report_fasta',
                             help='Specify whether to output sequences that "mapped" to genes.'
                                  '"all" should only be used for deep investigation/debugging.'
                                  '"detected" will report the reads that passed detection thresholds for each detected gene.'
-                                 '"detected-all" will report all reads for each detected gene.  (default: None)')
+                                 '"detected-all" reports all mapped reads for each evidence gene.'
+                                 '"evidence" and "evidence-all" are explicit aliases for the detected modes.'
+                                 '"candidate" and "candidate-all" restrict output to candidate allele calls.'
+                                 '"exact" and "exact-all" restrict output to exact nucleotide alleles.  (default: None)')
 
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
@@ -133,6 +147,33 @@ Examples:
                               type=int, default=1,
                               dest='detection_min_num_reads',
                               help='Minimum number of reads required for detection (default: 1)')
+    gene_detection_group.add_argument(
+        '--detection-system', '--detection-mode',
+        choices=['qualified', 'legacy-relaxed'],
+        default='qualified',
+        help='Detection interpretation: "qualified" uses evidence, family/mosaic, '
+             'and exact-allele resolution (default); "legacy-relaxed" reproduces '
+             'the original direct threshold-only detector.')
+    gene_detection_group.add_argument('--evidence-corroborating-depth', type=int, default=2,
+                              help='Depth required across the gene for a robust read-based allele call (default: 2)')
+    gene_detection_group.add_argument('--evidence-exact-identity', type=float, default=100.0,
+                              help='Deprecated identity setting retained for compatibility; literal exact calls require 100%% identity and full candidate-depth coverage')
+    gene_detection_group.add_argument('--evidence-candidate-depth', type=int, default=3,
+                              help='Minimum per-base depth required across 100%% of a nucleotide allele candidate (default: 3)')
+    gene_detection_group.add_argument('--evidence-candidate-identity', type=float, default=98.0,
+                              help='Minimum mean identity for a nucleotide allele candidate (default: 98.0)')
+    gene_detection_group.add_argument('--evidence-max-internal-gap-bp', type=int, default=15,
+                              help='Largest unsupported internal gap allowed for an exact call (default: 15 bp)')
+    gene_detection_group.add_argument('--evidence-max-internal-gap-fraction', type=float, default=0.02,
+                              help='Gene-length fraction allowed as an internal gap (default: 0.02)')
+    gene_detection_group.add_argument('--evidence-min-unique-reads', type=int, default=2,
+                              help='Minimum competitively unique reads for an exact allele (default: 2)')
+    gene_detection_group.add_argument('--evidence-min-unique-fraction', type=float, default=0.10,
+                              help='Minimum fraction of passing reads uniquely supporting the allele (default: 0.10)')
+    gene_detection_group.add_argument('--evidence-ambiguity-fraction', type=float, default=0.50,
+                              help='Ambiguous-best read fraction that triggers an allele warning (default: 0.50)')
+    gene_detection_group.add_argument('--evidence-score-tie', type=float, default=1.0,
+                              help='Absolute bit-score difference treated as a competitive tie (default: 1.0)')
 
     # gene_detection_group.add_argument( '--max_target_seqs', dest='max_target_seqs', type=int, default=100,
     #                           help='Maximum number of "hits" to return per query sequence (default: 100)')
@@ -195,6 +236,13 @@ Examples:
                                     'Path will also be used for all temporary files (default: output directory)')
     runtime_group.add_argument('--force-modify-fastq', action='store_true',
                                help='Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique')
+    runtime_group.add_argument(
+        '--fastp-trim', '--fastp', '--trim-reads',
+        dest='fastp_trim',
+        action='store_true',
+        default=False,
+        help='For Paired-FASTQ input, run fastp automatic adapter and quality trimming before analysis'
+    )
     runtime_group.add_argument('--no_cleanup',  action='store_true',)
     runtime_group.add_argument( '--verbose', action='store_true',)
 
@@ -206,6 +254,9 @@ Examples:
 
     options = parser.parse_args()
 
+    options.temp_directory_user_specified = bool(
+        getattr(options, 'temp_directory', None)
+    )
     # Ensure a temporary directory is defined. If the user did not supply
     # --temp-directory, default to the output directory (behaviour documented
     # in menu). This makes options.temp_directory available to
@@ -375,8 +426,14 @@ Examples:
                     bn = 'Yes' if db_map.get('blastn') else 'No'
                     bx = 'Yes' if db_map.get('blastx') else 'No'
                     bp = 'Yes' if db_map.get('blastp') else 'No'
+                    diamond_label = diamond_mode_label(
+                        options.sequence_type, getattr(options, 'genes_type', None)
+                    )
                     dm = 'Yes' if db_map.get('diamond') else 'No'
-                    logger.info(f"  {db_name}: BLASTn: {bn}; BLASTx: {bx}; BLASTp: {bp}; DIAMOND: {dm}")
+                    logger.info(
+                        f"  {db_name}: BLASTn: {bn}; BLASTx: {bx}; "
+                        f"BLASTp: {bp}; {diamond_label}: {dm}"
+                    )
                 except Exception:
                     logger.debug(f"Failed to inspect database mapping for {db_name}")
         except Exception:
@@ -464,7 +521,10 @@ Examples:
             logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
             logger.info(f"  BLASTx: {'Yes' if 'blastx' in options.tools else 'No'}")
             logger.info(f"  BLASTp: {'Yes' if 'blastp' in options.tools else 'No'}")
-            logger.info(f"  DIAMOND: {'Yes' if 'diamond' in options.tools else 'No'}")
+            diamond_label = diamond_mode_label(
+                options.sequence_type, getattr(options, 'genes_type', None)
+            )
+            logger.info(f"  {diamond_label}: {'Yes' if 'diamond' in options.tools else 'No'}")
             logger.info(f"  Bowtie2: {'Present (will be SKIPPED)' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Present (will be SKIPPED)' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Present (will be SKIPPED)' if 'minimap2' in options.tools else 'No'}")
@@ -477,7 +537,10 @@ Examples:
             logger.info(f"  BLASTn: {'Yes' if 'blastn' in options.tools else 'No'}")
             logger.info(f"  BLASTx: {'Yes' if 'blastx' in options.tools else 'No'}")
             logger.info(f"  BLASTp: {'Yes' if 'blastp' in options.tools else 'No'}")
-            logger.info(f"  DIAMOND: {'Yes' if 'diamond' in options.tools else 'No'}")
+            diamond_label = diamond_mode_label(
+                options.sequence_type, getattr(options, 'genes_type', None)
+            )
+            logger.info(f"  {diamond_label}: {'Yes' if 'diamond' in options.tools else 'No'}")
             logger.info(f"  Bowtie2: {'Yes' if 'bowtie2' in options.tools else 'No'}")
             logger.info(f"  BWA: {'Yes' if 'bwa' in options.tools else 'No'}")
             logger.info(f"  Minimap2: {'Yes' if 'minimap2' in options.tools else 'No'}")
@@ -491,6 +554,7 @@ Examples:
         logger.info(f"Min query identity: {options.query_min_identity}%")
         logger.info(f"Min detection coverage: {options.detection_min_coverage}%")
         logger.info(f"Min detection identity: {options.detection_min_identity}%")
+        logger.info(f"Detection system: {options.detection_system}")
         # Reflect Genes-FASTA + --genes-type effects in displayed run modes
         eff_run_dna = run_dna
         eff_run_protein = run_protein
@@ -550,14 +614,20 @@ Examples:
                 # Ensure discovery logging never interrupts processing
                 logger.debug("Failed to log discovered samples list")
 
+            failed_samples = []
             for sample_name, input_spec in samples:
                 logger.info(f"Processing sample: {sample_name}")
                 sample_opts = deepcopy(options)
                 sample_out = os.path.join(options.output, sample_name)
                 sample_opts.output = sample_out
                 sample_opts.input = input_spec
-                if getattr(sample_opts, 'temp_directory', None) is None:
-                    sample_opts.temp_directory = sample_out
+                sample_opts.temp_directory = sample_temp_directory(
+                    options.temp_directory,
+                    options.output,
+                    sample_out,
+                    sample_name,
+                    options.temp_directory_user_specified,
+                )
 
                 os.makedirs(sample_out, exist_ok=True)
                 # write run parameters manifest for sample
@@ -570,6 +640,17 @@ Examples:
                         'detection_min_identity': options.detection_min_identity,
                         'detection_min_base_depth': options.detection_min_base_depth,
                         'detection_min_num_reads': options.detection_min_num_reads,
+                        'detection_system': options.detection_system,
+                        'evidence_corroborating_depth': options.evidence_corroborating_depth,
+                        'evidence_exact_identity': options.evidence_exact_identity,
+                        'evidence_candidate_depth': options.evidence_candidate_depth,
+                        'evidence_candidate_identity': options.evidence_candidate_identity,
+                        'evidence_max_internal_gap_bp': options.evidence_max_internal_gap_bp,
+                        'evidence_max_internal_gap_fraction': options.evidence_max_internal_gap_fraction,
+                        'evidence_min_unique_reads': options.evidence_min_unique_reads,
+                        'evidence_min_unique_fraction': options.evidence_min_unique_fraction,
+                        'evidence_ambiguity_fraction': options.evidence_ambiguity_fraction,
+                        'evidence_score_tie': options.evidence_score_tie,
                         'sensitivity': getattr(options, 'sensitivity', None),
                         'evalue': getattr(options, 'evalue', None),
                         'min_bitscore': getattr(options, 'min_bitscore', None),
@@ -578,7 +659,8 @@ Examples:
                         'sequence_type': getattr(sample_opts, 'sequence_type', None),
                         'genes_type': ('protein' if getattr(sample_opts, 'genes_type', None) == 'aa' else getattr(sample_opts, 'genes_type', None)),
                         'report_fasta': getattr(options, 'report_fasta', None),
-                        'threads': getattr(options, 'threads', None)
+                        'threads': getattr(options, 'threads', None),
+                        'fastp_trim': getattr(options, 'fastp_trim', False)
                     }
                     with open(os.path.join(sample_out, 'run_parameters.json'), 'w') as pf:
                         json.dump(params, pf, indent=2)
@@ -606,6 +688,7 @@ Examples:
                         detection_min_identity=options.detection_min_identity,
                         detection_min_base_depth=options.detection_min_base_depth,
                         detection_min_num_reads=options.detection_min_num_reads,
+                        detection_system=options.detection_system,
                         run_dna=run_dna,
                         run_protein=run_protein,
                         sequence_type=sample_opts.sequence_type,
@@ -617,14 +700,28 @@ Examples:
                         chunk_jobs=sample_opts.chunk_jobs,
                         chunk_threads_per_job=sample_opts.chunk_threads_per_job,
                         preserve_chunks=sample_opts.preserve_chunks,
-                        max_fasta_chunk_bytes=max_fasta_chunk_bytes
+                        max_fasta_chunk_bytes=max_fasta_chunk_bytes,
+                        evidence_corroborating_depth=options.evidence_corroborating_depth,
+                        evidence_exact_identity=options.evidence_exact_identity,
+                        evidence_candidate_depth=options.evidence_candidate_depth,
+                        evidence_candidate_identity=options.evidence_candidate_identity,
+                        evidence_max_internal_gap_bp=options.evidence_max_internal_gap_bp,
+                        evidence_max_internal_gap_fraction=options.evidence_max_internal_gap_fraction,
+                        evidence_min_unique_reads=options.evidence_min_unique_reads,
+                        evidence_min_unique_fraction=options.evidence_min_unique_fraction,
+                        evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
+                        evidence_score_tie=options.evidence_score_tie,
                     )
 
                     results = workflow.run_workflow(sample_opts)
-                    cleanup_all_temp_files(sample_opts, logger)
+                    if not workflow_has_success(results):
+                        failed_samples.append(sample_name)
+                        logger.error(
+                            f"No selected tool completed successfully for sample "
+                            f"'{sample_name}'"
+                        )
                 finally:
-                    # No per-sample handler to detach - global file handler remains in root output
-                    pass
+                    cleanup_all_temp_files(sample_opts, logger)
 
             # After all samples processed, combine per-sample detection matrices into combined matrices
             try:
@@ -639,6 +736,11 @@ Examples:
                 logger.debug("Failed to combine detection matrices across samples")
 
             logger.info("Completed processing all samples")
+            if failed_samples:
+                logger.error(
+                    "Batch run failed for sample(s): " + ', '.join(failed_samples)
+                )
+                sys.exit(1)
             return
 
         else:
@@ -667,6 +769,7 @@ Examples:
             detection_min_identity=options.detection_min_identity,
             detection_min_base_depth=options.detection_min_base_depth,
             detection_min_num_reads=options.detection_min_num_reads,
+            detection_system=options.detection_system,
             run_dna=run_dna,
             run_protein=run_protein,
             sequence_type=options.sequence_type,
@@ -678,7 +781,17 @@ Examples:
             chunk_jobs=options.chunk_jobs,
             chunk_threads_per_job=options.chunk_threads_per_job,
             preserve_chunks=options.preserve_chunks,
-            max_fasta_chunk_bytes=max_fasta_chunk_bytes
+            max_fasta_chunk_bytes=max_fasta_chunk_bytes,
+            evidence_corroborating_depth=options.evidence_corroborating_depth,
+            evidence_exact_identity=options.evidence_exact_identity,
+            evidence_candidate_depth=options.evidence_candidate_depth,
+            evidence_candidate_identity=options.evidence_candidate_identity,
+            evidence_max_internal_gap_bp=options.evidence_max_internal_gap_bp,
+            evidence_max_internal_gap_fraction=options.evidence_max_internal_gap_fraction,
+            evidence_min_unique_reads=options.evidence_min_unique_reads,
+            evidence_min_unique_fraction=options.evidence_min_unique_fraction,
+            evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
+            evidence_score_tie=options.evidence_score_tie,
         )
 
         ###
@@ -694,6 +807,17 @@ Examples:
                 'detection_min_identity': options.detection_min_identity,
                 'detection_min_base_depth': options.detection_min_base_depth,
                 'detection_min_num_reads': options.detection_min_num_reads,
+                'detection_system': options.detection_system,
+                'evidence_corroborating_depth': options.evidence_corroborating_depth,
+                'evidence_exact_identity': options.evidence_exact_identity,
+                'evidence_candidate_depth': options.evidence_candidate_depth,
+                'evidence_candidate_identity': options.evidence_candidate_identity,
+                'evidence_max_internal_gap_bp': options.evidence_max_internal_gap_bp,
+                'evidence_max_internal_gap_fraction': options.evidence_max_internal_gap_fraction,
+                'evidence_min_unique_reads': options.evidence_min_unique_reads,
+                'evidence_min_unique_fraction': options.evidence_min_unique_fraction,
+                'evidence_ambiguity_fraction': options.evidence_ambiguity_fraction,
+                'evidence_score_tie': options.evidence_score_tie,
                 'sensitivity': getattr(options, 'sensitivity', None),
                 'evalue': getattr(options, 'evalue', None),
                 'min_bitscore': getattr(options, 'min_bitscore', None),
@@ -702,7 +826,8 @@ Examples:
                 'sequence_type': getattr(options, 'sequence_type', None),
                 'genes_type': ('protein' if getattr(options, 'genes_type', None) == 'aa' else getattr(options, 'genes_type', None)),
                 'report_fasta': getattr(options, 'report_fasta', None),
-                'threads': getattr(options, 'threads', None)
+                'threads': getattr(options, 'threads', None),
+                'fastp_trim': getattr(options, 'fastp_trim', False)
             }
             with open(os.path.join(outdir, 'run_parameters.json'), 'w') as pf:
                 json.dump(params, pf, indent=2)
@@ -734,9 +859,17 @@ Examples:
         # Print specific statements for each failed tool
         if failed_tools:
             for db_name, tool, genes in failed_tools:
+                display_tool = (
+                    diamond_mode_label(
+                        options.sequence_type,
+                        getattr(options, 'genes_type', None),
+                    )
+                    if tool == 'DIAMOND-AA'
+                    else tool
+                )
                 gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
-                logger.info(f"Tool failure - {tool} (database: {db_name}): detected {gene_count} genes")
-                logger.warning(f"  -> {tool} failed for {db_name}")
+                logger.info(f"Tool failure - {display_tool} (database: {db_name}): detected {gene_count} genes")
+                logger.warning(f"  -> {display_tool} failed for {db_name}")
 
         if all_failed:
             logger.error("All tools failed - Something went catastrophically wrong. Exiting with error code.")

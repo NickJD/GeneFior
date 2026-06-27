@@ -16,3 +16,21 @@ src/GeneFior/databases/card/protein_fasta_protein_homolog_model_SID.fasta
 .DS_Store
 
 src/GeneFior.egg-info/
+
+test_data/232758E_18_legacy_detection/
+
+test_data/232758E_18_qualified_evidence/
+
+test_data/232758E_18_genestats_last/
+
+test_data/232758E_18_legacy_last/
+
+test_data/232758E_18_legacy_rerun/
+
+test_data/232758E_18_qualified_last/
+
+test_data/232758E_18_qualified_rerun/
+
+test_data/232758E_18_detection_system_comparison.tsv
+
+real_data_test/

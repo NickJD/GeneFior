@@ -17,6 +17,7 @@ Please see GeneFior.pdf for a draft publication.
     - hmmer >=3.4
     - seqtk >=1.4
     - pigz >=2.8
+    - fastp >=1.3.5 (optional, for paired-read trimming)
 
 ### Installation:
 GeneFíor is available via bioconda (https://anaconda.org/channels/bioconda/packages/genefior/overview). \
@@ -34,7 +35,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.9.1 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+GeneFíor v0.10.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -55,9 +56,9 @@ Required selection:
                         Output directory for results
 
 Output selection:
-  --report-fasta {all,detected,detected-all}
+  --report-fasta {all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
                         Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for
-                        each detected gene."detected-all" will report all reads for each detected gene. (default: None)
+                        each detected gene. Evidence modes are explicit aliases; candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide allele calls. (default: None)
 
 Tool selection:
   --tools {blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} ...]
@@ -111,6 +112,8 @@ Runtime Parameters:
   -tmp TEMP_DIRECTORY, --temp-directory TEMP_DIRECTORY
                         Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - Path will also be used for all temporary files (default: output directory)
   --force-modify-fastq  Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique
+  --fastp-trim, --fastp, --trim-reads
+                        For Paired-FASTQ input, run fastp automatic adapter and quality trimming before analysis
   --no_cleanup
   --verbose
 
@@ -137,7 +140,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.9.1 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.10.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -156,9 +159,9 @@ Required selection:
                         Output directory for results
 
 Output selection:
-  --report-fasta {all,detected,detected-all}
+  --report-fasta {all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
                         Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for
-                        each detected gene."detected-all" will report all reads for each detected gene. (default: None)
+                        each detected gene. Evidence modes are explicit aliases; candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide allele calls. (default: None)
 
 Tool selection:
   --tools {blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} ...]
@@ -219,6 +222,8 @@ Runtime Parameters:
   -tmp TEMP_DIRECTORY, --temp-directory TEMP_DIRECTORY
                         Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - Path will also be used for all temporary files (default: output directory)
   --force-modify-fastq  Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique
+  --fastp-trim, --fastp, --trim-reads
+                        For Paired-FASTQ input, run fastp automatic adapter and quality trimming before analysis
   --no_cleanup
   --verbose
 
@@ -235,6 +240,37 @@ Examples:
   # Custom thresholds, paired-fastq input, threads and dna-only mode
   AMRfíor -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/     -t 16 --d-min-cov 90 --d-min-id 85     --dna-only    
 ```
+
+### Optional paired-read trimming
+
+Add `--fastp-trim` (also accepted as `--fastp` or `--trim-reads`) to a
+`Paired-FASTQ` GeneFior or AMRfior run to apply fastp automatic adapter and
+quality trimming before every selected search tool. The `fastp` executable
+must be available in `PATH`. HTML and JSON QC reports are retained in
+`<output>/fastp/`; the trimmed FASTQ files follow the normal temporary-file
+cleanup policy. Without this option, the log explicitly records that
+non-trimmed reads were used.
+
+### Multiple custom databases with GeneFior
+
+GeneFior accepts multiple independent custom databases through a
+comma-separated `--db-path` value:
+
+```bash
+GeneFior \
+  -i reads_R1.fastq.gz,reads_R2.fastq.gz \
+  -st Paired-FASTQ \
+  --db-path /data/databases/amr,/data/databases/virulence \
+  --tools diamond blastn bowtie2 \
+  -o results
+```
+
+Each directory must contain its own tool-specific subdirectories, such as
+`diamond/`, `blast_dna/`, and `bowtie2/`. With multiple paths, GeneFior uses
+each directory name as the database name in logs and output files. Directory
+names must therefore be unique. A single path retains the historical
+`user-provided-db` output label.
+
 ### Sensitivity presets map: 
 ```
 Sensitivity presets provide convenient combinations of parameters for different use cases. The presets map to specific parameter settings for DIAMOND and Bowtie2 as follows:
@@ -248,12 +284,90 @@ Sensitivity presets provide convenient combinations of parameters for different 
 | very-sensitive   | --very-sensitive            | --very-sensitive-local          |
 | ultra-sensitive  | --ultra-sensitive           | --very-sensitive-local          | 
 ```
+## Evidence qualification and allele resolution
+
+GeneFíor no longer treats union coverage alone as proof that one exact database
+allele is present. Every tool now receives a qualified evidence call:
+
+- `EXACT_ALLELE_DETECTED`: literal nucleotide allele support with 100% mean identity, full-length coverage, and allele-resolving support.
+- `CANDIDATE_ALLELE_DETECTED`: nucleotide allele candidate with full-length support, mean identity at least 98% by default, and allele-resolving support. For read inputs, every base must be covered at least 3x by default; for full-length `Genes-FASTA` DNA input, one full-length query sequence can support the candidate.
+- `ALLELE_LIKE`: strong evidence close to the named allele, but candidate or exact identity is unresolved.
+- `FAMILY_DETECTED`: the gene family is strongly supported, but reads do not distinguish its alleles.
+- `PARTIAL_OR_DIVERGENT`: an incomplete or divergent mapping pattern that does
+  not pass the user's evidence thresholds.
+- `MIXED_OR_MOSAIC`: discontinuous or threshold-sensitive evidence inconsistent with one coherent allele.
+- `PROFILE_DETECTED`: robust HMM profile evidence.
+- `MUST_FLAG_REVIEW`: a must-flag profile passed the significance filter but
+  failed ordinary evidence thresholds; it is flagged for review, not counted
+  as positive evidence.
+- `NOT_DETECTED`: insufficient evidence.
+
+Protein searches (`BLASTx`, `BLASTp`, and DIAMOND) cannot by themselves claim
+an exact nucleotide allele because synonymous differences are invisible.
+Their strongest normal result is therefore `ALLELE_LIKE` or
+`FAMILY_DETECTED`. Nucleotide read tools can make a candidate call when every
+base is covered at least `--evidence-candidate-depth` times and the mean
+identity is at least `--evidence-candidate-identity`. Full-length DNA
+`Genes-FASTA` input uses full-length 1x allele coverage instead of read-depth
+corroboration. Exact calls are stricter: candidate support plus literal 100%
+identity.
+
+Important output columns:
+
+- `Evidence_Present=1` means the gene passes the user's configured detection
+  coverage, identity, base-depth, and minimum-read thresholds.
+- `Candidate_Allele_Detected=1` means the named nucleotide allele is a strong
+  candidate under the configured candidate-depth and candidate-identity thresholds
+  for read inputs, or under full-length 1x coverage and candidate-identity
+  thresholds for DNA `Genes-FASTA` input.
+- `Exact_Allele_Detected=1` means the named nucleotide allele was resolved.
+- `Profile_Detected=1` means a robust HMM profile was detected.
+- `Detected` is retained as a backwards-compatible alias of
+  `Evidence_Present`; it reports whether the user's detection thresholds pass.
+- `Evidence_Status` and `Evidence_Warnings` should be used for interpretation.
+- Qualified tool-stat files include `Detection_System`, `Evidence_Status`,
+  `Evidence_Warnings`, `Evidence_Present`, `Candidate_Allele_Detected`,
+  `Exact_Allele_Detected`, and the family/allele-resolution fields.
+- Read export modes `detected`/`evidence` and
+  `detected-all`/`evidence-all` export threshold-passing calls. The `candidate`
+  and `candidate-all` modes restrict output to candidate allele calls, while
+  `exact` and `exact-all` restrict output to exact nucleotide allele calls.
+
+New per-database outputs:
+
+- `<database>_detection_matrix.tsv`: user-threshold evidence binary calls.
+- `<database>_evidence_matrix.tsv`: qualified per-tool evidence statuses.
+- `<database>_evidence_summary.tsv`: evidence, candidate-allele, and exact-allele
+  counts per tool and across all tools.
+- `<database>_allele_resolution.tsv`: family-level top database candidate and competing alleles.
+
+These qualified-only files and fields are produced only by
+`--detection-system qualified`.
+
+Detection-system compatibility:
+
+- `--detection-system qualified` is the default. It reports threshold-passing
+  evidence, distinguishes family/mosaic/allele-like/candidate-allele results,
+  and applies the additional exact-allele requirements.
+- `--detection-system legacy-relaxed` reproduces the original binary detector:
+  gene coverage, mean identity, covered-region depth, and read count are
+  compared directly with the user's thresholds. It does not require
+  corroborated depth, continuous coverage, competitive uniqueness, or family
+  resolution. For strict historical compatibility, its minimum-read check uses
+  the original alignment/HSP count rather than deduplicated passing-read
+  support. It never labels the result as an exact allele.
+  Legacy tool-stat files report the quantitative mapping statistics followed
+  by one binary `Detected` column. They do not emit evidence matrices,
+  evidence summaries, allele-resolution reports, or qualified evidence fields.
+  Gene-Stats likewise reports only the binary detection value for legacy runs.
+- `--detection-mode` is accepted as an alias for `--detection-system`.
+
 ## Menu for GeneFíor-Recompute (or genefíor-recompute):
 
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.9.1 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.10.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -280,12 +394,20 @@ Gene Detection Parameters:
   --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
                         Minimum number of reads required for detection (default: 1)
 
-Output Parameterts:
-  --report-fasta {None,all,detected,detected-all}
+Output Parameters:
+  --report-fasta {None,all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
                         Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for
-                        each detected gene."detected-all" will report all reads for each detected gene. (default: None)
+                        each detected gene. Evidence modes are explicit aliases; candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide allele calls. (default: None)
+  --report-read-names {all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
+                        Write deduplicated read-name files per database/tool/gene. Candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide alleles. Read names are stored on disk during recompute rather than retained in memory.
   --query-fasta QUERY_FASTA
-                        Specify the original query FASTA/FASTQ file used for alignment (required for reporting mapped sequences for BLAST/DIAMOND).
+                        Specify the original query FASTA/FASTQ file used for alignment (required for FASTA reporting from BLAST/DIAMOND).
+
+Recompute memory behaviour:
+- By default, read names and per-hit identity values are not retained.
+- Coverage/depth uses compact interval boundaries rather than a Python object per covered base.
+- Read-name and FASTA reporting are opt-in and use a temporary disk-backed store.
+- Query-level thresholds can be tightened safely. Relaxing them below the source run is rejected because source BLAST/DIAMOND outputs were already filtered; use `--allow-incomplete-relaxation` only when accepting incomplete results.
 
 Miscellaneous Parameters:
   -v, --version         Show program version and exit
@@ -298,13 +420,18 @@ Examples:
   # More stringent depth requirement
   GeneFior-recompute -i original_results/ -o high_depth/ \
     --d-min-base-depth 5.0 --d-min-reads 10
+
+  # Export threshold-passing read names and sequences for detected genes
+  GeneFior-recompute -i original_results/ -o recomputed_with_reads/ \
+    --tools blastx --report-read-names detected --report-fasta detected \
+    --query-fasta reads.fasta.gz
 ```
 ## Menu for GeneFíor-Gene-Stats (or genefíor-gene-stats):
 
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.9.1 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.10.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -314,16 +441,23 @@ options:
                         Output directory for visualisation reports
   -g GENES, --genes GENES
                         Comma-separated gene names (FULL NAMES) or path to file with gene names (one per line)
-  --all-genes           Include all genes found in raw outputs (default: only genes listed as detected in detection_matrix.tsv)
+  --all-genes           Include all genes found in raw outputs (default: genes with meaningful evidence in evidence_matrix.tsv, falling back to strict detections for older runs)
+  --gene-selection {evidence,candidate,exact,candidate-or-exact,all}
+                        Select genes automatically from qualified evidence outputs. Use candidate-or-exact to report every candidate or exact nucleotide allele call without specifying gene names.
   --databases {resfinder,card,ncbi} [{resfinder,card,ncbi} ...]
                         Database(s) to interrogate
   --tools {blastn,blastx,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,diamond,bowtie2,bwa,minimap2,all} ...]
                         Tool(s) to interrogate
   --ref-fasta REF_FASTA
-                        NOT IMPLEMENTED YET - Reference FASTA file for variant calling (optional)
+                        Plain-text reference FASTA file for variant calling (optional)
   --query-fasta QUERY_FASTA
-                        NOT IMPLEMENTED YET - Query FASTA file (your input reads) for BLAST base-level analysis (optional)
+                        Original query FASTA/FASTQ file. Required for FASTA read export from BLAST/DIAMOND results.
+  --raw-dir RAW_DIR     Directory containing raw GeneFior alignment outputs. May point directly to raw_outputs/ or to a result directory containing raw_outputs/. Useful when -i/--input is a recompute output.
   --plot-per-tool       Generate individual per-tool coverage PNGs in addition to combined comparison plots (default: off)
+  --report-read-names   Write deduplicated read-name files for the selected genes, databases, and tools
+  --report-fasta        Write deduplicated read FASTA files for the selected genes, databases, and tools
+  --read-selection {all,passing}
+                        Export all raw mappings or only mappings passing the original query identity/coverage thresholds (default: passing)
 
 Examples:
   # Visualise specific genes (FULL NAMES) from all tools
@@ -337,15 +471,37 @@ Examples:
     -g genes_of_interest.txt \
     --databases resfinder \
     --tools blastn diamond 
+
+  # Export reads for one selected gene from selected tools
+  GeneFior-gene-stats -i results/ -o gene_reads/ \
+    -g "tet(Q)_1_L33696" \
+    --databases resfinder \
+    --tools blastx bowtie2 \
+    --report-read-names --report-fasta --read-selection passing \
+    --query-fasta reads.fasta.gz
+
+  # Report all candidate/exact allele genes automatically
+  GeneFior-gene-stats -i results/ -o candidate_exact_gene_stats/ \
+    --gene-selection candidate-or-exact \
+    --databases resfinder card \
+    --tools blastn bwa minimap2
+
+  # Generate Gene-Stats from a recompute output while using the original raw files
+  GeneFior-gene-stats -i recomputed_results/ -o gene_stats/ \
+    --raw-dir original_results/raw_outputs \
+    --databases resfinder card \
+    --tools blastn blastx diamond bowtie2 bwa minimap2 \
+    --query-fasta reads_R1.fastq.gz,reads_R2.fastq.gz
 ```
 
 ## GeneFíor-Combine (genefior-combine)
 
 GeneFíor-Combine is a small standalone tool for combining per-sample *_detection_matrix.tsv files produced by a
-multi-sample GeneFíor/AMRfíor run into per-database combined matrices. It writes two outputs per database:
+multi-sample GeneFíor/AMRfíor run into per-database combined matrices. It writes:
 
 - <database>_combined_detection_matrix.tsv (binary presence/absence matrix compatible with previous behaviour)
 - <database>_combined_detection_matrix_tools.tsv (informative matrix where each cell lists which tools detected the gene in that sample)
+- <database>_combined_evidence_matrix.tsv (qualified per-sample evidence statuses with evidence, candidate, exact, profile, and strict sample counts)
 
 Usage:
 ```commandline
@@ -353,7 +509,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.9.1 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.10.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit

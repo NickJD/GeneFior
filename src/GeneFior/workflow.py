@@ -20,9 +20,37 @@ from typing import Optional
 
 try:
     from .gene_stats import GeneStats
+    from .evidence import (
+        EvidenceConfig,
+        DETECTION_SYSTEM_LEGACY_RELAXED,
+        DETECTION_SYSTEM_QUALIFIED,
+        NOT_DETECTED,
+        best_status,
+        classify_gene_evidence,
+        classify_gene_legacy,
+        legacy_thresholds_pass,
+        normalise_detection_system,
+        resolve_family_calls,
+        scores_tied,
+        tool_modality,
+    )
     from .constants import *
 except (ModuleNotFoundError, ImportError) as error:
     from gene_stats import GeneStats
+    from evidence import (
+        EvidenceConfig,
+        DETECTION_SYSTEM_LEGACY_RELAXED,
+        DETECTION_SYSTEM_QUALIFIED,
+        NOT_DETECTED,
+        best_status,
+        classify_gene_evidence,
+        classify_gene_legacy,
+        legacy_thresholds_pass,
+        normalise_detection_system,
+        resolve_family_calls,
+        scores_tied,
+        tool_modality,
+    )
     from constants import *
 
 class Workflow:
@@ -59,7 +87,18 @@ class Workflow:
                      hmmer_evalue: Optional[float] = None,
                      hmmer_threshold_mode: str = 'evalue',
                      hmmer_must_flag: bool = True,
-                     tools: Optional[List[str]] = None):
+                     tools: Optional[List[str]] = None,
+                     evidence_corroborating_depth: int = 2,
+                     evidence_exact_identity: float = 100.0,
+                     evidence_candidate_depth: int = 3,
+                     evidence_candidate_identity: float = 98.0,
+                     evidence_max_internal_gap_bp: int = 15,
+                     evidence_max_internal_gap_fraction: float = 0.02,
+                     evidence_min_unique_reads: int = 2,
+                     evidence_min_unique_fraction: float = 0.10,
+                     evidence_ambiguity_fraction: float = 0.50,
+                     evidence_score_tie: float = 1.0,
+                     detection_system: str = DETECTION_SYSTEM_QUALIFIED):
 
                  
         ### Handle input FASTA and FASTQ
@@ -98,6 +137,19 @@ class Workflow:
         self.detection_min_identity = detection_min_identity
         self.detection_min_base_depth = detection_min_base_depth
         self.detection_min_num_reads = detection_min_num_reads
+        self.detection_system = normalise_detection_system(detection_system)
+        self.evidence_config = EvidenceConfig(
+            corroborating_depth=evidence_corroborating_depth,
+            exact_identity_min=evidence_exact_identity,
+            candidate_depth=evidence_candidate_depth,
+            candidate_identity_min=evidence_candidate_identity,
+            max_internal_gap_bp=evidence_max_internal_gap_bp,
+            max_internal_gap_fraction=evidence_max_internal_gap_fraction,
+            min_unique_best_reads=evidence_min_unique_reads,
+            min_unique_best_fraction=evidence_min_unique_fraction,
+            ambiguity_warning_fraction=evidence_ambiguity_fraction,
+            score_tie_absolute=evidence_score_tie,
+        )
 
         # Threshold (bytes) to split large FASTA into chunks for parallel BLAST.
         self.max_fasta_chunk_bytes = max_fasta_chunk_bytes
@@ -211,6 +263,17 @@ class Workflow:
             db_name: defaultdict(lambda: defaultdict(bool))
             for db_name in self.databases.keys()
         }
+        # Qualified evidence calls parallel the strict legacy boolean matrix.
+        # detections=True now means an exact nucleotide allele or a robust HMM
+        # profile call; lower-confidence evidence remains visible here.
+        self.evidence_calls = {
+            db_name: defaultdict(dict)
+            for db_name in self.databases.keys()
+        }
+        self.family_calls = {
+            db_name: defaultdict(dict)
+            for db_name in self.databases.keys()
+        }
 
         # Store detailed statistics: {database: {tool: {gene: GeneStats}}}
         self.gene_stats = {
@@ -244,6 +307,99 @@ class Workflow:
         if self.tools is None:
             return True
         return tool_name in self.tools
+
+    def _classify_tool_evidence(self, database: str, tool_name: str,
+                                must_flag_overrides: Set[str] = None,
+                                eligible_genes: Set[str] = None) -> Set[str]:
+        """Classify all genes for one tool under the selected detection system."""
+        must_flag_overrides = must_flag_overrides or set()
+        self.evidence_calls.setdefault(database, defaultdict(dict))
+        self.family_calls.setdefault(database, defaultdict(dict))
+        self.detections.setdefault(
+            database,
+            defaultdict(lambda: defaultdict(bool)),
+        )
+
+        stats_by_gene = self.gene_stats.get(database, {}).get(tool_name, {})
+        calls = {}
+        detection_system = normalise_detection_system(
+            getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        )
+        for gene, stats in stats_by_gene.items():
+            if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                call = classify_gene_legacy(
+                    gene=gene,
+                    tool_name=tool_name,
+                    stats=stats,
+                    detection_min_coverage=self.detection_min_coverage,
+                    detection_min_identity=self.detection_min_identity,
+                    detection_min_base_depth=self.detection_min_base_depth,
+                    detection_min_num_reads=self.detection_min_num_reads,
+                )
+            else:
+                call = classify_gene_evidence(
+                    gene=gene,
+                    tool_name=tool_name,
+                    stats=stats,
+                    config=self.evidence_config,
+                    detection_min_coverage=self.detection_min_coverage,
+                    detection_min_identity=self.detection_min_identity,
+                    detection_min_base_depth=self.detection_min_base_depth,
+                    detection_min_num_reads=self.detection_min_num_reads,
+                    reads_mode=not getattr(self, 'is_genes_fasta', False),
+                    must_flag_override=gene in must_flag_overrides,
+                )
+            if eligible_genes is not None and gene not in eligible_genes:
+                call.status = NOT_DETECTED
+                call.exact_detected = False
+                call.evidence_present = False
+                call.warnings = sorted(set(call.warnings + ["SIGNIFICANCE_FILTER_FAILED"]))
+            calls[gene] = call
+
+        family_summaries = (
+            {}
+            if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED
+            else resolve_family_calls(
+                calls,
+                stats_by_gene,
+                self.evidence_config,
+            )
+        )
+        self.family_calls[database][tool_name] = family_summaries
+
+        evidence = set()
+        status_counts = defaultdict(int)
+        review_examples = []
+        for gene, call in calls.items():
+            self.evidence_calls[database][gene][tool_name] = call
+            self.detections[database][gene][tool_name] = call.evidence_present
+            status_counts[call.status] += 1
+            if call.evidence_present:
+                evidence.add(gene)
+                if (call.status == "MIXED_OR_MOSAIC"
+                        and len(review_examples) < 10):
+                    review_examples.append(f"{gene}={call.status}")
+        summary = ", ".join(
+            f"{status}={count}"
+            for status, count in sorted(status_counts.items())
+            if count
+        )
+        if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+            self.logger.info(
+                f"Detection classification for {database}/{tool_name} "
+                f"[{detection_system}]: DETECTED={len(evidence)}"
+            )
+        else:
+            self.logger.info(
+                f"Detection classification for {database}/{tool_name} "
+                f"[{detection_system}]: {summary}"
+            )
+        if review_examples:
+            self.logger.warning(
+                "Priority evidence reviews (first 10): "
+                + ", ".join(review_examples)
+            )
+        return evidence
 
     def check_gzip(self,fasta_path_str):
         self.logger.info(f"Checking if input FASTA ` {self.input_fasta} ` is gzipped and not broken...")
@@ -1030,6 +1186,23 @@ class Workflow:
     def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
                              gene_reads: dict, all_reads: dict):
         # Method to write FASTA files for mapped reads.
+        evidence_genes = {
+            gene
+            for gene, gene_calls in self.evidence_calls.get(database, {}).items()
+            if tool_name in gene_calls and gene_calls[tool_name].evidence_present
+        }
+        exact_genes = {
+            gene
+            for gene, gene_calls in self.evidence_calls.get(database, {}).items()
+            if tool_name in gene_calls
+            and gene_calls[tool_name].exact_allele_detected
+        }
+        candidate_genes = {
+            gene
+            for gene, gene_calls in self.evidence_calls.get(database, {}).items()
+            if tool_name in gene_calls
+            and gene_calls[tool_name].candidate_allele_detected
+        }
         def sanitise_gene_name(gene: str) -> str:
             safe_gene = gene.replace('|', '_').replace('/', '_').replace(':','_').replace('-','_')
             if not hasattr(self, 'gene_name_changes'):
@@ -1076,11 +1249,19 @@ class Workflow:
                     self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
 
 
-        elif self.report_fasta == 'detected':
+        elif self.report_fasta in ('detected', 'evidence', 'candidate', 'exact'):
+            selected_genes = (
+                exact_genes
+                if self.report_fasta == 'exact'
+                else candidate_genes
+                if self.report_fasta == 'candidate'
+                else evidence_genes
+            )
             if getattr(self, "verbose", True):
                 self.logger.info(
-                    f"Writing FASTA files for threshold-passing reads mapped to detected genes in {database}...")
-            for gene in detected_genes:
+                    f"Writing FASTA files for threshold-passing reads mapped to "
+                    f"{self.report_fasta} genes in {database}...")
+            for gene in selected_genes:
                 read_names = set(gene_reads[gene].get('passing', []))
                 if not read_names:
                     continue
@@ -1101,10 +1282,22 @@ class Workflow:
                     self.logger.info(f"  FASTA file: {fasta_path} ({count} reads: {r1_count} R1, {r2_count} R2)")
 
 
-        elif self.report_fasta == 'detected-all':
+        elif self.report_fasta in (
+                'detected-all', 'evidence-all', 'candidate-all',
+                'exact-all'):
+            selected_genes = (
+                exact_genes
+                if self.report_fasta == 'exact-all'
+                else candidate_genes
+                if self.report_fasta == 'candidate-all'
+                else evidence_genes
+            )
             if getattr(self, "verbose", True):
-                self.logger.info(f"Writing FASTA files for all reads mapped to detected genes in {database}...")
-            for gene in detected_genes:
+                self.logger.info(
+                    f"Writing FASTA files for all reads mapped to "
+                    f"{self.report_fasta} genes in {database}..."
+                )
+            for gene in selected_genes:
                 read_names = set(gene_reads[gene].get('all', []))
                 if not read_names:
                     continue
@@ -1516,7 +1709,6 @@ class Workflow:
                 '-o', str(output_file),
                 '-f', '6', 'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
                 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore', 'qlen', 'slen',
-                '--header',
                 '--id', str(self.query_min_identity),
                 '--query-cover', str(self.query_min_coverage),
                 #'-e', str(self.evalue),
@@ -2146,15 +2338,24 @@ class Workflow:
 
         return success, detected
 
-    def parse_blast_results(self, output_file: Path, database: str, tool_name: str) -> Set[str]:
+    def parse_blast_results(self, output_file: Path, database: str, tool_name: str,
+                            count_only: bool = False, read_store=None) -> Set[str]:
         """Parse BLAST/DIAMOND tabular output and collect per-gene stats.
 
         Only alignments meeting identity and query-coverage thresholds are added.
         Gene detection is decided from combined gene coverage and base-depth thresholds.
+
+        When count_only is True, per-gene read-name lists are replaced with
+        integer counters. This is intended for GeneFior-Recompute on very large
+        tabular outputs where FASTA reporting is not being requested.
         """
         detected_genes = set()
         gene_lengths = {}  # Store gene lengths
-        gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
+        count_only = bool(count_only and (not self.report_fasta or read_store is not None))
+        if count_only:
+            gene_reads = defaultdict(lambda: {'passing_count': 0, 'all_count': 0})
+        else:
+            gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
 
         # Ensure structure exists for this database and tool (do not reset entire gene_stats)
         if database not in self.gene_stats:
@@ -2167,8 +2368,11 @@ class Workflow:
             # No output present -> return empty detected set and empty gene_reads dict
             return set(), {}
 
-        # Load all reads from input FASTA for later FASTA output (cached) - Should only load once
-        if not hasattr(self, 'all_reads'):
+        # Load all reads from input FASTA only when FASTA output is requested.
+        # Recompute commonly runs without query FASTA and may process huge hit
+        # tables, so avoid materialising reads unless the user explicitly needs
+        # mapped-read FASTA files.
+        if self.report_fasta and read_store is None and not hasattr(self, 'all_reads'):
             self.all_reads = {}
             try:
                 import gzip
@@ -2198,32 +2402,150 @@ class Workflow:
                         self.all_reads[read_name] = ''.join(seq_lines)
             except Exception as e:
                 self.logger.error(f"Error reading FASTA file - Ignore if running Genefíor-Recompute without sequences")
-        all_reads = self.all_reads
+        all_reads = getattr(self, 'all_reads', {})
         mapped_reads = 0
         passing_reads = 0
+        malformed_lines = 0
+
+        def process_query_group(read_name: str, hits: List[dict]):
+            nonlocal mapped_reads, passing_reads
+            if not hits:
+                return
+
+            qualifying_by_gene = defaultdict(list)
+            raw_genes = set()
+            for hit in hits:
+                gene = hit['gene']
+                raw_genes.add(gene)
+
+                if hit['identity'] < self.query_min_identity:
+                    continue
+                if hit['query_coverage'] < self.query_min_coverage:
+                    continue
+                if getattr(self, 'evalue', None) is not None:
+                    if hit['evalue'] is None or hit['evalue'] > float(self.evalue):
+                        continue
+                if getattr(self, 'min_bitscore', None) is not None:
+                    if hit['bitscore'] is None or hit['bitscore'] < float(self.min_bitscore):
+                        continue
+                qualifying_by_gene[gene].append(hit)
+
+            for gene in raw_genes:
+                if count_only:
+                    gene_reads[gene]['all_count'] += 1
+                else:
+                    gene_reads[gene]['all'].append(read_name)
+                if read_store is not None:
+                    read_store.add(
+                        database, tool_name, gene, read_name,
+                        passing=False,
+                    )
+            mapped_reads += len(raw_genes)
+
+            best_score_by_gene: Dict[str, float] = {}
+            for gene, gene_hits in qualifying_by_gene.items():
+                if gene not in self.gene_stats[database][tool_name]:
+                    self.gene_stats[database][tool_name][gene] = GeneStats(
+                        gene_name=gene,
+                        compact=count_only,
+                    )
+                stats = self.gene_stats[database][tool_name][gene]
+                intervals = [
+                    (
+                        min(hit['sstart'], hit['send']) - 1,
+                        max(hit['sstart'], hit['send']),
+                    )
+                    for hit in gene_hits
+                ]
+                identity_weights = [
+                    max(1, abs(hit['send'] - hit['sstart']) + 1)
+                    for hit in gene_hits
+                ]
+                aggregate_identity = (
+                    sum(
+                        hit['identity'] * weight
+                        for hit, weight in zip(gene_hits, identity_weights)
+                    )
+                    / sum(identity_weights)
+                )
+                stats.add_intervals(
+                    intervals,
+                    aggregate_identity,
+                    gene_lengths.get(gene, 0),
+                )
+                if count_only:
+                    gene_reads[gene]['passing_count'] += 1
+                else:
+                    gene_reads[gene]['passing'].append(read_name)
+                if read_store is not None:
+                    read_store.add(
+                        database, tool_name, gene, read_name,
+                        passing=True,
+                    )
+                passing_reads += 1
+                score = max(
+                    (
+                        hit['bitscore']
+                        if hit['bitscore'] is not None
+                        else hit['identity']
+                    )
+                    for hit in gene_hits
+                )
+                best_score_by_gene[gene] = score
+
+            if not best_score_by_gene:
+                return
+            best_score = max(best_score_by_gene.values())
+            tied_genes = {
+                gene
+                for gene, score in best_score_by_gene.items()
+                if scores_tied(best_score, score, self.evidence_config)
+            }
+            for gene, score in best_score_by_gene.items():
+                is_best = gene in tied_genes
+                self.gene_stats[database][tool_name][gene].add_read_support(
+                    mapped=gene in raw_genes,
+                    passing=True,
+                    best=is_best,
+                    unique_best=is_best and len(tied_genes) == 1,
+                    ambiguous_best=is_best and len(tied_genes) > 1,
+                    high_confidence=is_best and len(tied_genes) == 1,
+                    score=score,
+                )
+
         try:
             with open(output_file, 'r') as f:
+                current_read = None
+                current_hits: List[dict] = []
                 for line in f:
                     if line.startswith('#'):
                         continue
                     fields = line.strip().split('\t')
-                    if len(fields) < 13:
+                    if len(fields) < 14:
                         continue
 
-                    read_name = fields[0]  # qseqid
-                    gene = fields[1]  # sseqid
-                    identity = float(fields[2])  # pident
-                    qstart = int(fields[6])  # query start
-                    qend = int(fields[7])  # query end
-                    sstart = int(fields[8])  # subject start
-                    send = int(fields[9])  # subject end
-                    qlen = int(fields[12])  # query length (added to output format)
-                    slen = int(fields[13])  # subject length (added to output format)
+                    try:
+                        read_name = fields[0]  # qseqid
+                        gene = fields[1]  # sseqid
+                        identity = float(fields[2])  # pident
+                        qstart = int(fields[6])  # query start
+                        qend = int(fields[7])  # query end
+                        sstart = int(fields[8])  # subject start
+                        send = int(fields[9])  # subject end
+                        qlen = int(fields[12])  # query length (added to output format)
+                        slen = int(fields[13])  # subject length (added to output format)
+                    except (TypeError, ValueError):
+                        malformed_lines += 1
+                        continue
                     # bitscore included in the standard outfmt
                     try:
                         bitscore = float(fields[11]) if len(fields) > 11 else None
                     except Exception:
                         bitscore = None
+                    try:
+                        evalue = float(fields[10]) if len(fields) > 10 else None
+                    except Exception:
+                        evalue = None
 
                     # Store gene length if available
                     if slen is not None:
@@ -2255,77 +2577,83 @@ class Workflow:
                     except Exception:
                         query_coverage = 0.0
 
-                    # Track all reads mapping to this gene
-                    gene_reads[gene]['all'].append(read_name)
-                    mapped_reads += 1
-
-                    if identity >= self.query_min_identity and query_coverage >= self.query_min_coverage:
-                        # If a minimum bitscore threshold was provided, enforce it here
-                        if getattr(self, 'min_bitscore', None) is not None:
-                            try:
-                                if bitscore is None or bitscore < float(self.min_bitscore):
-                                    # does not meet bitscore threshold
-                                    continue
-                            except Exception:
-                                # on parse error be conservative and skip
-                                continue
-                        # Initialise stats if first hit for this gene
-                        if gene not in self.gene_stats[database][tool_name]:
-                            self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-
-                        # Add hit to statistics (use subject coordinates if available)
-                        ss = sstart if sstart is not None else 1
-                        se = send if send is not None else ss
-                        self.gene_stats[database][tool_name][gene].add_hit(
-                            ss, se, identity, gene_lengths.get(gene, 0)
-                        )
-
-                        # Track reads that pass thresholds
-                        gene_reads[gene]['passing'].append(read_name)
-                        passing_reads += 1
+                    if current_read is not None and read_name != current_read:
+                        process_query_group(current_read, current_hits)
+                        current_hits = []
+                    current_read = read_name
+                    current_hits.append({
+                        'gene': gene,
+                        'identity': identity,
+                        'query_coverage': query_coverage,
+                        'sstart': sstart,
+                        'send': send,
+                        'bitscore': bitscore,
+                        'evalue': evalue,
+                    })
+                if current_read is not None:
+                    process_query_group(current_read, current_hits)
         except KeyError:
             raise
         except Exception as e:
             self.logger.error(f"Error parsing {output_file}: {e}")
+            raise RuntimeError(f"Failed to parse {output_file}") from e
 
-        # Finalise statistics and determine detection based on gene coverage
+        if malformed_lines:
+            self.logger.warning(
+                f"Skipped {malformed_lines} malformed rows while parsing {output_file}."
+            )
+
+        # Finalise statistics and classify exact/family/partial evidence.
         for gene in self.gene_stats[database][tool_name]:
-            stats = self.gene_stats[database][tool_name][gene]
-            stats.finalise()
+            self.gene_stats[database][tool_name][gene].finalise()
+        detected_genes = self._classify_tool_evidence(database, tool_name)
 
-            # Gene is detected if it meets all gene-level thresholds.
-            # avg_identity is the mean read identity across all qualifying reads; it is
-            # checked against detection_min_identity (the gene-level identity gate),
-            # which is separate from query_min_identity (the per-read/HSP gate used above).
-            if (stats.gene_coverage >= self.detection_min_coverage and
-                    stats.avg_identity >= self.detection_min_identity and
-                    stats.base_depth_hit >= self.detection_min_base_depth and
-                    stats.num_sequences >= self.detection_min_num_reads):
-                detected_genes.add(gene)
-                self.detections[database][gene][tool_name] = True
-
-        self.logger.info(f"Total reads processed in {database.upper()} using {tool_name}: {len(all_reads)}")
+        if self.report_fasta and read_store is None:
+            self.logger.info(f"Input reads loaded for FASTA output in {database.upper()} using {tool_name}: {len(all_reads)}")
         # Note: mapped_reads counts hits seen in the BLAST output file
         self.logger.info(f"Reads that returned a hit in {database.upper()} using {tool_name}: {mapped_reads}")
         self.logger.info(f"Reads passing thresholds in {database.upper()} using {tool_name}: {passing_reads}")
-        self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
+        if normalise_detection_system(
+                getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        ) == DETECTION_SYSTEM_LEGACY_RELAXED:
+            self.logger.info(
+                f"Detected genes in {database.upper()} using {tool_name}: "
+                f"{len(detected_genes)}"
+            )
+        else:
+            evidence_count = sum(
+                1 for call in self.evidence_calls.get(database, {}).values()
+                if tool_name in call and call[tool_name].evidence_present
+            )
+            exact_count = sum(
+                1 for calls in self.evidence_calls.get(database, {}).values()
+                if tool_name in calls and calls[tool_name].exact_allele_detected
+            )
+            self.logger.info(
+                f"Evidence genes in {database.upper()} using {tool_name}: "
+                f"{evidence_count}; exact allele genes: {exact_count}"
+            )
 
         # Output FASTA files of reads mapping to genes
-        if self.report_fasta:
+        if self.report_fasta and read_store is None:
             self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
 
         return detected_genes, gene_reads
 
-    def parse_bam_results(self, bam_file: Path, database: str, tool_name: str) -> Set[str]:
+    def parse_bam_results(self, bam_file: Path, database: str, tool_name: str,
+                          count_only: bool = False, read_store=None) -> Set[str]:
         """Parse BAM (samtools view) and collect per-gene stats.
 
         Uses CIGAR to compute aligned positions and per-read identity; detection
         follows the same coverage/base-depth rules as BLAST parsing.
+
+        When count_only is True, per-gene read-name lists and read sequences are
+        replaced with counters. This keeps GeneFior-Recompute bounded on large
+        BAM inputs when FASTA reporting is not requested.
         """
         detected_genes = set()
         if not bam_file.exists():
-            self.logger.error(f"BAM file not found: {bam_file}")
-            return detected_genes
+            raise FileNotFoundError(f"BAM file not found: {bam_file}")
 
         # Ensure structure exists for this database and tool (do not reset entire gene_stats)
         if database not in self.gene_stats:
@@ -2335,10 +2663,18 @@ class Workflow:
             self.gene_stats[database][tool_name] = defaultdict(GeneStats)
 
         gene_lengths = {}  # Store gene lengths from BAM header
-        gene_reads = defaultdict(lambda: {'passing': [], 'all': [], 'passing_r1': [], 'passing_r2': []})
+        count_only = bool(count_only and (not self.report_fasta or read_store is not None))
+        if count_only:
+            gene_reads = defaultdict(lambda: {
+                'passing_count': 0, 'all_count': 0,
+                'passing_r1_count': 0, 'passing_r2_count': 0,
+            })
+        else:
+            gene_reads = defaultdict(lambda: {'passing': [], 'all': [], 'passing_r1': [], 'passing_r2': []})
         all_reads = {}
         mapped_reads = 0
         passing_reads = 0
+        stderr = ''
 
 
         try:
@@ -2374,6 +2710,15 @@ class Workflow:
                 # skip unmapped
                 if flag & 0x4:
                     continue
+                is_secondary = bool(flag & 0x100)
+                is_supplementary = bool(flag & 0x800)
+                is_primary = not is_secondary and not is_supplementary
+                if not is_primary:
+                    continue
+                try:
+                    mapq = int(fields[4])
+                except (TypeError, ValueError):
+                    mapq = 0
 
                 # Add /1 or /2 to read name based on SAM flag
                 if flag & 0x40:
@@ -2389,33 +2734,44 @@ class Workflow:
                 cigar = fields[5]
                 seq = fields[9]
                 # store read sequence if available
-                if read_name not in all_reads and seq and seq != '*':
+                if self.report_fasta and read_store is None and read_name not in all_reads and seq and seq != '*':
                     all_reads[read_name] = seq
 
                 gene_len = gene_lengths.get(gene, 0)
-                gene_reads[gene]['all'].append(read_name)
+                if count_only:
+                    gene_reads[gene]['all_count'] += 1
+                else:
+                    gene_reads[gene]['all'].append(read_name)
+                if read_store is not None:
+                    read_store.add(
+                        database, tool_name, gene, read_name,
+                        passing=False, sequence=(seq if seq and seq != '*' else None),
+                    )
                 mapped_reads +=1
 
                 # try to get NM tag from optional fields
-                nm = 0
+                nm = None
                 for opt in fields[11:]:
                     if opt.startswith('NM:i:'):
                         try:
                             nm = int(opt.split(':')[-1])
                         except ValueError:
-                            nm = 0
+                            nm = None
                         break
 
                 # parse CIGAR and compute aligned positions & alignment length
                 ref_pos = ref_start
                 aligned_positions = set()  # reference positions — feeds into gene coverage
+                aligned_intervals = []  # compact half-open reference spans for recompute
                 query_aligned_bases = 0  # query bases aligned — feeds into query coverage
                 alignment_length = 0  # for identity calculation
 
                 for count_str, op in cigar_re.findall(cigar):
                     length = int(count_str)
                     if op in ('M', '=', 'X'):
-                        aligned_positions.update(range(ref_pos, ref_pos + length))
+                        aligned_intervals.append((ref_pos, ref_pos + length))
+                        if not count_only:
+                            aligned_positions.update(range(ref_pos, ref_pos + length))
                         ref_pos += length
                         alignment_length += length
                         # M/=/X consume both query and reference: unambiguously "aligned"
@@ -2441,10 +2797,12 @@ class Workflow:
                         pass
 
                 if alignment_length == 0:
-                    identity = 0.0
-                else:
+                    identity = None
+                elif nm is not None:
                     matches = max(0, alignment_length - nm)
                     identity = (matches / alignment_length) * 100.0
+                else:
+                    identity = None
 
                 query_length = len(seq) if seq and seq != '*' else 0
                 # Per-read query coverage: (M + I bases) / read length, consistent with
@@ -2454,17 +2812,58 @@ class Workflow:
                 # Per-read gate uses query_min_identity (same threshold as BLAST/DIAMOND
                 # per-HSP filtering) so that all tools are consistent.  detection_min_identity
                 # is reserved for the gene-level avg-identity gate applied after finalise().
-                if identity >= self.query_min_identity and query_coverage >= self.query_min_coverage:
+                identity_passes = (
+                    identity is not None
+                    and identity >= self.query_min_identity
+                )
+                if (is_primary
+                        and identity_passes
+                        and query_coverage >= self.query_min_coverage):
                     if gene not in self.gene_stats[database][tool_name]:
-                        self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
-                    self.gene_stats[database][tool_name][gene].add_positions(aligned_positions, identity, gene_len)
-                    gene_reads[gene]['passing'].append(read_name)
+                        self.gene_stats[database][tool_name][gene] = GeneStats(
+                            gene_name=gene,
+                            compact=count_only,
+                        )
+                    if count_only:
+                        self.gene_stats[database][tool_name][gene].add_intervals(
+                            aligned_intervals, identity, gene_len
+                        )
+                    else:
+                        self.gene_stats[database][tool_name][gene].add_positions(
+                            aligned_positions, identity, gene_len
+                        )
+                    if count_only:
+                        gene_reads[gene]['passing_count'] += 1
+                    else:
+                        gene_reads[gene]['passing'].append(read_name)
+                    if read_store is not None:
+                        read_store.add(
+                            database, tool_name, gene, read_name,
+                            passing=True, sequence=(seq if seq and seq != '*' else None),
+                        )
+                    # MAPQ 255 means mapping quality is unavailable, not unique.
+                    unique_mapping = 20 <= mapq < 255
+                    self.gene_stats[database][tool_name][gene].add_read_support(
+                        mapped=True,
+                        passing=True,
+                        best=True,
+                        unique_best=unique_mapping,
+                        ambiguous_best=not unique_mapping,
+                        high_confidence=unique_mapping,
+                        score=mapq,
+                    )
 
                     # Track R1/R2 separately based on read name suffix
                     if read_name.endswith('_R1') or '/1' in read_name:
-                        gene_reads[gene]['passing_r1'].append(read_name)
+                        if count_only:
+                            gene_reads[gene]['passing_r1_count'] += 1
+                        else:
+                            gene_reads[gene]['passing_r1'].append(read_name)
                     elif read_name.endswith('_R2') or '/2' in read_name:
-                        gene_reads[gene]['passing_r2'].append(read_name)
+                        if count_only:
+                            gene_reads[gene]['passing_r2_count'] += 1
+                        else:
+                            gene_reads[gene]['passing_r2'].append(read_name)
 
                     passing_reads +=1
 
@@ -2499,35 +2898,50 @@ class Workflow:
             except Exception:
                 pass
 
+            if proc.returncode not in (0, None):
+                raise RuntimeError(
+                    f"samtools view failed for {bam_file} with exit code "
+                    f"{proc.returncode}: {stderr.strip()}"
+                )
+
         except Exception as e:
             self.logger.error(f"Error reading BAM via samtools: {e}")
+            raise RuntimeError(f"Failed to parse BAM file {bam_file}") from e
 
 
 
-        # Finalise statistics and determine detection based on gene coverage
+        # Finalise statistics and classify exact/family/partial evidence.
         for gene in self.gene_stats[database][tool_name]:
-            stats = self.gene_stats[database][tool_name][gene]
-            stats.finalise()
-
-            # Gene is detected if it meets all gene-level thresholds.
-            # avg_identity (mean of per-read identities for qualifying reads) is checked
-            # against detection_min_identity here — the per-read gate above already used
-            # query_min_identity to screen out low-quality reads before they contributed.
-            if (stats.gene_coverage >= self.detection_min_coverage and
-                    stats.avg_identity >= self.detection_min_identity and
-                    stats.base_depth_hit >= self.detection_min_base_depth and
-                    stats.num_sequences >= self.detection_min_num_reads):
-                detected_genes.add(gene)
-                self.detections[database][gene][tool_name] = True
+            self.gene_stats[database][tool_name][gene].finalise()
+        detected_genes = self._classify_tool_evidence(database, tool_name)
 
         #self.logger.info(f"Total reads processed in {database.upper()} using {tool_name}: {len(all_reads)}")
         ## Need a fix for this
         self.logger.info(f"Reads that returned a hit in {database.upper()} using {tool_name}: {mapped_reads}")
         self.logger.info(f"Reads passing thresholds in {database.upper()} using {tool_name}: {passing_reads}")
-        self.logger.info(f"Detected {len(detected_genes)} genes in {database.upper()} using {tool_name}")
+        if normalise_detection_system(
+                getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        ) == DETECTION_SYSTEM_LEGACY_RELAXED:
+            self.logger.info(
+                f"Detected genes in {database.upper()} using {tool_name}: "
+                f"{len(detected_genes)}"
+            )
+        else:
+            evidence_count = sum(
+                1 for call in self.evidence_calls.get(database, {}).values()
+                if tool_name in call and call[tool_name].evidence_present
+            )
+            exact_count = sum(
+                1 for calls in self.evidence_calls.get(database, {}).values()
+                if tool_name in calls and calls[tool_name].exact_allele_detected
+            )
+            self.logger.info(
+                f"Evidence genes in {database.upper()} using {tool_name}: "
+                f"{evidence_count}; exact allele genes: {exact_count}"
+            )
 
         # Output FASTA files of reads mapping to genes
-        if self.report_fasta:
+        if self.report_fasta and read_store is None:
             self._write_fasta_outputs(database, tool_name, detected_genes, gene_reads, all_reads)
 
 
@@ -2594,6 +3008,7 @@ class Workflow:
         # ── Pass 1: tblout – decide which profiles pass the E-value threshold ──────
         # One representative row per (target, query) pair.
         detected_by_evalue: Set[str] = set()
+        passing_target_profile_pairs: Set[Tuple[str, str]] = set()
         seq_best_evalue: dict = {}   # profile -> best (lowest) E-value seen
         if tbl_file.exists():
             try:
@@ -2604,6 +3019,7 @@ class Workflow:
                         fields = line.strip().split()
                         if len(fields) < 6:
                             continue
+                        target_name = fields[0]
                         gene = fields[2]   # HMM profile name
                         try:
                             evalue = float(fields[4])
@@ -2617,10 +3033,17 @@ class Workflow:
                         try:
                             if _use_profile_cutoffs or _hmmer_ev is None or evalue <= float(_hmmer_ev):
                                 detected_by_evalue.add(gene)
+                                passing_target_profile_pairs.add(
+                                    (target_name, gene)
+                                )
                         except Exception:
                             detected_by_evalue.add(gene)
+                            passing_target_profile_pairs.add(
+                                (target_name, gene)
+                            )
             except Exception as e:
                 self.logger.error(f"Error parsing {tbl_file}: {e}")
+                raise RuntimeError(f"Failed to parse HMMER table {tbl_file}") from e
 
         # Fetch per-domain and gene-level thresholds from the workflow instance.
         # These mirror the same thresholds used by parse_blast_results so that
@@ -2692,7 +3115,10 @@ class Workflow:
                         # how BLAST 'all' includes any sequence that maps at all).
                         gene_reads[gene]['all'].add(target_name)
 
-                        if not domain_passes:
+                        pair_passes = (
+                            target_name, gene
+                        ) in passing_target_profile_pairs
+                        if not domain_passes or not pair_passes:
                             # Domain is too poor quality to contribute to stats
                             continue
 
@@ -2707,11 +3133,13 @@ class Workflow:
 
                         # 'passing' = domain passed quality filters AND the full-sequence
                         # E-value threshold from Pass 1
-                        if gene in detected_by_evalue:
-                            gene_reads[gene]['passing'].add(target_name)
+                        gene_reads[gene]['passing'].add(target_name)
 
             except Exception as e:
                 self.logger.error(f"Error parsing {domtbl_file}: {e}")
+                raise RuntimeError(
+                    f"Failed to parse HMMER domain table {domtbl_file}"
+                ) from e
 
         else:
             # domtblout not available – fall back to tblout-only (no position data)
@@ -2731,88 +3159,41 @@ class Workflow:
                                 score = float(fields[5])
                             except ValueError:
                                 score = 0.0
+                            if (target_name, gene) not in passing_target_profile_pairs:
+                                gene_reads[gene]['all'].add(target_name)
+                                continue
                             if gene not in self.gene_stats[database][tool_name]:
                                 self.gene_stats[database][tool_name][gene] = GeneStats(gene_name=gene)
                             self.gene_stats[database][tool_name][gene].add_hit(1, 1, score)
                             gene_reads[gene]['all'].add(target_name)
-                            if gene in detected_by_evalue:
-                                gene_reads[gene]['passing'].add(target_name)
+                            gene_reads[gene]['passing'].add(target_name)
                 except Exception as e:
                     self.logger.error(f"Error in tblout fallback: {e}")
+                    raise RuntimeError(
+                        f"Failed to parse HMMER table {tbl_file}"
+                    ) from e
 
-        # ── Finalise per-gene statistics ──────────────────────────────────────────
-        for gene in self.gene_stats[database][tool_name]:
-            self.gene_stats[database][tool_name][gene].finalise()
+        # Finalise profile statistics and add unique target-sequence support.
+        for gene, stats in self.gene_stats[database][tool_name].items():
+            stats.mapped_read_support = len(gene_reads[gene]['all'])
+            stats.passing_read_support = len(gene_reads[gene]['passing'])
+            stats.best_read_support = stats.passing_read_support
+            stats.unique_best_read_support = stats.passing_read_support
+            stats.high_confidence_read_support = stats.passing_read_support
+            stats.finalise()
 
-        # ── Gene-level detection gate ─────────────────────────────────────────────
-        # A profile is only reported as detected when ALL of the following hold:
-        #   1. Full-sequence E-value passes (from Pass 1)
-        #   2. Profile coverage (% of HMM model covered) >= detection_min_coverage
-        #
-        # Note: detection_min_identity is intentionally NOT applied here because
-        # stats.avg_identity stores bit-scores (not %identity) for HMMER; applying
-        # a percentage threshold against bit-scores would be meaningless.
-        # Users can control sensitivity via --hmmer-evalue/-e and --d-min-cov instead.
-        #
-        # detection_min_num_reads IS applied here (for reads-mode inputs where
-        # multiple sequences must support a detection for it to count).
-        _d_min_reads = int(getattr(self, 'detection_min_num_reads', 1))
-        _is_reads_mode = not getattr(self, 'is_genes_fasta', False)
-
-        for gene in detected_by_evalue:
-            stats = self.gene_stats[database][tool_name].get(gene)
-            passes_d_cov = True
-            passes_d_reads = True
-
-            if stats is not None and _d_min_cov > 0.0 and stats.gene_length > 0:
-                passes_d_cov = stats.gene_coverage >= _d_min_cov
-
-            # Apply min-reads gate for reads input (not for full-length gene FASTA)
-            if _is_reads_mode and _d_min_reads > 1 and stats is not None:
-                passes_d_reads = stats.num_sequences >= _d_min_reads
-
-            # Determine whether this gene is must-flagged.  This is only possible when
-            # an annotations file with a 'Must flag' column was loaded for this database.
-            is_must_flag = bool(annotations.get(gene, {}).get('must_flag'))
-
-            if passes_d_cov and passes_d_reads:
-                detected_genes.add(gene)
-                self.detections[database][gene][tool_name] = True
-                if annotations and gene in annotations:
-                    desc = annotations[gene].get('description', '')
-                    flag = ' [MUST FLAG]' if is_must_flag else ''
-                    self.logger.debug(
-                        f"  HMMER detected: {gene} – {desc}{flag} "
-                        f"(best E={seq_best_evalue.get(gene, '?'):.2e}, "
-                        f"profile_cov={stats.gene_coverage if stats else 0:.1f}%, "
-                        f"seqs={stats.num_sequences if stats else 0})"
-                    )
-            elif is_must_flag and getattr(self, 'hmmer_must_flag', True):
-                # Must-flag genes override the coverage/min-reads gates: they are always
-                # reported when they pass the E-value filter so that high-priority genes
-                # are never silently dropped due to low coverage or read depth.
-                detected_genes.add(gene)
-                self.detections[database][gene][tool_name] = True
-                reasons = []
-                if not passes_d_cov:
-                    reasons.append(f"profile_cov={stats.gene_coverage if stats else 0:.1f}% < {_d_min_cov:.1f}%")
-                if not passes_d_reads:
-                    reasons.append(f"seqs={stats.num_sequences if stats else 0} < min_reads={_d_min_reads}")
-                desc = annotations[gene].get('description', '')
-                self.logger.warning(
-                    f"  ⚑  MUST-FLAG override: {gene} – {desc} reported despite threshold failure "
-                    f"({'; '.join(reasons) if reasons else 'unknown reason'}) "
-                    f"(best E={seq_best_evalue.get(gene, '?'):.2e})"
-                )
-            else:
-                reasons = []
-                if not passes_d_cov:
-                    reasons.append(f"profile_cov={stats.gene_coverage if stats else 0:.1f}% < {_d_min_cov:.1f}%")
-                if not passes_d_reads:
-                    reasons.append(f"seqs={stats.num_sequences if stats else 0} < min_reads={_d_min_reads}")
-                self.logger.debug(
-                    f"  HMMER filtered: {gene} ({'; '.join(reasons)})"
-                )
+        must_flag_overrides = {
+            gene
+            for gene in detected_by_evalue
+            if getattr(self, 'hmmer_must_flag', True)
+            and annotations.get(gene, {}).get('must_flag')
+        }
+        detected_genes = self._classify_tool_evidence(
+            database,
+            tool_name,
+            must_flag_overrides=must_flag_overrides,
+            eligible_genes=detected_by_evalue,
+        )
 
         # Convert sets → lists for write_tool_stats
         gene_reads_lists = {
@@ -2836,13 +3217,34 @@ class Workflow:
         - Base_Coverage: Average base coverage across the entire gene (%)
         - Base_Coverage_Hit: Average base coverage considering only bases with at least one hit (%)
         - Avg_Identity: Average identity across all qualifying sequences (%)
-        - Detected: 1 if gene passes all thresholds, 0 otherwise
+        - Detected: result selected by Detection_System
         """
         # Normalise gene_reads to a safe empty structure if caller did not provide one
         if gene_reads is None:
             gene_reads = defaultdict(lambda: {'passing': [], 'all': []})
 
+        def _read_count(read_info: dict, key: str) -> int:
+            """Return a read/hit count from either list-backed or count-only data."""
+            if not isinstance(read_info, dict):
+                return 0
+            count_key = f"{key}_count"
+            if count_key in read_info:
+                try:
+                    return int(read_info.get(count_key, 0))
+                except Exception:
+                    return 0
+            value = read_info.get(key, [])
+            if isinstance(value, int):
+                return value
+            try:
+                return len(value)
+            except Exception:
+                return 0
+
         stats_file = self.stats_dir / f"{database}_{tool_name}_stats.tsv"
+        detection_system = normalise_detection_system(
+            getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        )
 
         gene_stats = self.gene_stats[database][tool_name]
         if not gene_stats:
@@ -2852,10 +3254,26 @@ class Workflow:
         with open(stats_file, 'w', newline='') as f:
             writer = csv.writer(f, delimiter='\t')
 
-            # Header
-            header = ['Gene', 'Gene_Length', 'Num_Sequences_Mapped',
-                      'Num_Sequences_Passing_Thresholds', 'Gene_Coverage',
-                      'Base_Coverage', 'Base_Coverage_Hit', 'Avg_Identity', 'Detected']
+            metric_header = [
+                'Gene', 'Gene_Length', 'Num_Sequences_Mapped',
+                'Num_Sequences_Passing_Thresholds', 'Gene_Coverage',
+                'Coverage_2x', 'Coverage_3x', 'Coverage_5x', 'Coverage_10x',
+                'Base_Coverage', 'Base_Coverage_Hit', 'Median_Depth',
+                'Depth_CV', 'Num_Internal_Gaps', 'Longest_Internal_Gap',
+                'Longest_Covered_Run', 'Avg_Identity',
+            ]
+            if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                header = metric_header + ['Detected']
+            else:
+                header = metric_header + [
+                'Mapped_Read_Support', 'Passing_Read_Support',
+                'Best_Read_Support', 'Unique_Best_Read_Support',
+                'Ambiguous_Best_Read_Support', 'Evidence_Status',
+                'Evidence_Warnings', 'Family', 'Top_Database_Candidate',
+                'Competing_Alleles', 'Evidence_Present',
+                'Candidate_Allele_Detected', 'Exact_Allele_Detected',
+                'Profile_Detected', 'Detection_System', 'Detected',
+                ]
             writer.writerow(header)
 
             # Sort genes alphabetically
@@ -2867,15 +3285,52 @@ class Workflow:
                     detected = self.detections[database][gene][tool_name]
                 except (KeyError, TypeError):
                     detected = False
-                row = [
+                metric_row = [
                     gene,
                     stats.gene_length,
-                    len(gene_reads.get(gene, {}).get('all', [])), # 'all' reads mapping to gene
-                    len(gene_reads.get(gene, {}).get('passing', [])), # Just those that 'passed' thresholds
+                    _read_count(gene_reads.get(gene, {}), 'all'), # 'all' reads mapping to gene
+                    _read_count(gene_reads.get(gene, {}), 'passing'), # Just those that 'passed' thresholds
                     f"{stats.gene_coverage:.2f}",
+                    f"{stats.coverage_2x:.2f}",
+                    f"{stats.coverage_3x:.2f}",
+                    f"{stats.coverage_5x:.2f}",
+                    f"{stats.coverage_10x:.2f}",
                     f"{stats.base_depth:.2f}",
                     f"{stats.base_depth_hit:.2f}",
+                    f"{stats.median_depth:.2f}",
+                    f"{stats.depth_cv:.4f}",
+                    stats.num_internal_gaps,
+                    stats.longest_internal_gap,
+                    stats.longest_covered_run,
                     f"{stats.avg_identity:.2f}",
+                ]
+                if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                    row = metric_row + ['1' if detected else '0']
+                    writer.writerow(row)
+                    continue
+
+                call = (
+                    self.evidence_calls
+                    .get(database, {})
+                    .get(gene, {})
+                    .get(tool_name)
+                )
+                row = metric_row + [
+                    stats.mapped_read_support,
+                    stats.passing_read_support,
+                    stats.best_read_support,
+                    stats.unique_best_read_support,
+                    stats.ambiguous_best_read_support,
+                    call.status if call else NOT_DETECTED,
+                    call.warning_text() if call else '',
+                    call.family if call else '',
+                    call.best_allele if call else gene,
+                    ';'.join(call.competing_alleles) if call else '',
+                    '1' if call and call.evidence_present else '0',
+                    '1' if call and call.candidate_allele_detected else '0',
+                    '1' if call and call.exact_allele_detected else '0',
+                    '1' if call and call.profile_detected else '0',
+                    detection_system,
                     '1' if detected else '0'
                 ]
                 writer.writerow(row)
@@ -2937,6 +3392,177 @@ class Workflow:
 
         self.logger.info(f"  Total genes detected: {len(genes)}")
         self.logger.info(f"  Tools used: {len(all_tools)}")
+        detection_system = normalise_detection_system(
+            getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        )
+        if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+            self._remove_qualified_reports(database)
+        else:
+            self.generate_evidence_matrix(database)
+
+    def _remove_qualified_reports(self, database: str):
+        """Remove stale qualified-only outputs from a legacy result directory."""
+        for suffix in (
+                'evidence_matrix.tsv',
+                'evidence_summary.tsv',
+                'allele_resolution.tsv'):
+            path = self.output_dir / f"{database}_{suffix}"
+            try:
+                path.unlink()
+                self.logger.info(f"Removed stale qualified report: {path}")
+            except FileNotFoundError:
+                pass
+
+    def generate_evidence_matrix(self, database: str):
+        """Write qualified per-tool calls and family-level allele resolution."""
+        detection_system = normalise_detection_system(
+            getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        )
+        if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+            self._remove_qualified_reports(database)
+            return
+        database_calls = self.evidence_calls.get(database, {})
+        all_tools = sorted({
+            tool
+            for gene_calls in database_calls.values()
+            for tool in gene_calls
+        })
+        if not all_tools:
+            return
+
+        evidence_file = self.output_dir / f"{database}_evidence_matrix.tsv"
+        genes = sorted(database_calls)
+        with open(evidence_file, 'w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t')
+            writer.writerow([
+                'Gene',
+                'Detection_System',
+                *all_tools,
+                'Best_Evidence_Status',
+                'Evidence_Detections',
+                'Candidate_Allele_Detections',
+                'Exact_Allele_Detections',
+                'Profile_Detections',
+                'Strict_Detections',
+                'Evidence_Warnings',
+            ])
+            for gene in genes:
+                calls = database_calls[gene]
+                statuses = [
+                    calls[tool].status if tool in calls else NOT_DETECTED
+                    for tool in all_tools
+                ]
+                exact_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].exact_allele_detected
+                )
+                candidate_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].candidate_allele_detected
+                )
+                profile_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].profile_detected
+                )
+                strict_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].exact_detected
+                )
+                evidence_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].evidence_present
+                )
+                warnings = sorted({
+                    warning
+                    for call in calls.values()
+                    for warning in call.warnings
+                })
+                writer.writerow([
+                    gene,
+                    detection_system,
+                    *statuses,
+                    best_status(statuses),
+                    evidence_count,
+                    candidate_count,
+                    exact_count,
+                    profile_count,
+                    strict_count,
+                    ';'.join(warnings),
+                ])
+        self.logger.info(f"Generated detection evidence matrix: {evidence_file}")
+
+        summary_file = self.output_dir / f"{database}_evidence_summary.tsv"
+        with open(summary_file, 'w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t')
+            writer.writerow([
+                'Tool', 'Detection_System', 'Evidence_Genes',
+                'Candidate_Allele_Genes', 'Exact_Allele_Genes',
+                'Profile_Genes', 'Exact_Or_Profile_Genes',
+            ])
+
+            def _summary_counts(tool=None):
+                selected = [
+                    call
+                    for gene_calls in database_calls.values()
+                    for call_tool, call in gene_calls.items()
+                    if tool is None or call_tool == tool
+                ]
+                evidence_genes = {
+                    call.gene for call in selected if call.evidence_present
+                }
+                exact_genes = {
+                    call.gene for call in selected
+                    if call.exact_allele_detected
+                }
+                candidate_genes = {
+                    call.gene for call in selected
+                    if call.candidate_allele_detected
+                }
+                profile_genes = {
+                    call.gene for call in selected if call.profile_detected
+                }
+                strict_genes = {
+                    call.gene for call in selected if call.exact_detected
+                }
+                return (
+                    len(evidence_genes),
+                    len(candidate_genes),
+                    len(exact_genes),
+                    len(profile_genes),
+                    len(strict_genes),
+                )
+
+            for tool in all_tools:
+                writer.writerow([
+                    tool, detection_system, *_summary_counts(tool)
+                ])
+            writer.writerow([
+                'ALL_TOOLS', detection_system, *_summary_counts()
+            ])
+        self.logger.info(f"Generated evidence count summary: {summary_file}")
+
+        family_file = self.output_dir / f"{database}_allele_resolution.tsv"
+        with open(family_file, 'w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t')
+            writer.writerow([
+                'Family', 'Tool', 'Status', 'Top_Database_Candidate',
+                'Candidate_Allele_Resolved', 'Exact_Allele_Resolved',
+                'Competing_Alleles', 'Warnings',
+            ])
+            for tool in sorted(self.family_calls.get(database, {})):
+                for family, summary in sorted(
+                        self.family_calls[database][tool].items()):
+                    writer.writerow([
+                        family,
+                        tool,
+                        summary['status'],
+                        summary['best_allele'],
+                        '1' if summary['candidate_allele_resolved'] else '0',
+                        '1' if summary['exact_allele_resolved'] else '0',
+                        ';'.join(summary['competing_alleles']),
+                        ';'.join(summary['warnings']),
+                    ])
+        self.logger.info(f"Generated allele-resolution report: {family_file}")
 
 
     def run_workflow(self,options):
@@ -3055,6 +3681,9 @@ class Workflow:
         self.logger.info("\n" + "=" * 70)
         self.logger.info("PIPELINE SUMMARY")
         self.logger.info("=" * 70)
+        detection_system = normalise_detection_system(
+            getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
+        )
 
         for db_name in self.databases.keys():
             if results[db_name]:
@@ -3070,7 +3699,50 @@ class Workflow:
                         success, genes = bool(val), set()
 
                     status = "✓" if success else "✗"
-                    gene_count = len(genes) if isinstance(genes, (set, list, tuple, dict)) else 0
+                    evidence_tool = {
+                        'BLASTn-DNA': 'BLASTn',
+                        'BLASTx-AA': 'BLASTx',
+                        'BLASTp-AA': 'BLASTp',
+                        'Bowtie2-DNA': 'Bowtie2',
+                        'BWA-DNA': 'BWA',
+                        'Minimap2-DNA': 'Minimap2',
+                    }.get(tool, tool)
+                    if tool == 'DIAMOND-AA':
+                        evidence_tool = (
+                            'DIAMOND-BLASTP'
+                            if (getattr(self, 'is_genes_fasta', False)
+                                and getattr(
+                                    self, 'detected_genes_type', None
+                                ) == 'protein')
+                            else 'DIAMOND-BLASTX'
+                        )
+                    if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                        detected_count = len(genes) if isinstance(
+                            genes, (set, list, tuple, dict)
+                        ) else 0
+                        self.logger.info(
+                            f"  {status} {evidence_tool:.<30} "
+                            f"{detected_count} detected"
+                        )
+                        continue
+                    tool_calls = [
+                        gene_calls[evidence_tool]
+                        for gene_calls in self.evidence_calls
+                        .get(db_name, {}).values()
+                        if evidence_tool in gene_calls
+                    ]
+                    evidence_count = sum(
+                        call.evidence_present for call in tool_calls
+                    )
+                    exact_count = sum(
+                        call.exact_allele_detected for call in tool_calls
+                    )
+                    candidate_count = sum(
+                        call.candidate_allele_detected for call in tool_calls
+                    )
+                    profile_count = sum(
+                        call.profile_detected for call in tool_calls
+                    )
                     # Append MUST-FLAG count for HMMER tools when annotations are present
                     must_flag_suffix = ""
                     if 'HMMER' in tool and isinstance(genes, set):
@@ -3083,7 +3755,62 @@ class Workflow:
                                     must_flag_suffix = f"  ⚑  {_mf} must-flag"
                         except Exception:
                             pass
-                    self.logger.info(f"  {status} {tool:.<30} {gene_count} genes detected{must_flag_suffix}")
+                    self.logger.info(
+                        f"  {status} {evidence_tool:.<30} "
+                        f"{evidence_count} evidence; "
+                        f"{candidate_count} candidate alleles; "
+                        f"{exact_count} exact alleles; "
+                        f"{profile_count} profiles"
+                        f"{must_flag_suffix}"
+                    )
+                if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                    detected_genes = {
+                        gene
+                        for gene, tool_calls in self.detections
+                        .get(db_name, {}).items()
+                        if any(tool_calls.values())
+                    }
+                    self.logger.info(
+                        f"  DETECTED: {len(detected_genes)} genes"
+                    )
+                    continue
+
+                evidence_calls = [
+                    call
+                    for gene_calls in self.evidence_calls.get(db_name, {}).values()
+                    for call in gene_calls.values()
+                    if call.evidence_present
+                ]
+                evidence_genes = {
+                    call.gene for call in evidence_calls
+                }
+                exact_allele_calls = sum(
+                    call.exact_allele_detected for call in evidence_calls
+                )
+                exact_allele_genes = {
+                    call.gene for call in evidence_calls
+                    if call.exact_allele_detected
+                }
+                candidate_allele_calls = sum(
+                    call.candidate_allele_detected for call in evidence_calls
+                )
+                candidate_allele_genes = {
+                    call.gene for call in evidence_calls
+                    if call.candidate_allele_detected
+                }
+                profile_calls = sum(
+                    call.profile_detected for call in evidence_calls
+                )
+                if evidence_calls:
+                    self.logger.info(
+                        f"  Evidence: {len(evidence_genes)} genes "
+                        f"({len(evidence_calls)} gene/tool calls); "
+                        f"candidate alleles: {len(candidate_allele_genes)} genes "
+                        f"({candidate_allele_calls} calls); "
+                        f"exact alleles: {len(exact_allele_genes)} genes "
+                        f"({exact_allele_calls} calls); "
+                        f"profiles: {profile_calls} calls"
+                    )
         # for db_name in self.databases.keys():
         #     if results[db_name]:
         #         self.logger.info(f"\n{db_name.upper()}:")
@@ -3101,4 +3828,3 @@ class Workflow:
         self.logger.info("=" * 70)
 
         return results
-

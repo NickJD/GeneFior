@@ -28,6 +28,7 @@ GeneStats class tests verify that the coverage union, depth, and identity
 aggregation work correctly across single and multiple hits.
 """
 
+import json
 import re
 import tempfile
 import textwrap
@@ -38,6 +39,8 @@ from unittest.mock import patch
 import pytest
 
 from GeneFior.gene_stats import GeneStats
+from GeneFior.evidence import EvidenceConfig, MUST_FLAG_REVIEW
+from GeneFior.GeneFior_Gene_Stats import GeneCoverage, GeneVisualiser
 from GeneFior.workflow import Workflow
 
 
@@ -67,14 +70,38 @@ def _make_workflow(
     wf.detection_min_base_depth = detection_min_base_depth
     wf.detection_min_num_reads = detection_min_num_reads
     wf.min_bitscore = None
+    wf.evalue = None
+    wf.evidence_config = EvidenceConfig(
+        corroborating_depth=1,
+        exact_identity_min=detection_min_identity,
+        min_unique_best_reads=1,
+        min_unique_best_fraction=0.0,
+    )
     wf.gene_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(GeneStats)))
     wf.detections = defaultdict(lambda: defaultdict(lambda: defaultdict(bool)))
+    wf.evidence_calls = defaultdict(lambda: defaultdict(dict))
+    wf.family_calls = defaultdict(lambda: defaultdict(dict))
+    wf.is_genes_fasta = False
     wf.report_fasta = None
     wf.all_reads = {}
     wf.input_fasta = None
     wf.logger = logging.getLogger("test_workflow")
     wf.logger.addHandler(logging.NullHandler())
     return wf
+
+
+def _make_visualiser(tmp_path: Path) -> GeneVisualiser:
+    """Build a Gene-Stats visualiser for direct parser tests."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+    return GeneVisualiser(
+        input_dir=str(input_dir),
+        output_dir=str(output_dir),
+        genes=["geneA"],
+        databases=["db"],
+        tools=["diamond"],
+    )
 
 
 def _blast_line(
@@ -493,6 +520,356 @@ class TestGeneStats:
         gs.finalise()
         assert gs.gene_coverage <= 100.0
 
+    def test_compact_interval_mode_matches_per_position_mode(self):
+        regular = GeneStats(gene_name="geneA")
+        compact = GeneStats(gene_name="geneA", compact=True)
+        hits = [
+            (1, 50, 90.0),
+            (25, 75, 95.0),
+            (80, 100, 100.0),
+        ]
+        for start, end, identity in hits:
+            regular.add_hit(start, end, identity, gene_len=100)
+            compact.add_hit(start, end, identity, gene_len=100)
+        regular.finalise()
+        compact.finalise()
+
+        assert compact.covered_positions == set()
+        assert compact.position_depths == {}
+        assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
+        assert abs(compact.base_depth - regular.base_depth) < 1e-9
+        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+        assert abs(compact.avg_identity - regular.avg_identity) < 1e-9
+
+    def test_compact_bam_intervals_match_positions(self):
+        regular = GeneStats(gene_name="geneA")
+        compact = GeneStats(gene_name="geneA", compact=True)
+        positions = set(range(0, 20)) | set(range(30, 50))
+        regular.add_positions(positions, identity=97.0, gene_len=100)
+        compact.add_intervals([(0, 20), (30, 50)], identity=97.0, gene_len=100)
+        regular.finalise()
+        compact.finalise()
+
+        assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
+        assert abs(compact.base_depth - regular.base_depth) < 1e-9
+        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+
+    def test_compact_intervals_merge_overlaps_within_read(self):
+        regular = GeneStats(gene_name="geneA")
+        compact = GeneStats(gene_name="geneA", compact=True)
+        positions = set(range(0, 30))
+        regular.add_positions(positions, identity=97.0, gene_len=100)
+        compact.add_intervals([(0, 20), (10, 30)], identity=97.0, gene_len=100)
+        regular.finalise()
+        compact.finalise()
+
+        assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
+        assert abs(compact.base_depth - regular.base_depth) < 1e-9
+        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+
+
+# ===========================================================================
+# 5b. Gene-Stats translated-coordinate coverage regressions
+# ===========================================================================
+
+class TestGeneStatsVisualiserBlastCoverage:
+    """Regression tests for GeneFior-Gene-Stats BLAST/DIAMOND coverage reports."""
+
+    def _write_raw_blast_dir(self, tmp_path):
+        source = tmp_path / "source_run"
+        raw_outputs = source / "raw_outputs"
+        raw_outputs.mkdir(parents=True)
+        blast_file = raw_outputs / "db_blastn_results.tsv"
+        blast_file.write_text(_blast_line(qseqid="read1", sseqid="geneA"))
+        return source, raw_outputs, blast_file
+
+    def test_gene_stats_can_use_explicit_raw_dir_for_recompute_outputs(
+            self, tmp_path):
+        input_dir = tmp_path / "qualified"
+        input_dir.mkdir()
+        source, raw_outputs, blast_file = self._write_raw_blast_dir(tmp_path)
+        visualiser = GeneVisualiser(
+            input_dir=str(input_dir),
+            output_dir=str(tmp_path / "out"),
+            genes=[],
+            databases=["db"],
+            tools=["blastn"],
+            raw_dir=str(source),
+        )
+
+        assert visualiser.discover_files()
+        assert visualiser.raw_dir_used == raw_outputs
+        assert visualiser.found_files == [
+            ("db", "blastn", "blast", blast_file)
+        ]
+
+    def test_gene_stats_uses_source_raw_outputs_from_manifest(
+            self, tmp_path):
+        input_dir = tmp_path / "qualified"
+        input_dir.mkdir()
+        _, raw_outputs, blast_file = self._write_raw_blast_dir(tmp_path)
+        (input_dir / "run_parameters.json").write_text(json.dumps({
+            "source_raw_outputs": str(raw_outputs),
+        }))
+        visualiser = GeneVisualiser(
+            input_dir=str(input_dir),
+            output_dir=str(tmp_path / "out"),
+            genes=[],
+            databases=["db"],
+            tools=["blastn"],
+        )
+
+        assert visualiser.discover_files()
+        assert visualiser.raw_dir_used == raw_outputs
+        assert visualiser.found_files == [
+            ("db", "blastn", "blast", blast_file)
+        ]
+
+    def _write_evidence_matrix(self, visualiser):
+        matrix = Path(visualiser.input_dir) / "db_evidence_matrix.tsv"
+        matrix.write_text(
+            "Gene\tDetection_System\tblastn\tBWA\tBest_Evidence_Status\t"
+            "Evidence_Detections\tCandidate_Allele_Detections\t"
+            "Exact_Allele_Detections\tProfile_Detections\t"
+            "Strict_Detections\tEvidence_Warnings\n"
+            "candidate_gene\tqualified\tCANDIDATE_ALLELE_DETECTED\t"
+            "NOT_DETECTED\tCANDIDATE_ALLELE_DETECTED\t1\t1\t0\t0\t0\t\n"
+            "exact_gene\tqualified\tEXACT_ALLELE_DETECTED\t"
+            "NOT_DETECTED\tEXACT_ALLELE_DETECTED\t1\t0\t1\t0\t1\t\n"
+            "family_gene\tqualified\tFAMILY_DETECTED\t"
+            "NOT_DETECTED\tFAMILY_DETECTED\t1\t0\t0\t0\t0\t\n"
+        )
+        return matrix
+
+    def test_gene_stats_can_select_candidate_or_exact_genes(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.genes = set()
+        visualiser.gene_selection = "candidate-or-exact"
+        self._write_evidence_matrix(visualiser)
+
+        selected = visualiser.load_detected_genes("db")
+
+        assert selected == {"candidate_gene", "exact_gene"}
+
+    def test_gene_stats_exact_selection_filters_raw_parsing(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.genes = set()
+        visualiser.gene_selection = "exact"
+        self._write_evidence_matrix(visualiser)
+        visualiser.selected_genes_by_db["db"] = visualiser.load_detected_genes("db")
+        blast_file = tmp_path / "blastn.tsv"
+        blast_file.write_text(
+            _blast_line(qseqid="read1", sseqid="candidate_gene")
+            + _blast_line(qseqid="read2", sseqid="exact_gene")
+            + _blast_line(qseqid="read3", sseqid="family_gene")
+        )
+
+        visualiser.parse_blast_results(blast_file, "db", "blastn")
+
+        assert set(visualiser.gene_coverages["db"]["blastn"]) == {"exact_gene"}
+
+    def test_diamond_subject_amino_acid_coords_expand_to_full_codons(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        blast_file = tmp_path / "diamond.tsv"
+        blast_file.write_text(
+            _blast_line(
+                qseqid="read1",
+                sseqid="geneA",
+                pident=100.0,
+                length=2,
+                qstart=1,
+                qend=6,
+                sstart=1,
+                send=2,
+                qlen=6,
+                slen=2,
+            )
+        )
+
+        visualiser.parse_blast_results(blast_file, "db", "diamond")
+        coverage = visualiser.gene_coverages["db"]["diamond"]["geneA"]
+
+        assert coverage.gene_length == 6
+        assert [coverage.positions[i].depth for i in range(6)] == [1, 1, 1, 1, 1, 1]
+        assert coverage.get_coverage_stats()["gaps"] == []
+
+    def test_loaded_query_sequence_does_not_double_count_blast_depth(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.query_sequences["read1"] = "AAAAAA"
+        blast_file = tmp_path / "diamond.tsv"
+        blast_file.write_text(
+            _blast_line(
+                qseqid="read1",
+                sseqid="geneA",
+                pident=100.0,
+                length=2,
+                qstart=1,
+                qend=6,
+                sstart=1,
+                send=2,
+                qlen=6,
+                slen=2,
+            )
+        )
+
+        visualiser.parse_blast_results(blast_file, "db", "diamond")
+        coverage = visualiser.gene_coverages["db"]["diamond"]["geneA"]
+
+        assert [coverage.positions[i].depth for i in range(6)] == [1, 1, 1, 1, 1, 1]
+        assert coverage.get_coverage_stats()["positions_with_bases"] == 6
+
+    def test_diamond_blastp_keeps_amino_acid_coordinates(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.sequence_type = "Genes-FASTA"
+        visualiser.genes_type = "aa"
+        blast_file = tmp_path / "diamond.tsv"
+        blast_file.write_text(_blast_line(
+            qseqid="protein1",
+            sseqid="geneA",
+            pident=100.0,
+            length=100,
+            qstart=1,
+            qend=100,
+            sstart=1,
+            send=100,
+            qlen=100,
+            slen=100,
+        ))
+
+        visualiser.parse_blast_results(blast_file, "db", "diamond")
+        coverage = visualiser.gene_coverages["db"]["diamond"]["geneA"]
+
+        assert coverage.gene_length == 100
+        assert coverage.unit == "aa"
+        assert coverage.get_coverage_stats()["coverage_percent"] == 100.0
+
+    def test_overlapping_hsps_from_one_read_do_not_inflate_depth(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        blast_file = tmp_path / "blastn.tsv"
+        blast_file.write_text(
+            _blast_line(
+                qseqid="read1", sseqid="geneA", qstart=1, qend=60,
+                sstart=1, send=60, qlen=100, slen=100,
+            )
+            + _blast_line(
+                qseqid="read1", sseqid="geneA", qstart=41, qend=100,
+                sstart=41, send=100, qlen=100, slen=100,
+            )
+        )
+
+        visualiser.parse_blast_results(blast_file, "db", "blastn")
+        coverage = visualiser.gene_coverages["db"]["blastn"]["geneA"]
+
+        assert coverage.read_count == 1
+        assert coverage.get_coverage_stats()["coverage_percent"] == 100.0
+        assert coverage.get_coverage_stats()["coverage_2x"] == 0.0
+
+    def test_bam_secondary_alignments_are_excluded(
+            self, tmp_path, monkeypatch):
+        visualiser = _make_visualiser(tmp_path)
+        bam_file = tmp_path / "alignments.bam"
+        bam_file.touch()
+        sam = (
+            "@SQ\tSN:geneA\tLN:10\n"
+            "read1\t0\tgeneA\t1\t60\t10M\t*\t0\t0\tAAAAAAAAAA\tIIIIIIIIII\tNM:i:0\n"
+            "read1\t256\tgeneA\t1\t60\t10M\t*\t0\t0\tAAAAAAAAAA\tIIIIIIIIII\tNM:i:0\n"
+        )
+
+        class FakePopen:
+            def __init__(self, *args, **kwargs):
+                self.stdout = _io.StringIO(sam)
+                self.stderr = _io.StringIO("")
+                self.returncode = 0
+
+            def wait(self):
+                return self.returncode
+
+        monkeypatch.setattr(
+            "GeneFior.GeneFior_Gene_Stats.subprocess.Popen",
+            FakePopen,
+        )
+
+        visualiser.parse_bam_file(bam_file, "db", "bowtie2")
+        coverage = visualiser.gene_coverages["db"]["bowtie2"]["geneA"]
+
+        assert coverage.read_count == 1
+        assert coverage.get_coverage_stats()["avg_depth"] == 1.0
+
+    def test_legacy_report_uses_only_binary_detected_field(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.detection_system = "legacy-relaxed"
+        visualiser.detected_by_tool["db"]["geneA"]["blastn"] = True
+        coverage = GeneCoverage("geneA", 10)
+        coverage.add_alignment(0, 10)
+
+        visualiser.generate_text_report(
+            "geneA", "db", "blastn", coverage
+        )
+
+        report = (
+            visualiser.report_dir
+            / "db_blastn_geneA_coverage.txt"
+        ).read_text()
+        assert "Detected:              1" in report
+        assert "Evidence status:" not in report
+        assert "Evidence warnings:" not in report
+
+    def test_text_report_makes_gene_span_explicit(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.detection_system = "legacy-relaxed"
+        coverage = GeneCoverage("geneA", 876)
+        coverage.add_alignment(0, 876)
+
+        visualiser.generate_text_report(
+            "geneA", "db", "blastn", coverage
+        )
+
+        report = (
+            visualiser.report_dir
+            / "db_blastn_geneA_coverage.txt"
+        ).read_text()
+        assert "Gene length:           876 bp" in report
+        assert "Gene span: 1..876 bp" in report
+        assert "Position scale (bp): start=1 | mid=438 | end=876" in report
+        assert "ASCII histogram: actual mean depth per plotted bin" in report
+
+    def test_ascii_report_uses_actual_depth_labels_above_50x(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.detection_system = "legacy-relaxed"
+        coverage = GeneCoverage("geneA", 10)
+        for _ in range(150):
+            coverage.add_alignment(0, 10)
+
+        visualiser.generate_text_report(
+            "geneA", "db", "blastn", coverage
+        )
+
+        report = (
+            visualiser.report_dir
+            / "db_blastn_geneA_coverage.txt"
+        ).read_text()
+        assert "Max depth: 150×" in report
+        assert "150× |" in report
+        assert visualiser._ascii_depth_levels(150)[0] == 150
+
+    def test_plot_axis_makes_gene_length_and_end_tick_explicit(self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        if not visualiser.plot_enabled:
+            pytest.skip("matplotlib not available")
+
+        fig, ax = visualiser.plt.subplots()
+        try:
+            visualiser._label_gene_axis(ax, 876, "bp", xlabel=True)
+
+            assert ax.get_xlim() == (0.5, 876.5)
+            assert 1 in ax.get_xticks()
+            assert 876 in ax.get_xticks()
+            assert ax.get_xlabel() == (
+                "Gene position (bp; full length = 876 bp)"
+            )
+        finally:
+            visualiser.plt.close(fig)
+
 
 # ===========================================================================
 # 6.  Integration — parse_blast_results with mock BLAST output file
@@ -503,6 +880,7 @@ class TestParseBlastResultsIntegration:
 
     def _run(self, lines: list, **wf_kwargs) -> tuple:
         """Write lines to a temp file and parse them; return (detected, gene_reads)."""
+        tool_name = wf_kwargs.pop("tool_name", "blastn")
         wf = _make_workflow(**wf_kwargs)
         wf.gene_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(GeneStats)))
         wf.detections = defaultdict(lambda: defaultdict(lambda: defaultdict(bool)))
@@ -512,7 +890,9 @@ class TestParseBlastResultsIntegration:
             fh.writelines(lines)
             tmp_path = Path(fh.name)
         try:
-            detected, gene_reads = wf.parse_blast_results(tmp_path, "db", "blastn")
+            detected, gene_reads = wf.parse_blast_results(
+                tmp_path, "db", tool_name
+            )
         finally:
             tmp_path.unlink(missing_ok=True)
         return detected, gene_reads, wf
@@ -556,10 +936,242 @@ class TestParseBlastResultsIntegration:
         """Single read covering only 40 % of the gene should not pass an 80 % detection threshold."""
         line = _blast_line(pident=100.0, qstart=1, qend=100, qlen=100,
                            sstart=1, send=40, slen=100)
-        detected, _, _ = self._run([line],
-                                   query_min_coverage=40.0, query_min_identity=80.0,
-                                   detection_min_coverage=80.0)
+        detected, _, wf = self._run(
+            [line],
+            query_min_coverage=40.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+        )
         assert "geneA" not in detected
+        call = wf.evidence_calls["db"]["geneA"]["blastn"]
+        assert not call.evidence_present
+        assert not wf.detections["db"]["geneA"]["blastn"]
+
+    def test_protein_evidence_is_detected_without_claiming_exact_allele(self):
+        """Protein evidence keeps ordinary detection semantics but is not exact."""
+        line = _blast_line(
+            pident=95.0,
+            qstart=1,
+            qend=100,
+            qlen=100,
+            sstart=1,
+            send=100,
+            slen=100,
+        )
+        detected, _, wf = self._run(
+            [line],
+            tool_name="DIAMOND-BLASTX",
+            query_min_coverage=40.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+            detection_min_identity=80.0,
+        )
+
+        call = wf.evidence_calls["db"]["geneA"]["DIAMOND-BLASTX"]
+        assert "geneA" in detected
+        assert call.evidence_present
+        assert not call.exact_allele_detected
+        assert wf.detections["db"]["geneA"]["DIAMOND-BLASTX"]
+
+    def test_workflow_legacy_relaxed_mode_disables_allele_resolution(self):
+        line = _blast_line(
+            pident=99.0,
+            qstart=1,
+            qend=100,
+            qlen=100,
+            sstart=1,
+            send=100,
+            slen=100,
+        )
+        wf = _make_workflow(
+            query_min_coverage=40.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+            detection_min_identity=80.0,
+        )
+        wf.detection_system = "legacy-relaxed"
+        with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".tsv", delete=False) as handle:
+            handle.write(line)
+            path = Path(handle.name)
+        try:
+            detected, _ = wf.parse_blast_results(path, "db", "BLASTn")
+        finally:
+            path.unlink(missing_ok=True)
+
+        call = wf.evidence_calls["db"]["geneA"]["BLASTn"]
+        assert "geneA" in detected
+        assert call.status == "DETECTED"
+        assert call.evidence_present
+        assert not call.exact_allele_detected
+        assert wf.family_calls["db"]["BLASTn"] == {}
+
+    def test_legacy_tool_stats_report_only_binary_detection_fields(
+            self, tmp_path):
+        wf = _make_workflow()
+        wf.detection_system = "legacy-relaxed"
+        wf.stats_dir = tmp_path / "tool_stats"
+        wf.stats_dir.mkdir()
+        hit_file = tmp_path / "legacy.tsv"
+        hit_file.write_text(_blast_line(pident=100.0))
+
+        _, gene_reads = wf.parse_blast_results(
+            hit_file, "db", "BLASTn"
+        )
+        wf.write_tool_stats("db", "BLASTn", gene_reads)
+
+        with open(
+                wf.stats_dir / "db_BLASTn_stats.tsv",
+                newline="",
+        ) as handle:
+            reader = _csv.DictReader(handle, delimiter="\t")
+            rows = list(reader)
+
+        assert reader.fieldnames[-1] == "Detected"
+        assert "Evidence_Status" not in reader.fieldnames
+        assert "Evidence_Present" not in reader.fieldnames
+        assert "Exact_Allele_Detected" not in reader.fieldnames
+        assert "Detection_System" not in reader.fieldnames
+        assert rows[0]["Detected"] == "1"
+
+    def test_legacy_mode_does_not_emit_qualified_report_files(
+            self, tmp_path):
+        wf = _make_workflow()
+        wf.detection_system = "legacy-relaxed"
+        wf.output_dir = tmp_path
+        for suffix in (
+                "evidence_matrix.tsv",
+                "evidence_summary.tsv",
+                "allele_resolution.tsv"):
+            (tmp_path / f"db_{suffix}").write_text("stale\n")
+        hit_file = tmp_path / "legacy.tsv"
+        hit_file.write_text(_blast_line(pident=100.0))
+
+        wf.parse_blast_results(hit_file, "db", "BLASTn")
+        wf.generate_detection_matrix("db")
+
+        assert (tmp_path / "db_detection_matrix.tsv").is_file()
+        assert not (tmp_path / "db_evidence_matrix.tsv").exists()
+        assert not (tmp_path / "db_evidence_summary.tsv").exists()
+        assert not (tmp_path / "db_allele_resolution.tsv").exists()
+
+    def test_final_summary_separates_evidence_from_exact_alleles(
+            self, tmp_path):
+        wf = _make_workflow(
+            query_min_coverage=40.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+            detection_min_identity=80.0,
+        )
+        wf.output_dir = tmp_path
+        protein_file = tmp_path / "protein.tsv"
+        nucleotide_file = tmp_path / "nucleotide.tsv"
+        protein_file.write_text(_blast_line(
+            qseqid="protein_read",
+            sseqid="protein_gene",
+            pident=95.0,
+        ))
+        nucleotide_file.write_text("".join(
+            _blast_line(
+                qseqid=f"nucleotide_read_{index}",
+                sseqid="nucleotide_gene",
+                pident=100.0,
+            )
+            for index in range(3)
+        ))
+
+        wf.parse_blast_results(
+            protein_file, "db", "DIAMOND-BLASTX"
+        )
+        wf.parse_blast_results(
+            nucleotide_file, "db", "BLASTn"
+        )
+        wf.generate_detection_matrix("db")
+
+        with open(
+                tmp_path / "db_evidence_summary.tsv",
+                newline="",
+        ) as handle:
+            rows = {
+                row["Tool"]: row
+                for row in _csv.DictReader(handle, delimiter="\t")
+            }
+
+        assert rows["DIAMOND-BLASTX"]["Evidence_Genes"] == "1"
+        assert rows["DIAMOND-BLASTX"]["Candidate_Allele_Genes"] == "0"
+        assert rows["DIAMOND-BLASTX"]["Exact_Allele_Genes"] == "0"
+        assert rows["BLASTn"]["Evidence_Genes"] == "1"
+        assert rows["BLASTn"]["Candidate_Allele_Genes"] == "0"
+        assert rows["BLASTn"]["Exact_Allele_Genes"] == "1"
+        assert rows["ALL_TOOLS"]["Evidence_Genes"] == "2"
+        assert rows["ALL_TOOLS"]["Candidate_Allele_Genes"] == "0"
+        assert rows["ALL_TOOLS"]["Exact_Allele_Genes"] == "1"
+
+    def test_qualified_tool_stats_include_evidence_fields(self, tmp_path):
+        wf = _make_workflow()
+        wf.stats_dir = tmp_path / "tool_stats"
+        wf.stats_dir.mkdir()
+        hit_file = tmp_path / "qualified.tsv"
+        hit_file.write_text(_blast_line(pident=100.0))
+
+        _, gene_reads = wf.parse_blast_results(
+            hit_file, "db", "BLASTn"
+        )
+        wf.write_tool_stats("db", "BLASTn", gene_reads)
+
+        with open(
+                wf.stats_dir / "db_BLASTn_stats.tsv",
+                newline="",
+        ) as handle:
+            reader = _csv.DictReader(handle, delimiter="\t")
+            list(reader)
+
+        assert "Evidence_Status" in reader.fieldnames
+        assert "Evidence_Present" in reader.fieldnames
+        assert "Candidate_Allele_Detected" in reader.fieldnames
+        assert "Exact_Allele_Detected" in reader.fieldnames
+        assert "Detection_System" in reader.fieldnames
+
+    def test_candidate_allele_is_reported_between_evidence_and_exact(
+            self, tmp_path):
+        wf = _make_workflow()
+        wf.output_dir = tmp_path
+        wf.stats_dir = tmp_path / "tool_stats"
+        wf.stats_dir.mkdir()
+        hit_file = tmp_path / "candidate.tsv"
+        hit_file.write_text("".join(
+            _blast_line(qseqid=f"read_{index}", pident=99.0)
+            for index in range(3)
+        ))
+
+        _, gene_reads = wf.parse_blast_results(
+            hit_file, "db", "BLASTn"
+        )
+        wf.write_tool_stats("db", "BLASTn", gene_reads)
+        wf.generate_detection_matrix("db")
+
+        with open(
+                wf.stats_dir / "db_BLASTn_stats.tsv",
+                newline="",
+        ) as handle:
+            stats_rows = list(_csv.DictReader(handle, delimiter="\t"))
+        with open(
+                tmp_path / "db_evidence_summary.tsv",
+                newline="",
+        ) as handle:
+            summary_rows = {
+                row["Tool"]: row
+                for row in _csv.DictReader(handle, delimiter="\t")
+            }
+
+        call = wf.evidence_calls["db"]["geneA"]["BLASTn"]
+        assert call.candidate_allele_detected
+        assert not call.exact_allele_detected
+        assert stats_rows[0]["Candidate_Allele_Detected"] == "1"
+        assert stats_rows[0]["Exact_Allele_Detected"] == "0"
+        assert summary_rows["BLASTn"]["Evidence_Genes"] == "1"
+        assert summary_rows["BLASTn"]["Candidate_Allele_Genes"] == "1"
+        assert summary_rows["BLASTn"]["Exact_Allele_Genes"] == "0"
 
     def test_large_alignment_len_regression_does_not_inflate_query_coverage(self):
         """Regression: alignment_len (field 3) > qlen must NOT produce > 100 % query coverage.
@@ -605,6 +1217,30 @@ class TestParseBlastResultsIntegration:
         detected, _, _ = self._run([bad_line, good_line])
         assert "geneA" in detected
 
+    def test_thirteen_column_line_skipped_without_aborting(self):
+        """A 13-column line lacks slen and must not abort parsing of later hits."""
+        thirteen_cols = "\t".join(str(x) for x in [
+            "read_bad", "geneA", 95.0, 100, 0, 0,
+            1, 100, 1, 100, 1e-20, 100.0, 100,
+        ]) + "\n"
+        good_line = _blast_line(qseqid="read_good", pident=95.0, qstart=1, qend=100, qlen=100,
+                                sstart=1, send=100, slen=100)
+        detected, _, _ = self._run([thirteen_cols, good_line])
+        assert "geneA" in detected
+
+    def test_malformed_numeric_row_does_not_abort_later_hits(self):
+        """A malformed numeric field must not discard the rest of a large file."""
+        malformed = _blast_line(
+            qseqid="read_bad", pident=95.0, qstart=1, qend=100,
+            qlen=100, sstart=1, send=100, slen=100,
+        ).replace("\t95.0\t", "\tnot-a-number\t", 1)
+        good_line = _blast_line(
+            qseqid="read_good", pident=95.0, qstart=1, qend=100,
+            qlen=100, sstart=1, send=100, slen=100,
+        )
+        detected, _, _ = self._run([malformed, good_line])
+        assert "geneA" in detected
+
     def test_min_num_reads_threshold(self):
         """With detection_min_num_reads=3, a single read must not produce a detection."""
         line = _blast_line(pident=100.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100)
@@ -613,6 +1249,169 @@ class TestParseBlastResultsIntegration:
                                    detection_min_coverage=80.0,
                                    detection_min_num_reads=3)
         assert "geneA" not in detected
+
+    def test_count_only_mode_keeps_counts_not_read_lists(self):
+        """Recompute can avoid storing every read name while preserving stats counts."""
+        wf = _make_workflow(query_min_coverage=40.0, query_min_identity=80.0,
+                            detection_min_coverage=80.0)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as fh:
+            fh.write(_blast_line(qseqid="r1", pident=95.0, qstart=1, qend=100,
+                                 qlen=100, sstart=1, send=100, slen=100))
+            fh.write(_blast_line(qseqid="r2", pident=95.0, qstart=1, qend=100,
+                                 qlen=100, sstart=1, send=100, slen=100))
+            tmp_path = Path(fh.name)
+        try:
+            detected, gene_reads = wf.parse_blast_results(tmp_path, "db", "blastn", count_only=True)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+        assert "geneA" in detected
+        assert gene_reads["geneA"]["all_count"] == 2
+        assert gene_reads["geneA"]["passing_count"] == 2
+        assert "all" not in gene_reads["geneA"]
+        assert wf.gene_stats["db"]["blastn"]["geneA"].avg_identity == 95.0
+
+    def test_multiple_hsps_from_one_read_count_as_one_depth_observation(self):
+        """Overlapping HSPs from one read must not inflate reads or depth."""
+        wf = _make_workflow(
+            query_min_coverage=40.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+        )
+        with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".tsv", delete=False) as handle:
+            handle.write(_blast_line(
+                qseqid="r1", pident=100.0, qstart=1, qend=60,
+                qlen=100, sstart=1, send=60, slen=100,
+            ))
+            handle.write(_blast_line(
+                qseqid="r1", pident=100.0, qstart=41, qend=100,
+                qlen=100, sstart=41, send=100, slen=100,
+            ))
+            path = Path(handle.name)
+        try:
+            detected, gene_reads = wf.parse_blast_results(
+                path, "db", "blastn", count_only=True
+            )
+        finally:
+            path.unlink(missing_ok=True)
+
+        stats = wf.gene_stats["db"]["blastn"]["geneA"]
+        assert "geneA" in detected
+        assert gene_reads["geneA"]["passing_count"] == 1
+        assert stats.num_sequences == 1
+        assert stats.passing_read_support == 1
+        assert stats.coverage_2x == 0.0
+
+    def test_partial_diagnostic_call_is_written_to_evidence_matrix(
+            self, tmp_path):
+        wf = _make_workflow(
+            query_min_coverage=20.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+        )
+        wf.output_dir = tmp_path
+        hit_file = tmp_path / "partial.tsv"
+        hit_file.write_text(_blast_line(
+            pident=100.0,
+            qstart=1,
+            qend=30,
+            qlen=100,
+            sstart=1,
+            send=30,
+            slen=100,
+        ))
+
+        wf.parse_blast_results(hit_file, "db", "blastn")
+        wf.generate_detection_matrix("db")
+
+        with open(
+                tmp_path / "db_evidence_matrix.tsv",
+                newline="",
+        ) as handle:
+            rows = list(_csv.DictReader(handle, delimiter="\t"))
+        assert len(rows) == 1
+        assert rows[0]["Gene"] == "geneA"
+        assert rows[0]["blastn"] == "PARTIAL_OR_DIVERGENT"
+        assert rows[0]["Evidence_Detections"] == "0"
+
+    def test_recompute_evalue_threshold_is_applied(self):
+        """A stricter recompute e-value threshold should filter otherwise valid hits."""
+        wf = _make_workflow(query_min_coverage=40.0, query_min_identity=80.0,
+                            detection_min_coverage=80.0)
+        wf.evalue = 1e-30
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as fh:
+            fh.write(_blast_line(pident=100.0, qstart=1, qend=100, qlen=100,
+                                 sstart=1, send=100, slen=100, evalue=1e-10))
+            tmp_path = Path(fh.name)
+        try:
+            detected, _ = wf.parse_blast_results(tmp_path, "db", "blastn")
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        assert "geneA" not in detected
+
+
+# ===========================================================================
+# 6b. DIAMOND command construction
+# ===========================================================================
+
+class TestDiamondCommandConstruction:
+    def test_diamond_results_tsv_is_written_without_comment_header(self, tmp_path):
+        wf = object.__new__(Workflow)
+        wf.raw_dir = tmp_path
+        wf.input_fasta = tmp_path / "reads.fasta"
+        wf.tool_sensitivity_params = {}
+        wf.query_min_identity = 80.0
+        wf.query_min_coverage = 40.0
+        wf.threads = 1
+        wf.evalue = None
+        wf.extra_tool_params = {}
+        wf.check_gzip = lambda _: True
+
+        captured = {}
+
+        def fake_run_command(cmd, description):
+            captured["cmd"] = cmd
+            captured["description"] = description
+            return False
+
+        wf.run_command = fake_run_command
+
+        success, detected = Workflow.run_diamond(wf, "db.dmnd", "resfinder")
+
+        assert success is False
+        assert detected == set()
+        assert "--header" not in captured["cmd"]
+        assert captured["cmd"][captured["cmd"].index("-f") + 1] == "6"
+        assert captured["description"] == "resfinder - DIAMOND-BLASTX"
+
+    def test_diamond_blastp_is_named_in_command_logging(self, tmp_path):
+        wf = object.__new__(Workflow)
+        wf.raw_dir = tmp_path
+        wf.input_fasta = tmp_path / "proteins.fasta"
+        wf.tool_sensitivity_params = {}
+        wf.query_min_identity = 80.0
+        wf.query_min_coverage = 40.0
+        wf.threads = 1
+        wf.evalue = None
+        wf.extra_tool_params = {}
+        wf.check_gzip = lambda _: True
+
+        captured = {}
+
+        def fake_run_command(cmd, description):
+            captured["cmd"] = cmd
+            captured["description"] = description
+            return False
+
+        wf.run_command = fake_run_command
+
+        Workflow.run_diamond(
+            wf, "db.dmnd", "custom", query_mode="blastp"
+        )
+
+        assert captured["cmd"][1] == "blastp"
+        assert captured["description"] == "custom - DIAMOND-BLASTP"
 
 
 # ===========================================================================
@@ -796,8 +1595,16 @@ def _make_hmmer_workflow(
     wf.evalue = None
     wf.hmmer_threshold_mode = 'evalue'
     wf.is_genes_fasta = False
+    wf.evidence_config = EvidenceConfig(
+        corroborating_depth=1,
+        exact_identity_min=0.0,
+        min_unique_best_reads=1,
+        min_unique_best_fraction=0.0,
+    )
     wf.gene_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(GeneStats)))
     wf.detections = defaultdict(lambda: defaultdict(lambda: defaultdict(bool)))
+    wf.evidence_calls = defaultdict(lambda: defaultdict(dict))
+    wf.family_calls = defaultdict(lambda: defaultdict(dict))
     wf.report_fasta = None
     wf.all_reads = {}
     wf.input_fasta = None
@@ -924,13 +1731,16 @@ class TestHmmerMustFlagOverride:
         return wf.parse_hmmer_results(tbl, dom, "db", "hmmer_protein")
 
     def test_must_flag_gene_detected_despite_low_coverage(self, tmp_path):
-        """Gene with 10% profile coverage must still be detected when must_flag=True."""
+        """Low-coverage must-flag evidence must be surfaced for review, not called exact."""
         wf = _make_hmmer_workflow(detection_min_coverage=80.0)
         wf.hmmer_annotations['db'] = {'geneA': {'description': 'test', 'must_flag': True}}
         wf.hmmer_annotations_meta['db'] = {'has_must_flag': True}
         # hmm_from=1, hmm_to=10 out of qlen=100 → 10% coverage
         detected, _ = self._run(wf, ['geneA'], ['geneA'], tmp_path, hmm_from=1, hmm_to=10, qlen=100)
-        assert 'geneA' in detected, "must_flag gene should be detected despite low profile coverage"
+        assert 'geneA' not in detected
+        call = wf.evidence_calls['db']['geneA']['hmmer_protein']
+        assert call.status == MUST_FLAG_REVIEW
+        assert not call.evidence_present
 
     def test_non_must_flag_gene_filtered_at_low_coverage(self, tmp_path):
         """Without must_flag, a low-coverage gene must be filtered out."""
@@ -974,6 +1784,37 @@ class TestHmmerMustFlagOverride:
         detected, _ = self._run(wf, ['geneA'], ['geneA'], tmp_path, hmm_from=1, hmm_to=10, qlen=100)
         assert 'geneA' not in detected, "must_flag override must be disabled when hmmer_must_flag=False"
 
+    def test_evalue_is_applied_to_each_target_profile_pair(self, tmp_path):
+        """A weak target must not borrow significance from another target."""
+        wf = _make_hmmer_workflow(detection_min_coverage=80.0)
+        wf.hmmer_evalue = 1e-5
+        tbl = tmp_path / "out.tbl"
+        dom = tmp_path / "out.domtbl"
+        tbl.write_text(
+            "# tblout mock\n"
+            "target_good\t-\tgeneA\t-\t1e-20\t200.0\t0\t0\t0\t0\t0\t0\t0\t0\t-\n"
+            "target_weak\t-\tgeneA\t-\t1\t20.0\t0\t0\t0\t0\t0\t0\t0\t0\t-\n"
+        )
+        good_domain = _write_domtblout(
+            ["geneA"], hmm_from=1, hmm_to=50, qlen=100,
+        ).replace("seq1", "target_good")
+        weak_domain = _write_domtblout(
+            ["geneA"], hmm_from=51, hmm_to=100, qlen=100,
+        ).replace("seq1", "target_weak")
+        dom.write_text(good_domain + "".join(
+            line for line in weak_domain.splitlines(keepends=True)
+            if not line.startswith("#")
+        ))
+
+        detected, _ = wf.parse_hmmer_results(
+            tbl, dom, "db", "hmmer_protein"
+        )
+
+        stats = wf.gene_stats["db"]["hmmer_protein"]["geneA"]
+        assert "geneA" not in detected
+        assert stats.gene_coverage == 50.0
+        assert stats.passing_read_support == 1
+
 
 class TestHmmerAnnotationsReportColumns:
     """TSV report must include Must_Flag column only when the source CSV had one."""
@@ -1009,4 +1850,3 @@ class TestHmmerAnnotationsReportColumns:
             assert 'Detected' in headers
             assert 'Gene_ID' in headers
             assert 'Description' in headers
-

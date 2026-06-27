@@ -1,7 +1,7 @@
 # Database path configuration for AMR detection tools.
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 # Get the directory where this file is located
 PACKAGE_DIR = Path(__file__).parent
@@ -33,6 +33,54 @@ NCBI_DATABASES = {
     "bwa": str(DB_ROOT / "ncbi/bwa/sequence_dna_bwadb"),
     "minimap2": str(DB_ROOT / "ncbi/minimap2/sequence_dna_minimap2db"),
 }
+
+
+def parse_database_paths(value) -> List[str]:
+    """Return normalised database directories from CLI strings or lists."""
+    if value in (None, ''):
+        return []
+
+    raw_values = value if isinstance(value, (list, tuple)) else [value]
+    paths = []
+    for raw_value in raw_values:
+        for part in str(raw_value).split(','):
+            path = part.strip()
+            if path:
+                paths.append(str(Path(path).expanduser().resolve()))
+    return paths
+
+
+def gather_multiple_databases(path_value, tools) -> Dict[str, Dict[str, str]]:
+    """Gather one or more database directories without merging their contents."""
+    database_paths = parse_database_paths(path_value)
+    if not database_paths:
+        return {}
+
+    missing = [path for path in database_paths if not Path(path).is_dir()]
+    if missing:
+        raise ValueError(
+            "Database path(s) not found or not directories: " + ', '.join(missing)
+        )
+
+    if len(database_paths) == 1:
+        return {
+            'user-provided-db': gather_databases(database_paths[0], tools)
+        }
+
+    labels = [Path(path).name or 'database' for path in database_paths]
+    duplicate_labels = sorted({
+        label for label in labels if labels.count(label) > 1
+    })
+    if duplicate_labels:
+        raise ValueError(
+            "Multiple database paths use the same directory name, which would "
+            "produce ambiguous output names: " + ', '.join(duplicate_labels)
+        )
+
+    return {
+        label: gather_databases(path, tools)
+        for label, path in zip(labels, database_paths)
+    }
 
 
 def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[str, str]]:
