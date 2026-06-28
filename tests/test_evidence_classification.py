@@ -23,7 +23,6 @@ def _classify(stats, tool="BLASTn", **overrides):
         config=config,
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
         detection_min_num_reads=1,
         reads_mode=True,
     )
@@ -51,7 +50,7 @@ def test_single_read_bridge_is_not_an_exact_detection():
     call = _classify(stats, tool="DIAMOND-BLASTX")
 
     assert call.status == MIXED_OR_MOSAIC
-    assert call.evidence_present
+    assert not call.evidence_present
     assert not call.exact_detected
     assert "LOW_CORROBORATED_COVERAGE" in call.warnings
     assert "PROTEIN_ONLY_ALLELE_AMBIGUITY" in call.warnings
@@ -77,7 +76,7 @@ def test_legacy_relaxed_mode_reproduces_direct_threshold_detection():
         stats=stats,
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
+        detection_min_depth=1,
         detection_min_num_reads=1,
     )
 
@@ -86,6 +85,34 @@ def test_legacy_relaxed_mode_reproduces_direct_threshold_detection():
     assert legacy.evidence_present
     assert not legacy.exact_allele_detected
     assert legacy.warnings == ["LEGACY_RELAXED_RULES"]
+
+
+def test_legacy_depth_gate_can_require_corrobated_coverage():
+    stats = GeneStats("blaCTX-M-1_1_DQ915955")
+    stats.add_hit(1, 876, 99.0, 876)
+    stats.finalise()
+
+    one_x = classify_gene_legacy(
+        gene="blaCTX-M-1_1_DQ915955",
+        tool_name="BLASTn",
+        stats=stats,
+        detection_min_coverage=80.0,
+        detection_min_identity=80.0,
+        detection_min_depth=1,
+        detection_min_num_reads=1,
+    )
+    three_x = classify_gene_legacy(
+        gene="blaCTX-M-1_1_DQ915955",
+        tool_name="BLASTn",
+        stats=stats,
+        detection_min_coverage=80.0,
+        detection_min_identity=80.0,
+        detection_min_depth=3,
+        detection_min_num_reads=1,
+    )
+
+    assert one_x.evidence_present
+    assert not three_x.evidence_present
 
 
 def test_detection_system_aliases_are_normalised():
@@ -113,7 +140,6 @@ def test_legacy_mode_preserves_historical_hsp_counting_for_min_reads():
         config=EvidenceConfig(),
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
         detection_min_num_reads=3,
         reads_mode=True,
     )
@@ -123,7 +149,7 @@ def test_legacy_mode_preserves_historical_hsp_counting_for_min_reads():
         stats=stats,
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
+        detection_min_depth=1,
         detection_min_num_reads=3,
     )
 
@@ -206,9 +232,10 @@ def test_candidate_allele_requires_full_three_x_depth():
 
     call = _classify(stats, tool="BWA")
 
-    assert call.status == ALLELE_LIKE
+    assert call.status == MIXED_OR_MOSAIC
     assert not call.candidate_allele_detected
     assert "INCOMPLETE_CANDIDATE_ALLELE_3X_COVERAGE" in call.warnings
+    assert not call.evidence_present
 
 
 def test_candidate_allele_requires_minimum_identity():
@@ -264,7 +291,6 @@ def test_full_length_dna_gene_can_be_candidate_at_one_x_coverage():
         config=EvidenceConfig(),
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
         detection_min_num_reads=1,
         reads_mode=False,
     )
@@ -287,7 +313,6 @@ def test_full_length_dna_gene_can_be_exact_at_one_x_coverage():
         config=EvidenceConfig(),
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
         detection_min_num_reads=1,
         reads_mode=False,
     )
@@ -309,7 +334,6 @@ def test_full_length_protein_gene_does_not_claim_nucleotide_allele():
         config=EvidenceConfig(),
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=1.0,
         detection_min_num_reads=1,
         reads_mode=False,
     )
@@ -346,7 +370,6 @@ def test_partial_high_identity_mapping_is_not_positive_evidence():
         config=EvidenceConfig(),
         detection_min_coverage=80.0,
         detection_min_identity=80.0,
-        detection_min_base_depth=0.0,
         detection_min_num_reads=1,
         reads_mode=True,
     )

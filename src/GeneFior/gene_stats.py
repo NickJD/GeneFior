@@ -11,7 +11,6 @@ class GeneStats:
     - gene_coverage: Percentage of the gene/subject sequence covered by all alignments combined
     - avg_identity: Average identity across all qualifying sequences for this gene
     - base_depth: Average depth across the gene (including uncovered positions as 0)
-    - base_depth_hit: Average depth across covered positions only
     0-based positions are used throughout.
     - gene_length: Length of the gene in the database
     - num_sequences: Number of sequences passing the identity threshold
@@ -24,7 +23,6 @@ class GeneStats:
     num_sequences: int = 0  # Number of sequences passing min_identity
     gene_coverage: float = 0.0  # Percentage of gene covered by all alignments
     base_depth: float = 0.0 # Average 'depth' across the gene
-    base_depth_hit: float = 0.0 # Average 'depth' across covered positions only
     avg_identity: float = 0.0 # Average identity across all qualifying sequences
     identity_sum: float = 0.0 # Running identity total; avoids storing one value per hit
     identities: List[float] = field(default_factory=list) # Deprecated compatibility field; no longer populated
@@ -200,7 +198,18 @@ class GeneStats:
             threshold = 1
         if threshold == 1:
             return self.gene_coverage
-        return self._coverage_by_depth.get(threshold, 0.0)
+        if threshold in self._coverage_by_depth:
+            return self._coverage_by_depth[threshold]
+        if self.gene_length <= 0:
+            return 0.0
+        covered = sum(
+            end - start
+            for start, end, depth in self._iter_depth_segments()
+            if depth >= threshold
+        )
+        coverage = covered / self.gene_length * 100
+        self._coverage_by_depth[threshold] = coverage
+        return coverage
 
     def finalise(self):
         # Calculate final statistics.
@@ -242,7 +251,6 @@ class GeneStats:
                 gap_spans.append((start, end))
                 current_covered_run = 0
 
-        covered = covered_by_depth[1]
         self._coverage_by_depth = {
             threshold: length / self.gene_length * 100
             for threshold, length in covered_by_depth.items()
@@ -253,7 +261,6 @@ class GeneStats:
         self.coverage_5x = self._coverage_by_depth[5]
         self.coverage_10x = self._coverage_by_depth[10]
         self.base_depth = total_depth / self.gene_length
-        self.base_depth_hit = total_depth / covered if covered else 0.0
 
         mean_square = total_depth_squared / self.gene_length
         variance = max(0.0, mean_square - (self.base_depth * self.base_depth))

@@ -174,11 +174,14 @@ Examples:
     gene_detection_group.add_argument('--d-min-id', '--detection-min-identity', type=float, default=80.0,
                               dest='detection_min_identity',
                               help='Minimum identity threshold in percent (default: 80.0)')
-    gene_detection_group.add_argument('--d-min-base-depth', '--detection-min-base-depth',
-                              type=float, default=1.0,
-                              dest='detection_min_base_depth',
-                              help='Minimum average base depth for detection '
-                                   '- calculated against regions of the detected gene with at least one read hit (default: 1.0)')
+    gene_detection_group.add_argument('--d-min-depth', '--detection-min-depth',
+                              '--d-min-base-depth', '--detection-min-base-depth',
+                              type=int, default=3,
+                              dest='detection_min_depth',
+                              help='Minimum per-base depth required across the '
+                                   'configured detection coverage in legacy-relaxed '
+                                   'mode. The old base-depth option names are '
+                                   'accepted as deprecated aliases (default: 3).')
     gene_detection_group.add_argument('--d-min-reads', '--detection-min-num-reads',
                               type=int, default=1,
                               dest='detection_min_num_reads',
@@ -190,8 +193,8 @@ Examples:
         help='Detection interpretation: "qualified" uses evidence, family/mosaic, '
              'and exact-allele resolution (default); "legacy-relaxed" reproduces '
              'the original direct threshold-only detector.')
-    gene_detection_group.add_argument('--evidence-corroborating-depth', type=int, default=2,
-                              help='Depth required across the gene for a robust read-based allele call (default: 2)')
+    gene_detection_group.add_argument('--evidence-corroborating-depth', type=int, default=3,
+                              help='Per-base depth required across the configured detection coverage for qualified evidence calls (default: 3)')
     gene_detection_group.add_argument('--evidence-exact-identity', type=float, default=100.0,
                               help='Deprecated identity setting retained for compatibility; literal exact calls require 100%% identity and full candidate-depth coverage')
     gene_detection_group.add_argument('--evidence-candidate-depth', type=int, default=3,
@@ -644,6 +647,8 @@ Examples:
         logger.info(f"Min query identity: {options.query_min_identity}%")
         logger.info(f"Min detection coverage: {options.detection_min_coverage}%")
         logger.info(f"Min detection identity: {options.detection_min_identity}%")
+        logger.info(f"Legacy detection depth: {options.detection_min_depth}×")
+        logger.info(f"Qualified evidence depth: {options.evidence_corroborating_depth}×")
         logger.info(f"Detection system: {options.detection_system}")
         # If Genes-FASTA was requested and user provided genes_type, reflect its effect in these logs
         eff_run_dna = run_dna
@@ -746,7 +751,7 @@ Examples:
                         'query_min_identity': options.query_min_identity,
                         'detection_min_coverage': options.detection_min_coverage,
                         'detection_min_identity': options.detection_min_identity,
-                        'detection_min_base_depth': options.detection_min_base_depth,
+                        'detection_min_depth': options.detection_min_depth,
                         'detection_min_num_reads': options.detection_min_num_reads,
                         'detection_system': options.detection_system,
                         'evidence_corroborating_depth': options.evidence_corroborating_depth,
@@ -795,7 +800,7 @@ Examples:
                         query_min_identity=options.query_min_identity,
                         detection_min_coverage=options.detection_min_coverage,
                         detection_min_identity=options.detection_min_identity,
-                        detection_min_base_depth=options.detection_min_base_depth,
+                        detection_min_depth=options.detection_min_depth,
                         detection_min_num_reads=options.detection_min_num_reads,
                         detection_system=options.detection_system,
                         run_dna=run_dna,
@@ -883,7 +888,7 @@ Examples:
             query_min_identity=options.query_min_identity,
             detection_min_coverage=options.detection_min_coverage,
             detection_min_identity=options.detection_min_identity,
-            detection_min_base_depth=options.detection_min_base_depth,
+            detection_min_depth=options.detection_min_depth,
             detection_min_num_reads=options.detection_min_num_reads,
             detection_system=options.detection_system,
             run_dna=run_dna,
@@ -926,7 +931,7 @@ Examples:
                 'query_min_identity': options.query_min_identity,
                 'detection_min_coverage': options.detection_min_coverage,
                 'detection_min_identity': options.detection_min_identity,
-                'detection_min_base_depth': options.detection_min_base_depth,
+                'detection_min_depth': options.detection_min_depth,
                 'detection_min_num_reads': options.detection_min_num_reads,
                 'detection_system': options.detection_system,
                 'evidence_corroborating_depth': options.evidence_corroborating_depth,

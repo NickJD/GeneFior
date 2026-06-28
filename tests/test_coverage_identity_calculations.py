@@ -53,7 +53,7 @@ def _make_workflow(
     query_min_identity: float = 80.0,
     detection_min_coverage: float = 80.0,
     detection_min_identity: float = 80.0,
-    detection_min_base_depth: float = 1.0,
+    detection_min_depth: int = 3,
     detection_min_num_reads: int = 1,
 ) -> Workflow:
     """Build a Workflow instance without requiring real files or databases.
@@ -67,12 +67,12 @@ def _make_workflow(
     wf.query_min_identity = query_min_identity
     wf.detection_min_coverage = detection_min_coverage
     wf.detection_min_identity = detection_min_identity
-    wf.detection_min_base_depth = detection_min_base_depth
+    wf.detection_min_depth = detection_min_depth
     wf.detection_min_num_reads = detection_min_num_reads
     wf.min_bitscore = None
     wf.evalue = None
     wf.evidence_config = EvidenceConfig(
-        corroborating_depth=1,
+        corroborating_depth=3,
         exact_identity_min=detection_min_identity,
         min_unique_best_reads=1,
         min_unique_best_fraction=0.0,
@@ -451,14 +451,14 @@ class TestGeneStats:
         for pos in range(overlap_start, overlap_end):
             assert gs.position_depths.get(pos, 0) == 2, f"Position {pos} should have depth 2"
 
-    def test_base_depth_hit_equals_mean_over_covered_positions(self):
-        """base_depth_hit must be the mean depth across covered positions only."""
+    def test_coverage_at_depth_uses_whole_gene_denominator(self):
+        """coverage_at_depth must ask how much of the whole gene reaches depth N."""
         gs = GeneStats(gene_name="geneA")
         # Only first 50 positions covered, each by 1 read
         gs.add_hit(sstart=1, send=50, identity=95.0, gene_len=100)
         gs.finalise()
-        # All 50 covered positions have depth 1 → mean = 1.0
-        assert abs(gs.base_depth_hit - 1.0) < 1e-9
+        assert abs(gs.coverage_at_depth(1) - 50.0) < 1e-9
+        assert abs(gs.coverage_at_depth(2) - 0.0) < 1e-9
 
     def test_base_depth_includes_uncovered_zeros(self):
         """base_depth (full-gene mean) must be diluted by uncovered positions."""
@@ -467,6 +467,16 @@ class TestGeneStats:
         gs.finalise()
         # 50 positions × depth 1, 50 positions × depth 0 → mean = 0.5
         assert abs(gs.base_depth - 0.5) < 1e-9
+
+    def test_coverage_at_arbitrary_depth_is_calculated_on_demand(self):
+        """User-specified depth thresholds must not be limited to 2/3/5/10."""
+        gs = GeneStats(gene_name="geneA")
+        for _ in range(4):
+            gs.add_hit(sstart=1, send=100, identity=95.0, gene_len=100)
+        gs.finalise()
+
+        assert abs(gs.coverage_at_depth(4) - 100.0) < 1e-9
+        assert abs(gs.coverage_at_depth(5) - 0.0) < 1e-9
 
     def test_avg_identity(self):
         gs = GeneStats(gene_name="geneA")
@@ -538,7 +548,7 @@ class TestGeneStats:
         assert compact.position_depths == {}
         assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
         assert abs(compact.base_depth - regular.base_depth) < 1e-9
-        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+        assert abs(compact.coverage_at_depth(2) - regular.coverage_at_depth(2)) < 1e-9
         assert abs(compact.avg_identity - regular.avg_identity) < 1e-9
 
     def test_compact_bam_intervals_match_positions(self):
@@ -552,7 +562,7 @@ class TestGeneStats:
 
         assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
         assert abs(compact.base_depth - regular.base_depth) < 1e-9
-        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+        assert abs(compact.coverage_at_depth(2) - regular.coverage_at_depth(2)) < 1e-9
 
     def test_compact_intervals_merge_overlaps_within_read(self):
         regular = GeneStats(gene_name="geneA")
@@ -565,7 +575,7 @@ class TestGeneStats:
 
         assert abs(compact.gene_coverage - regular.gene_coverage) < 1e-9
         assert abs(compact.base_depth - regular.base_depth) < 1e-9
-        assert abs(compact.base_depth_hit - regular.base_depth_hit) < 1e-9
+        assert abs(compact.coverage_at_depth(2) - regular.coverage_at_depth(2)) < 1e-9
 
 
 # ===========================================================================
@@ -1131,6 +1141,9 @@ class TestParseBlastResultsIntegration:
         assert "Candidate_Allele_Detected" in reader.fieldnames
         assert "Exact_Allele_Detected" in reader.fieldnames
         assert "Detection_System" in reader.fieldnames
+        assert "Detection_Depth" in reader.fieldnames
+        assert "Detection_Depth_Coverage" in reader.fieldnames
+        assert "Base_Coverage_Hit" not in reader.fieldnames
 
     def test_candidate_allele_is_reported_between_evidence_and_exact(
             self, tmp_path):
@@ -1509,7 +1522,6 @@ class TestThresholdConsistency:
             query_min_identity=70.0,
             detection_min_identity=80.0,
             detection_min_coverage=0.0,
-            detection_min_base_depth=0.0,
         )
         blast_file = tmp_path / "hits.tsv"
         blast_file.write_text(_blast_line(pident=75.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100) + "\n")
@@ -1525,7 +1537,6 @@ class TestThresholdConsistency:
             query_min_identity=70.0,
             detection_min_identity=60.0,
             detection_min_coverage=0.0,
-            detection_min_base_depth=0.0,
         )
         blast_file = tmp_path / "hits.tsv"
         blast_file.write_text(_blast_line(pident=65.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100) + "\n")
@@ -1540,7 +1551,6 @@ class TestThresholdConsistency:
             query_min_identity=70.0,    # per-read gate — lets 75% reads through
             detection_min_identity=80.0,  # gene-level gate — requires 80% avg
             detection_min_coverage=50.0,
-            detection_min_base_depth=0.0,
         )
         blast_file = tmp_path / "hits.tsv"
         # Two reads both at 75% identity: avg_identity = 75, below detection_min_identity=80
@@ -1557,7 +1567,6 @@ class TestThresholdConsistency:
             query_min_identity=70.0,
             detection_min_identity=80.0,
             detection_min_coverage=80.0,
-            detection_min_base_depth=0.0,
         )
         blast_file = tmp_path / "hits.tsv"
         # Single read at 95%: avg_identity = 95, coverage = 100/100 = 100%
@@ -1578,7 +1587,7 @@ import io as _io
 
 def _make_hmmer_workflow(
     detection_min_coverage: float = 80.0,
-    detection_min_base_depth: float = 0.0,
+    detection_min_depth: int = 1,
     detection_min_num_reads: int = 1,
 ) -> Workflow:
     """Minimal Workflow for HMMER parsing tests."""
@@ -1588,7 +1597,7 @@ def _make_hmmer_workflow(
     wf.query_min_identity = 0.0
     wf.detection_min_coverage = detection_min_coverage
     wf.detection_min_identity = 0.0
-    wf.detection_min_base_depth = detection_min_base_depth
+    wf.detection_min_depth = detection_min_depth
     wf.detection_min_num_reads = detection_min_num_reads
     wf.min_bitscore = None
     wf.hmmer_evalue = None

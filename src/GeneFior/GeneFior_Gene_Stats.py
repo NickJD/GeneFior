@@ -285,7 +285,7 @@ class GeneVisualiser:
         self.query_min_identity = None
         self.detection_min_coverage = 80.0
         self.detection_system = 'qualified'
-        self.evidence_corroborating_depth = 2
+        self.evidence_corroborating_depth = 3
         self.evidence_candidate_depth = 3
         self.evidence_candidate_identity = 98.0
         self.evidence_max_internal_gap_bp = 15

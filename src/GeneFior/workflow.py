@@ -28,7 +28,6 @@ try:
         best_status,
         classify_gene_evidence,
         classify_gene_legacy,
-        legacy_thresholds_pass,
         normalise_detection_system,
         resolve_family_calls,
         scores_tied,
@@ -45,7 +44,6 @@ except (ModuleNotFoundError, ImportError) as error:
         best_status,
         classify_gene_evidence,
         classify_gene_legacy,
-        legacy_thresholds_pass,
         normalise_detection_system,
         resolve_family_calls,
         scores_tied,
@@ -66,7 +64,7 @@ class Workflow:
                  query_min_identity: float = 80.0,  # Query identity threshold
                  detection_min_coverage: float = 80.0,
                  detection_min_identity: float = 80.0,
-                 detection_min_base_depth: float = 1.0,
+                 detection_min_depth: int = 3,
                  detection_min_num_reads: int = 1,
                   evalue: Optional[float] = None,
                   min_bitscore: Optional[float] = None,
@@ -88,7 +86,7 @@ class Workflow:
                      hmmer_threshold_mode: str = 'evalue',
                      hmmer_must_flag: bool = True,
                      tools: Optional[List[str]] = None,
-                     evidence_corroborating_depth: int = 2,
+                     evidence_corroborating_depth: int = 3,
                      evidence_exact_identity: float = 100.0,
                      evidence_candidate_depth: int = 3,
                      evidence_candidate_identity: float = 98.0,
@@ -135,7 +133,7 @@ class Workflow:
         self.query_min_identity = query_min_identity
         self.detection_min_coverage = detection_min_coverage
         self.detection_min_identity = detection_min_identity
-        self.detection_min_base_depth = detection_min_base_depth
+        self.detection_min_depth = max(3, int(detection_min_depth or 3))
         self.detection_min_num_reads = detection_min_num_reads
         self.detection_system = normalise_detection_system(detection_system)
         self.evidence_config = EvidenceConfig(
@@ -333,8 +331,9 @@ class Workflow:
                     stats=stats,
                     detection_min_coverage=self.detection_min_coverage,
                     detection_min_identity=self.detection_min_identity,
-                    detection_min_base_depth=self.detection_min_base_depth,
+                    detection_min_depth=self.detection_min_depth,
                     detection_min_num_reads=self.detection_min_num_reads,
+                    reads_mode=not getattr(self, 'is_genes_fasta', False),
                 )
             else:
                 call = classify_gene_evidence(
@@ -344,7 +343,6 @@ class Workflow:
                     config=self.evidence_config,
                     detection_min_coverage=self.detection_min_coverage,
                     detection_min_identity=self.detection_min_identity,
-                    detection_min_base_depth=self.detection_min_base_depth,
                     detection_min_num_reads=self.detection_min_num_reads,
                     reads_mode=not getattr(self, 'is_genes_fasta', False),
                     must_flag_override=gene in must_flag_overrides,
@@ -2343,7 +2341,8 @@ class Workflow:
         """Parse BLAST/DIAMOND tabular output and collect per-gene stats.
 
         Only alignments meeting identity and query-coverage thresholds are added.
-        Gene detection is decided from combined gene coverage and base-depth thresholds.
+        Gene detection is decided from coverage-at-depth, identity, and
+        read-support thresholds.
 
         When count_only is True, per-gene read-name lists are replaced with
         integer counters. This is intended for GeneFior-Recompute on very large
@@ -2645,7 +2644,7 @@ class Workflow:
         """Parse BAM (samtools view) and collect per-gene stats.
 
         Uses CIGAR to compute aligned positions and per-read identity; detection
-        follows the same coverage/base-depth rules as BLAST parsing.
+        follows the same coverage-at-depth rules as BLAST parsing.
 
         When count_only is True, per-gene read-name lists and read sequences are
         replaced with counters. This keeps GeneFior-Recompute bounded on large
@@ -3214,8 +3213,9 @@ class Workflow:
         - Num_Sequences_Mapped: Number of sequences that mapped to this gene with identity >= detection-min-identity
         - Num_Sequences_Passing_Thresholds: Number of sequences that passed all thresholds (identity, coverage, base_coverage, min_reads etc)
         - Gene_Coverage: Percentage of the gene covered by all qualifying alignments combined (%)
-        - Base_Coverage: Average base coverage across the entire gene (%)
-        - Base_Coverage_Hit: Average base coverage considering only bases with at least one hit (%)
+        - Base_Coverage: Average depth across the entire gene
+        - Detection_Depth: Per-base depth required across the configured detection coverage
+        - Detection_Depth_Coverage: Percentage of the gene covered at Detection_Depth or higher
         - Avg_Identity: Average identity across all qualifying sequences (%)
         - Detected: result selected by Detection_System
         """
@@ -3258,7 +3258,8 @@ class Workflow:
                 'Gene', 'Gene_Length', 'Num_Sequences_Mapped',
                 'Num_Sequences_Passing_Thresholds', 'Gene_Coverage',
                 'Coverage_2x', 'Coverage_3x', 'Coverage_5x', 'Coverage_10x',
-                'Base_Coverage', 'Base_Coverage_Hit', 'Median_Depth',
+                'Base_Coverage', 'Detection_Depth',
+                'Detection_Depth_Coverage', 'Median_Depth',
                 'Depth_CV', 'Num_Internal_Gaps', 'Longest_Internal_Gap',
                 'Longest_Covered_Run', 'Avg_Identity',
             ]
@@ -3285,6 +3286,21 @@ class Workflow:
                     detected = self.detections[database][gene][tool_name]
                 except (KeyError, TypeError):
                     detected = False
+                if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
+                    detection_depth = (
+                        self.detection_min_depth
+                        if not getattr(self, 'is_genes_fasta', False)
+                        else 1
+                    )
+                else:
+                    detection_depth = (
+                        self.evidence_config.corroborating_depth
+                        if not getattr(self, 'is_genes_fasta', False)
+                        else 1
+                    )
+                detection_depth_coverage = stats.coverage_at_depth(
+                    detection_depth
+                )
                 metric_row = [
                     gene,
                     stats.gene_length,
@@ -3296,7 +3312,8 @@ class Workflow:
                     f"{stats.coverage_5x:.2f}",
                     f"{stats.coverage_10x:.2f}",
                     f"{stats.base_depth:.2f}",
-                    f"{stats.base_depth_hit:.2f}",
+                    detection_depth,
+                    f"{detection_depth_coverage:.2f}",
                     f"{stats.median_depth:.2f}",
                     f"{stats.depth_cv:.4f}",
                     stats.num_internal_gaps,

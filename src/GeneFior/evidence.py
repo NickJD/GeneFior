@@ -37,7 +37,7 @@ EVIDENCE_PRESENT_STATUSES = {
 
 @dataclass
 class EvidenceConfig:
-    corroborating_depth: int = 2
+    corroborating_depth: int = 3
     exact_identity_min: float = 100.0
     candidate_depth: int = 3
     candidate_identity_min: float = 98.0
@@ -129,35 +129,37 @@ def normalise_detection_system(value: str) -> str:
 
 def legacy_thresholds_pass(stats, detection_min_coverage: float,
                            detection_min_identity: float,
-                           detection_min_base_depth: float,
+                           detection_min_depth: int,
                            detection_min_num_reads: int,
-                           profile: bool = False) -> bool:
-    """Apply the original direct gene-level threshold rule."""
+                           profile: bool = False,
+                           reads_mode: bool = True) -> bool:
+    """Apply the relaxed binary detector with a true depth coverage gate."""
     identity_pass = profile or stats.avg_identity >= detection_min_identity
+    required_depth = max(3, int(detection_min_depth or 3)) if reads_mode else 1
+    sequence_support = stats.num_sequences
     return (
-        stats.gene_coverage >= detection_min_coverage
+        stats.coverage_at_depth(required_depth) >= detection_min_coverage
         and identity_pass
-        and stats.base_depth_hit >= detection_min_base_depth
-        and stats.num_sequences >= detection_min_num_reads
+        and sequence_support >= detection_min_num_reads
     )
 
 
 def _qualified_thresholds_pass(stats, detection_min_coverage: float,
                                detection_min_identity: float,
-                               detection_min_base_depth: float,
                                detection_min_num_reads: int,
+                               detection_depth: int,
                                profile: bool = False) -> bool:
-    """Apply user thresholds using distinct passing-read support where known."""
+    """Apply user thresholds using true coverage-at-depth support."""
     identity_pass = profile or stats.avg_identity >= detection_min_identity
     sequence_support = (
         stats.passing_read_support
         if stats.passing_read_support > 0
         else stats.num_sequences
     )
+    depth = max(3, int(detection_depth or 3))
     return (
-        stats.gene_coverage >= detection_min_coverage
+        stats.coverage_at_depth(depth) >= detection_min_coverage
         and identity_pass
-        and stats.base_depth_hit >= detection_min_base_depth
         and sequence_support >= detection_min_num_reads
     )
 
@@ -168,17 +170,21 @@ def classify_gene_legacy(
         stats,
         detection_min_coverage: float,
         detection_min_identity: float,
-        detection_min_base_depth: float,
-        detection_min_num_reads: int) -> EvidenceCall:
-    """Reproduce the original relaxed binary detector without allele claims."""
+        detection_min_depth: int,
+        detection_min_num_reads: int,
+        reads_mode: bool = True) -> EvidenceCall:
+    """Run the relaxed binary detector without allele claims."""
     modality = tool_modality(tool_name)
+    required_depth = max(3, int(detection_min_depth or 3)) if reads_mode else 1
+    detection_depth_coverage = stats.coverage_at_depth(required_depth)
     detected = legacy_thresholds_pass(
         stats,
         detection_min_coverage,
         detection_min_identity,
-        detection_min_base_depth,
+        required_depth,
         detection_min_num_reads,
         profile=modality == "profile",
+        reads_mode=reads_mode,
     )
     return EvidenceCall(
         gene=gene,
@@ -190,9 +196,9 @@ def classify_gene_legacy(
         warnings=["LEGACY_RELAXED_RULES"],
         best_allele=gene,
         rationale=(
-            f"legacy coverage={stats.gene_coverage:.2f}%; "
+            f"legacy coverage_{required_depth}x="
+            f"{detection_depth_coverage:.2f}%; "
             f"identity={stats.avg_identity:.2f}%; "
-            f"covered_depth={stats.base_depth_hit:.2f}; "
             f"sequences={stats.num_sequences}"
         ),
     )
@@ -205,7 +211,6 @@ def classify_gene_evidence(
         config: EvidenceConfig,
         detection_min_coverage: float,
         detection_min_identity: float,
-        detection_min_base_depth: float,
         detection_min_num_reads: int,
         reads_mode: bool = True,
         must_flag_override: bool = False) -> EvidenceCall:
@@ -215,20 +220,28 @@ def classify_gene_evidence(
     is_profile = modality == "profile"
     warnings: List[str] = []
 
+    detection_depth = (
+        max(3, int(config.corroborating_depth))
+        if reads_mode else 1
+    )
+    detection_depth_coverage = stats.coverage_at_depth(detection_depth)
+    identity_pass = is_profile or stats.avg_identity >= detection_min_identity
+    passing_support = (
+        stats.passing_read_support
+        if stats.passing_read_support > 0
+        else stats.num_sequences
+    )
+    read_support_pass = passing_support >= detection_min_num_reads
     base_pass = _qualified_thresholds_pass(
         stats,
         detection_min_coverage,
         detection_min_identity,
-        detection_min_base_depth,
         detection_min_num_reads,
+        detection_depth,
         profile=is_profile,
     )
 
     corroborating_coverage = stats.coverage_at_depth(config.corroborating_depth)
-    robust_pass = (
-        not reads_mode
-        or corroborating_coverage >= detection_min_coverage
-    )
     max_allowed_gap = max(
         config.max_internal_gap_bp,
         int(round(stats.gene_length * config.max_internal_gap_fraction)),
@@ -238,10 +251,6 @@ def classify_gene_evidence(
         or stats.num_internal_gaps > 1
     )
 
-    passing_support = max(
-        stats.passing_read_support,
-        stats.num_sequences,
-    )
     unique_support = stats.unique_best_read_support
     ambiguous_support = stats.ambiguous_best_read_support
     best_support = max(stats.best_read_support, unique_support + ambiguous_support)
@@ -261,11 +270,13 @@ def classify_gene_evidence(
 
     if stats.gene_coverage < detection_min_coverage:
         warnings.append("PARTIAL_COVERAGE")
-    if stats.avg_identity < detection_min_identity and not is_profile:
+    if not identity_pass and not is_profile:
         warnings.append("LOW_MEAN_IDENTITY")
+    if not read_support_pass:
+        warnings.append("LOW_READ_SUPPORT")
     if discontinuous:
         warnings.append("DISCONTINUOUS_COVERAGE")
-    if reads_mode and not robust_pass:
+    if reads_mode and detection_depth_coverage < detection_min_coverage:
         warnings.append("LOW_CORROBORATED_COVERAGE")
         if stats.gene_coverage >= detection_min_coverage:
             warnings.append("THRESHOLD_SENSITIVE")
@@ -311,7 +322,17 @@ def classify_gene_evidence(
             ) >= 100.0 - 1e-9
         )
     )
-    if modality == "nucleotide" and base_pass:
+    nucleotide_candidate_diagnostics = (
+        modality == "nucleotide"
+        and (
+            base_pass
+            or (
+                stats.gene_coverage >= detection_min_coverage
+                and identity_pass
+            )
+        )
+    )
+    if nucleotide_candidate_diagnostics:
         if not candidate_coverage_pass:
             warnings.append(
                 "INCOMPLETE_CANDIDATE_ALLELE_COVERAGE"
@@ -331,11 +352,17 @@ def classify_gene_evidence(
         status = MUST_FLAG_REVIEW
         warnings.append("MUST_FLAG_THRESHOLD_OVERRIDE")
     elif not base_pass:
-        if stats.num_sequences > 0 and stats.gene_coverage >= config.partial_min_coverage:
+        if (reads_mode
+                and identity_pass
+                and read_support_pass
+                and stats.gene_coverage >= detection_min_coverage
+                and detection_depth_coverage < detection_min_coverage):
+            status = MIXED_OR_MOSAIC
+        elif stats.num_sequences > 0 and stats.gene_coverage >= config.partial_min_coverage:
             status = PARTIAL_OR_DIVERGENT
         else:
             status = NOT_DETECTED
-    elif discontinuous or (reads_mode and not robust_pass):
+    elif discontinuous:
         status = MIXED_OR_MOSAIC
     elif modality == "profile":
         status = PROFILE_DETECTED
@@ -357,12 +384,15 @@ def classify_gene_evidence(
         status = ALLELE_LIKE
 
     exact_detected = status in POSITIVE_EXACT_STATUSES
-    # Evidence is the original high-confidence detection tier: all configured
-    # user thresholds must pass. Diagnostic partial or must-flag review states
+    # Evidence is the high-confidence threshold tier: the configured detection
+    # coverage must be achieved at the configured detection depth, with the
+    # configured identity and read-support gates. Diagnostic review states
     # remain visible, but are not positive evidence.
     evidence_present = base_pass
     rationale = (
-        f"coverage={stats.gene_coverage:.2f}%; "
+        f"coverage_1x={stats.gene_coverage:.2f}%; "
+        f"detection_depth={detection_depth}x; "
+        f"detection_depth_coverage={detection_depth_coverage:.2f}%; "
         f"coverage_{config.corroborating_depth}x={corroborating_coverage:.2f}%; "
         f"coverage_{candidate_depth}x={candidate_coverage:.2f}%; "
         f"identity={stats.avg_identity:.2f}%; "

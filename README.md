@@ -35,7 +35,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.10.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+GeneFíor v0.10.1 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -75,8 +75,8 @@ Gene Detection Parameters:
                         Minimum coverage threshold in percent (default: 80.0)
   --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
                         Minimum identity threshold in percent (default: 80.0)
-  --d-min-base-depth DETECTION_MIN_BASE_DEPTH, --detection-min-base-depth DETECTION_MIN_BASE_DEPTH
-                        Minimum average base depth for detection - calculated against regions of the detected gene with at least one read hit (default: 1.0)
+  --d-min-depth DETECTION_MIN_DEPTH, --detection-min-depth DETECTION_MIN_DEPTH
+                        Minimum per-base depth required across the configured detection coverage in legacy-relaxed mode (default: 1)
   --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
                         Minimum number of reads required for detection (default: 1)
 
@@ -140,7 +140,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.10.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.10.1 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -185,8 +185,8 @@ Gene Detection Parameters:
                         Minimum coverage threshold in percent (default: 80.0)
   --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
                         Minimum identity threshold in percent (default: 80.0)
-  --d-min-base-depth DETECTION_MIN_BASE_DEPTH, --detection-min-base-depth DETECTION_MIN_BASE_DEPTH
-                        Minimum average base depth for detection - calculated against regions of the detected gene with at least one read hit (default: 1.0)
+  --d-min-depth DETECTION_MIN_DEPTH, --detection-min-depth DETECTION_MIN_DEPTH
+                        Minimum per-base depth required across the configured detection coverage in legacy-relaxed mode (default: 1)
   --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
                         Minimum number of reads required for detection (default: 1)
 
@@ -315,7 +315,8 @@ identity.
 Important output columns:
 
 - `Evidence_Present=1` means the gene passes the user's configured detection
-  coverage, identity, base-depth, and minimum-read thresholds.
+  coverage at the qualified evidence depth, identity, and minimum-read
+  thresholds.
 - `Candidate_Allele_Detected=1` means the named nucleotide allele is a strong
   candidate under the configured candidate-depth and candidate-identity thresholds
   for read inputs, or under full-length 1x coverage and candidate-identity
@@ -367,7 +368,7 @@ Detection-system compatibility:
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.10.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.10.1 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -389,8 +390,8 @@ Gene Detection Parameters:
                         Minimum coverage threshold in percent (default: 80.0)
   --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
                         Minimum identity threshold in percent (default: 80.0)
-  --d-min-base-depth DETECTION_MIN_BASE_DEPTH, --detection-min-base-depth DETECTION_MIN_BASE_DEPTH
-                        Minimum average base depth for detection - calculated against regions of the detected gene with at least one read hit (default: 1.0)
+  --d-min-depth DETECTION_MIN_DEPTH, --detection-min-depth DETECTION_MIN_DEPTH
+                        Minimum per-base depth required across the configured detection coverage in legacy-relaxed mode (default: source run, otherwise 1)
   --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
                         Minimum number of reads required for detection (default: 1)
 
@@ -419,7 +420,7 @@ Examples:
 
   # More stringent depth requirement
   GeneFior-recompute -i original_results/ -o high_depth/ \
-    --d-min-base-depth 5.0 --d-min-reads 10
+    --d-min-depth 5 --d-min-reads 10
 
   # Export threshold-passing read names and sequences for detected genes
   GeneFior-recompute -i original_results/ -o recomputed_with_reads/ \
@@ -431,7 +432,7 @@ Examples:
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.10.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.10.1 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -509,7 +510,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.10.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.10.1 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit

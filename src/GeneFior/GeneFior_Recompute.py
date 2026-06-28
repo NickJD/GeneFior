@@ -175,9 +175,9 @@ def apply_source_run_defaults(options, logger):
         'query_min_identity': 80.0,
         'detection_min_coverage': 80.0,
         'detection_min_identity': 80.0,
-        'detection_min_base_depth': 1.0,
+        'detection_min_depth': 1,
         'detection_min_num_reads': 1,
-        'evidence_corroborating_depth': 2,
+        'evidence_corroborating_depth': 3,
         'evidence_exact_identity': 100.0,
         'evidence_candidate_depth': 3,
         'evidence_candidate_identity': 98.0,
@@ -195,7 +195,13 @@ def apply_source_run_defaults(options, logger):
     for name, fallback in defaults.items():
         if getattr(options, name, None) is not None:
             continue
-        value = original.get(name, fallback)
+        if name == 'detection_min_depth':
+            value = original.get(
+                'detection_min_depth',
+                original.get('detection_min_base_depth', fallback),
+            )
+        else:
+            value = original.get(name, fallback)
         if value is None and fallback is not None:
             value = fallback
         if name == 'genes_type' and value == 'protein':
@@ -286,7 +292,8 @@ def run(options, workflow, logger):
     logger.info(f"  Query min id: {options.query_min_identity}%")
     logger.info(f"  Gene min coverage: {options.detection_min_coverage}%")
     logger.info(f"  Min identity: {options.detection_min_identity}%")
-    logger.info(f"  Min base depth: {options.detection_min_base_depth}×")
+    logger.info(f"  Legacy detection depth: {options.detection_min_depth}×")
+    logger.info(f"  Qualified evidence depth: {options.evidence_corroborating_depth}×")
     logger.info(f"  Min num reads: {options.detection_min_num_reads}")
     logger.info(f"  Detection system: {options.detection_system}")
     logger.info("=" * 70)
@@ -498,7 +505,7 @@ Examples:
 
   # More stringent depth requirement
   GeneFior-recompute -i original_results/ -o high_depth/ \\
-    --d-min-base-depth 5.0 --d-min-reads 10
+    --d-min-depth 5 --d-min-reads 10
 
         """
     )
@@ -527,11 +534,15 @@ Examples:
     gene_detection_group.add_argument('--d-min-id', '--detection-min-identity', type=float, default=None,
                               dest='detection_min_identity',
                               help='Minimum identity threshold in percent (default: 80.0)')
-    gene_detection_group.add_argument('--d-min-base-depth', '--detection-min-base-depth',
-                              type=float, default=None,
-                              dest='detection_min_base_depth',
-                              help='Minimum average base depth for detection '
-                                   '- calculated against regions of the detected gene with at least one read hit (default: 1.0)')
+    gene_detection_group.add_argument('--d-min-depth', '--detection-min-depth',
+                              '--d-min-base-depth', '--detection-min-base-depth',
+                              type=int, default=None,
+                              dest='detection_min_depth',
+                              help='Minimum per-base depth required across the '
+                                   'configured detection coverage in legacy-relaxed '
+                                   'mode. The old base-depth option names are '
+                                   'accepted as deprecated aliases (default: source '
+                                   'run, otherwise 3).')
     gene_detection_group.add_argument('--d-min-reads', '--detection-min-num-reads',
                               type=int, default=None,
                               dest='detection_min_num_reads',
@@ -544,7 +555,7 @@ Examples:
              'and exact-allele resolution (default); "legacy-relaxed" reproduces '
              'the original direct threshold-only detector.')
     gene_detection_group.add_argument('--evidence-corroborating-depth', type=int, default=None,
-                              help='Depth required across the gene for a robust read-based allele call (default: 2)')
+                              help='Per-base depth required across the configured detection coverage for qualified evidence calls (default: source run, otherwise 3)')
     gene_detection_group.add_argument('--evidence-exact-identity', type=float, default=None,
                               help='Deprecated identity setting retained for manifest compatibility; literal exact calls require 100%% identity and full candidate-depth coverage')
     gene_detection_group.add_argument('--evidence-candidate-depth', type=int, default=None,
@@ -698,7 +709,7 @@ Examples:
         query_min_identity=options.query_min_identity,
         detection_min_coverage=options.detection_min_coverage,
         detection_min_identity=options.detection_min_identity,
-        detection_min_base_depth=options.detection_min_base_depth,
+        detection_min_depth=options.detection_min_depth,
         detection_min_num_reads=options.detection_min_num_reads,
         detection_system=options.detection_system,
         evalue=options.evalue,
@@ -737,7 +748,7 @@ Examples:
             'query_min_identity': options.query_min_identity,
             'detection_min_coverage': options.detection_min_coverage,
             'detection_min_identity': options.detection_min_identity,
-            'detection_min_base_depth': options.detection_min_base_depth,
+            'detection_min_depth': options.detection_min_depth,
             'detection_min_num_reads': options.detection_min_num_reads,
             'detection_system': options.detection_system,
             'evidence_corroborating_depth': options.evidence_corroborating_depth,

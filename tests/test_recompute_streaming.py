@@ -96,7 +96,7 @@ def test_recompute_inherits_source_sequence_and_evidence_metadata(tmp_path):
         query_min_identity=None,
         detection_min_coverage=None,
         detection_min_identity=None,
-        detection_min_base_depth=None,
+        detection_min_depth=None,
         detection_min_num_reads=None,
         evidence_corroborating_depth=None,
         evidence_exact_identity=None,
@@ -115,8 +115,40 @@ def test_recompute_inherits_source_sequence_and_evidence_metadata(tmp_path):
     assert options.query_min_coverage == 55.0
     assert options.query_min_identity == 91.0
     assert options.detection_min_coverage == 87.0
+    assert options.detection_min_depth == 1
     assert options.evidence_corroborating_depth == 3
     assert options.tools == ["all"]
+
+
+def test_recompute_maps_old_base_depth_manifest_to_detection_depth(tmp_path):
+    (tmp_path / "run_parameters.json").write_text(json.dumps({
+        "detection_min_base_depth": 4,
+    }))
+    options = _options(
+        tmp_path,
+        detection_min_depth=None,
+        detection_min_coverage=None,
+        detection_min_identity=None,
+        detection_min_num_reads=None,
+        query_min_coverage=None,
+        query_min_identity=None,
+        evidence_corroborating_depth=None,
+        evidence_exact_identity=None,
+        evidence_candidate_depth=None,
+        evidence_candidate_identity=None,
+        evidence_max_internal_gap_bp=None,
+        evidence_max_internal_gap_fraction=None,
+        evidence_min_unique_reads=None,
+        evidence_min_unique_fraction=None,
+        evidence_ambiguity_fraction=None,
+        evidence_score_tie=None,
+        sequence_type=None,
+        genes_type=None,
+    )
+
+    apply_source_run_defaults(options, logging.getLogger("test"))
+
+    assert options.detection_min_depth == 4
 
 
 def test_diamond_mode_prefers_source_manifest_for_protein_genes(tmp_path):
