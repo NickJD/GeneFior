@@ -32,6 +32,8 @@ def test_family_name_collapses_common_resfinder_alleles():
     assert infer_gene_family("blaCTX-M-1_1_DQ915955") == "blaCTX-M"
     assert infer_gene_family("blaCTX-M-36_1_AB177384") == "blaCTX-M"
     assert infer_gene_family("tet(A)_1_AJ313332") == "tet(A)"
+    assert infer_gene_family("SHV-52|ARO:3001109") == "SHV"
+    assert infer_gene_family("aadA1_1_X12870") == "aadA"
 
 
 def test_single_read_bridge_is_not_an_exact_detection():
@@ -56,7 +58,7 @@ def test_single_read_bridge_is_not_an_exact_detection():
     assert "PROTEIN_ONLY_ALLELE_AMBIGUITY" in call.warnings
 
 
-def test_legacy_relaxed_mode_reproduces_direct_threshold_detection():
+def test_legacy_relaxed_mode_does_not_accept_single_read_bridge():
     stats = GeneStats("blaCTX-M-1_1_DQ915955")
     stats.add_hit(1, 77, 100.0, 292)
     stats.add_hit(90, 139, 80.0, 292)
@@ -81,18 +83,22 @@ def test_legacy_relaxed_mode_reproduces_direct_threshold_detection():
     )
 
     assert qualified.status == MIXED_OR_MOSAIC
-    assert legacy.status == LEGACY_RELAXED_DETECTED
-    assert legacy.evidence_present
+    assert legacy.status != LEGACY_RELAXED_DETECTED
+    assert not legacy.evidence_present
     assert not legacy.exact_allele_detected
     assert legacy.warnings == ["LEGACY_RELAXED_RULES"]
 
 
-def test_legacy_depth_gate_can_require_corrobated_coverage():
+def test_legacy_depth_gate_enforces_three_x_floor():
     stats = GeneStats("blaCTX-M-1_1_DQ915955")
     stats.add_hit(1, 876, 99.0, 876)
     stats.finalise()
+    three_read_stats = GeneStats("blaCTX-M-1_1_DQ915955")
+    for _ in range(3):
+        three_read_stats.add_hit(1, 876, 99.0, 876)
+    three_read_stats.finalise()
 
-    one_x = classify_gene_legacy(
+    requested_one_x = classify_gene_legacy(
         gene="blaCTX-M-1_1_DQ915955",
         tool_name="BLASTn",
         stats=stats,
@@ -101,7 +107,16 @@ def test_legacy_depth_gate_can_require_corrobated_coverage():
         detection_min_depth=1,
         detection_min_num_reads=1,
     )
-    three_x = classify_gene_legacy(
+    actual_three_x = classify_gene_legacy(
+        gene="blaCTX-M-1_1_DQ915955",
+        tool_name="BLASTn",
+        stats=three_read_stats,
+        detection_min_coverage=80.0,
+        detection_min_identity=80.0,
+        detection_min_depth=1,
+        detection_min_num_reads=1,
+    )
+    requested_three_x = classify_gene_legacy(
         gene="blaCTX-M-1_1_DQ915955",
         tool_name="BLASTn",
         stats=stats,
@@ -111,8 +126,9 @@ def test_legacy_depth_gate_can_require_corrobated_coverage():
         detection_min_num_reads=1,
     )
 
-    assert one_x.evidence_present
-    assert not three_x.evidence_present
+    assert not requested_one_x.evidence_present
+    assert actual_three_x.evidence_present
+    assert not requested_three_x.evidence_present
 
 
 def test_detection_system_aliases_are_normalised():

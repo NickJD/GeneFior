@@ -12,10 +12,28 @@ try:
     from .constants import GENEFIOR_VERSION
     from .read_store import ReadMatchStore
     from .workflow import Workflow
+    from .utils import load_gene_id_file
+    from .hamronization import (
+        add_hamronization_arguments,
+        export_from_options,
+        infer_sample_id,
+        parse_database_versions,
+        validate_database_versions,
+        validate_hamronization_request,
+    )
 except (ModuleNotFoundError, ImportError):
     from constants import GENEFIOR_VERSION
     from read_store import ReadMatchStore
     from workflow import Workflow
+    from utils import load_gene_id_file
+    from hamronization import (
+        add_hamronization_arguments,
+        export_from_options,
+        infer_sample_id,
+        parse_database_versions,
+        validate_database_versions,
+        validate_hamronization_request,
+    )
 
 
 
@@ -191,6 +209,10 @@ def apply_source_run_defaults(options, logger):
         'genes_type': None,
         'evalue': None,
         'min_bitscore': None,
+        'always_flag_genes': [],
+        'hamronized_output': None,
+        'hamronized_min_call': 'evidence',
+        'sample_id': None,
     }
     for name, fallback in defaults.items():
         if getattr(options, name, None) is not None:
@@ -303,6 +325,15 @@ def run(options, workflow, logger):
     if not discovered:
         return False
     found_files, databases_found, tools_found = discovered
+    try:
+        validate_database_versions(
+            options.hamronized_output,
+            found_files.keys(),
+            options.database_versions,
+        )
+    except ValueError as exc:
+        logger.error(str(exc))
+        return False
 
     #if not discover_files():
     #    return False
@@ -482,6 +513,15 @@ def run(options, workflow, logger):
         # Generate detection matrix
         workflow.generate_detection_matrix(database)
 
+    export_from_options(
+        options,
+        options.output,
+        "GeneFior-Recompute",
+        GENEFIOR_VERSION.lstrip("v"),
+        logger=logger,
+        input_spec=(options.query_fasta or options.input),
+    )
+
     # Summary
     logger.info("\n" + "=" * 70)
     logger.info("RECOMPUTATION COMPLETE")
@@ -574,6 +614,13 @@ Examples:
                               help='Ambiguous-best read fraction that triggers an allele warning (default: 0.50)')
     gene_detection_group.add_argument('--evidence-score-tie', type=float, default=None,
                               help='Absolute bit-score difference treated as a competitive tie (default: 1.0)')
+    gene_detection_group.add_argument(
+        '--always-flag-genes', '--always-flag-gene-list',
+        dest='always_flag_genes_file',
+        default=None,
+        help='CSV/TSV/text file of database gene IDs to always surface for '
+             'review when any evidence exists. These genes are not counted as '
+             'detected unless they pass the normal thresholds.')
 
     # Allow e-value and bitscore thresholds to be supplied for recompute
     parser.add_argument('--evalue', type=float, default=None,
@@ -634,6 +681,7 @@ Examples:
                             version='GeneFíor ' + GENEFIOR_VERSION,
                             help='Show program version and exit')
 
+    add_hamronization_arguments(parser, inherit_defaults=True)
     options = parser.parse_args()
     if options.report_fasta == 'None':
         options.report_fasta = None
@@ -669,6 +717,43 @@ Examples:
 
         # Tool selection
     apply_source_run_defaults(options, logger)
+    try:
+        inherited_versions = {
+            str(key).casefold(): str(value)
+            for key, value in (
+                getattr(options, 'source_run_parameters', {})
+                .get('database_versions', {}) or {}
+            ).items()
+        }
+        supplied_versions = parse_database_versions(
+            options.database_version_specs
+        )
+        options.database_versions = {
+            **inherited_versions,
+            **supplied_versions,
+        }
+        validate_hamronization_request(
+            options.hamronized_output,
+            options.hamronized_min_call,
+            options.detection_system,
+        )
+    except ValueError as exc:
+        logger.error(str(exc))
+        sys.exit(2)
+    try:
+        inherited_flags = set(getattr(options, 'always_flag_genes', []) or [])
+        supplied_flags = load_gene_id_file(
+            getattr(options, 'always_flag_genes_file', None),
+            logger,
+        )
+        options.always_flag_genes = inherited_flags | supplied_flags
+    except Exception as exc:
+        logger.error(f"Failed to load --always-flag-genes file: {exc}")
+        sys.exit(1)
+    if options.always_flag_genes:
+        logger.info(
+            f"Always-flag review genes: {len(options.always_flag_genes)}"
+        )
     if not validate_recompute_relaxation(options, logger):
         sys.exit(2)
     # If user requested FASTA reporting for BLAST/DIAMOND outputs, require --query-fasta
@@ -735,6 +820,7 @@ Examples:
         evidence_min_unique_fraction=options.evidence_min_unique_fraction,
         evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
         evidence_score_tie=options.evidence_score_tie,
+        always_flag_genes=getattr(options, 'always_flag_genes', set()),
     )
 
 
@@ -765,6 +851,15 @@ Examples:
             'report_fasta': options.report_fasta,
             'report_read_names': options.report_read_names,
             'allow_incomplete_relaxation': options.allow_incomplete_relaxation,
+            'always_flag_genes_file': options.always_flag_genes_file,
+            'always_flag_genes': sorted(getattr(options, 'always_flag_genes', set())),
+            'hamronized_output': getattr(options, 'hamronized_output', None),
+            'hamronized_min_call': getattr(options, 'hamronized_min_call', 'evidence'),
+            'sample_id': (
+                getattr(options, 'sample_id', None)
+                or infer_sample_id(options.query_fasta or options.input, options.output)
+            ),
+            'database_versions': dict(getattr(options, 'database_versions', {})),
             'sequence_type': options.sequence_type,
             'genes_type': (
                 'protein' if options.genes_type == 'aa'

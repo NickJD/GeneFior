@@ -41,6 +41,7 @@ import pytest
 from GeneFior.gene_stats import GeneStats
 from GeneFior.evidence import EvidenceConfig, MUST_FLAG_REVIEW
 from GeneFior.GeneFior_Gene_Stats import GeneCoverage, GeneVisualiser
+from GeneFior.utils import load_gene_id_file
 from GeneFior.workflow import Workflow
 
 
@@ -85,6 +86,7 @@ def _make_workflow(
     wf.report_fasta = None
     wf.all_reads = {}
     wf.input_fasta = None
+    wf.always_flag_genes = set()
     wf.logger = logging.getLogger("test_workflow")
     wf.logger.addHandler(logging.NullHandler())
     return wf
@@ -127,6 +129,14 @@ def _blast_line(
     ]) + "\n"
 
 
+def _blast_lines(count: int = 3, qseqid_prefix: str = "read", **kwargs) -> str:
+    """Return multiple BLAST outfmt-6 rows with unique query IDs."""
+    return "".join(
+        _blast_line(qseqid=f"{qseqid_prefix}_{index}", **kwargs)
+        for index in range(count)
+    )
+
+
 def _cigar_query_coverage_and_identity(cigar: str, seq_len: int, nm: int) -> tuple:
     """Replicate the CIGAR parsing logic from parse_bam_results.
 
@@ -164,6 +174,66 @@ def _cigar_query_coverage_and_identity(cigar: str, seq_len: int, nm: int) -> tup
 
     query_coverage = (query_aligned_bases / seq_len) * 100.0 if seq_len > 0 else 0.0
     return query_coverage, identity
+
+
+class TestAlwaysFlagGeneList:
+    def test_gene_id_file_parser_uses_gene_id_header(self, tmp_path):
+        gene_file = tmp_path / "genes.tsv"
+        gene_file.write_text(
+            "Gene_ID\tNote\n"
+            "blaCTX-M-1_1_DQ915955\twatch\n"
+            "aac(3)-IIc_1_X54723\twatch\n"
+        )
+
+        assert load_gene_id_file(gene_file) == {
+            "blaCTX-M-1_1_DQ915955",
+            "aac(3)-IIc_1_X54723",
+        }
+
+    def test_always_flagged_low_evidence_gene_is_review_not_detected(
+            self, tmp_path):
+        wf = _make_workflow(
+            query_min_coverage=20.0,
+            query_min_identity=80.0,
+            detection_min_coverage=80.0,
+        )
+        wf.output_dir = tmp_path
+        wf.always_flag_genes = {"geneA"}
+        hit_file = tmp_path / "partial.tsv"
+        hit_file.write_text(_blast_line(
+            pident=100.0,
+            qstart=1,
+            qend=30,
+            qlen=100,
+            sstart=1,
+            send=30,
+            slen=100,
+        ))
+
+        wf.parse_blast_results(hit_file, "db", "blastn")
+        wf.generate_detection_matrix("db")
+
+        with open(
+                tmp_path / "db_evidence_matrix.tsv",
+                newline="",
+        ) as handle:
+            rows = list(_csv.DictReader(handle, delimiter="\t"))
+        with open(
+                tmp_path / "db_evidence_summary.tsv",
+                newline="",
+        ) as handle:
+            summary_rows = {
+                row["Tool"]: row
+                for row in _csv.DictReader(handle, delimiter="\t")
+            }
+
+        assert rows[0]["Gene"] == "geneA"
+        assert rows[0]["blastn"] == MUST_FLAG_REVIEW
+        assert rows[0]["Always_Flagged"] == "1"
+        assert rows[0]["Evidence_Detections"] == "0"
+        assert "ALWAYS_FLAGGED_GENE" in rows[0]["Evidence_Warnings"]
+        assert summary_rows["blastn"]["Evidence_Genes"] == "0"
+        assert summary_rows["blastn"]["Always_Flagged_Genes"] == "1"
 
 
 # ===========================================================================
@@ -641,15 +711,29 @@ class TestGeneStatsVisualiserBlastCoverage:
             "Gene\tDetection_System\tblastn\tBWA\tBest_Evidence_Status\t"
             "Evidence_Detections\tCandidate_Allele_Detections\t"
             "Exact_Allele_Detections\tProfile_Detections\t"
-            "Strict_Detections\tEvidence_Warnings\n"
+            "Strict_Detections\tAlways_Flagged\tEvidence_Warnings\n"
             "candidate_gene\tqualified\tCANDIDATE_ALLELE_DETECTED\t"
-            "NOT_DETECTED\tCANDIDATE_ALLELE_DETECTED\t1\t1\t0\t0\t0\t\n"
+            "NOT_DETECTED\tCANDIDATE_ALLELE_DETECTED\t1\t1\t0\t0\t0\t0\t\n"
             "exact_gene\tqualified\tEXACT_ALLELE_DETECTED\t"
-            "NOT_DETECTED\tEXACT_ALLELE_DETECTED\t1\t0\t1\t0\t1\t\n"
+            "NOT_DETECTED\tEXACT_ALLELE_DETECTED\t1\t0\t1\t0\t1\t0\t\n"
             "family_gene\tqualified\tFAMILY_DETECTED\t"
-            "NOT_DETECTED\tFAMILY_DETECTED\t1\t0\t0\t0\t0\t\n"
+            "NOT_DETECTED\tFAMILY_DETECTED\t1\t0\t0\t0\t0\t0\t\n"
+            "flagged_gene\tqualified\tMUST_FLAG_REVIEW\t"
+            "NOT_DETECTED\tMUST_FLAG_REVIEW\t0\t0\t0\t0\t0\t1\t"
+            "ALWAYS_FLAGGED_GENE\n"
         )
         return matrix
+
+    def test_gene_stats_evidence_selection_includes_always_flagged_genes(
+            self, tmp_path):
+        visualiser = _make_visualiser(tmp_path)
+        visualiser.genes = set()
+        visualiser.gene_selection = "evidence"
+        self._write_evidence_matrix(visualiser)
+
+        selected = visualiser.load_detected_genes("db")
+
+        assert "flagged_gene" in selected
 
     def test_gene_stats_can_select_candidate_or_exact_genes(self, tmp_path):
         visualiser = _make_visualiser(tmp_path)
@@ -907,10 +991,13 @@ class TestParseBlastResultsIntegration:
             tmp_path.unlink(missing_ok=True)
         return detected, gene_reads, wf
 
-    def test_single_perfect_hit_detected(self):
-        """A single 100 % identity, full-coverage hit should be detected."""
-        line = _blast_line(pident=100.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100)
-        detected, _, _ = self._run([line],
+    def test_three_perfect_hits_detected(self):
+        """Three full-coverage hits should satisfy the 3x evidence floor."""
+        lines = _blast_lines(
+            pident=100.0, qstart=1, qend=100, qlen=100,
+            sstart=1, send=100, slen=100,
+        )
+        detected, _, _ = self._run([lines],
                                    query_min_coverage=40.0, query_min_identity=80.0,
                                    detection_min_coverage=80.0)
         assert "geneA" in detected
@@ -931,13 +1018,17 @@ class TestParseBlastResultsIntegration:
                                    detection_min_coverage=80.0)
         assert "geneA" not in detected
 
-    def test_multiple_reads_union_drives_detection(self):
-        """Two reads each covering a different 50 % of the gene → 100 % coverage → detected."""
-        l1 = _blast_line("r1", pident=95.0, qstart=1, qend=100, qlen=100,
-                         sstart=1, send=50, slen=100)
-        l2 = _blast_line("r2", pident=95.0, qstart=1, qend=100, qlen=100,
-                         sstart=51, send=100, slen=100)
-        detected, _, _ = self._run([l1, l2],
+    def test_multiple_read_groups_union_drives_detection(self):
+        """Three reads over each half give 100% 3x coverage and detection."""
+        left = _blast_lines(
+            qseqid_prefix="left", pident=95.0, qstart=1, qend=100,
+            qlen=100, sstart=1, send=50, slen=100,
+        )
+        right = _blast_lines(
+            qseqid_prefix="right", pident=95.0, qstart=1, qend=100,
+            qlen=100, sstart=51, send=100, slen=100,
+        )
+        detected, _, _ = self._run([left, right],
                                    query_min_coverage=40.0, query_min_identity=80.0,
                                    detection_min_coverage=80.0)
         assert "geneA" in detected
@@ -959,17 +1050,12 @@ class TestParseBlastResultsIntegration:
 
     def test_protein_evidence_is_detected_without_claiming_exact_allele(self):
         """Protein evidence keeps ordinary detection semantics but is not exact."""
-        line = _blast_line(
-            pident=95.0,
-            qstart=1,
-            qend=100,
-            qlen=100,
-            sstart=1,
-            send=100,
-            slen=100,
+        lines = _blast_lines(
+            pident=95.0, qstart=1, qend=100, qlen=100,
+            sstart=1, send=100, slen=100,
         )
         detected, _, wf = self._run(
-            [line],
+            [lines],
             tool_name="DIAMOND-BLASTX",
             query_min_coverage=40.0,
             query_min_identity=80.0,
@@ -984,15 +1070,6 @@ class TestParseBlastResultsIntegration:
         assert wf.detections["db"]["geneA"]["DIAMOND-BLASTX"]
 
     def test_workflow_legacy_relaxed_mode_disables_allele_resolution(self):
-        line = _blast_line(
-            pident=99.0,
-            qstart=1,
-            qend=100,
-            qlen=100,
-            sstart=1,
-            send=100,
-            slen=100,
-        )
         wf = _make_workflow(
             query_min_coverage=40.0,
             query_min_identity=80.0,
@@ -1002,7 +1079,10 @@ class TestParseBlastResultsIntegration:
         wf.detection_system = "legacy-relaxed"
         with tempfile.NamedTemporaryFile(
                 mode="w", suffix=".tsv", delete=False) as handle:
-            handle.write(line)
+            handle.write(_blast_lines(
+                pident=99.0, qstart=1, qend=100, qlen=100,
+                sstart=1, send=100, slen=100,
+            ))
             path = Path(handle.name)
         try:
             detected, _ = wf.parse_blast_results(path, "db", "BLASTn")
@@ -1023,7 +1103,7 @@ class TestParseBlastResultsIntegration:
         wf.stats_dir = tmp_path / "tool_stats"
         wf.stats_dir.mkdir()
         hit_file = tmp_path / "legacy.tsv"
-        hit_file.write_text(_blast_line(pident=100.0))
+        hit_file.write_text(_blast_lines(pident=100.0))
 
         _, gene_reads = wf.parse_blast_results(
             hit_file, "db", "BLASTn"
@@ -1055,7 +1135,7 @@ class TestParseBlastResultsIntegration:
                 "allele_resolution.tsv"):
             (tmp_path / f"db_{suffix}").write_text("stale\n")
         hit_file = tmp_path / "legacy.tsv"
-        hit_file.write_text(_blast_line(pident=100.0))
+        hit_file.write_text(_blast_lines(pident=100.0))
 
         wf.parse_blast_results(hit_file, "db", "BLASTn")
         wf.generate_detection_matrix("db")
@@ -1076,8 +1156,8 @@ class TestParseBlastResultsIntegration:
         wf.output_dir = tmp_path
         protein_file = tmp_path / "protein.tsv"
         nucleotide_file = tmp_path / "nucleotide.tsv"
-        protein_file.write_text(_blast_line(
-            qseqid="protein_read",
+        protein_file.write_text(_blast_lines(
+            qseqid_prefix="protein_read",
             sseqid="protein_gene",
             pident=95.0,
         ))
@@ -1197,9 +1277,11 @@ class TestParseBlastResultsIntegration:
         """
         # qstart=1, qend=80, qlen=80 → span coverage = 100 %
         # alignment_len=120 → old coverage = 150 % (bug)
-        line = _blast_line(pident=95.0, length=120, qstart=1, qend=80, qlen=80,
-                           sstart=1, send=80, slen=100)
-        detected, _, wf = self._run([line],
+        lines = _blast_lines(
+            pident=95.0, length=120, qstart=1, qend=80, qlen=80,
+            sstart=1, send=80, slen=100,
+        )
+        detected, _, wf = self._run([lines],
                                     query_min_coverage=40.0, query_min_identity=80.0,
                                     detection_min_coverage=70.0)
         assert "geneA" in detected   # span-based coverage = 100 % → passes
@@ -1217,8 +1299,11 @@ class TestParseBlastResultsIntegration:
     def test_comment_lines_ignored(self):
         """Lines starting with '#' must be silently skipped."""
         comment = "# This is a comment\n"
-        line = _blast_line(pident=100.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100)
-        detected, _, _ = self._run([comment, line],
+        lines = _blast_lines(
+            pident=100.0, qstart=1, qend=100, qlen=100,
+            sstart=1, send=100, slen=100,
+        )
+        detected, _, _ = self._run([comment, lines],
                                    query_min_coverage=40.0, query_min_identity=80.0,
                                    detection_min_coverage=80.0)
         assert "geneA" in detected
@@ -1226,8 +1311,11 @@ class TestParseBlastResultsIntegration:
     def test_malformed_line_skipped(self):
         """A line with fewer than 13 fields must be silently skipped without error."""
         bad_line = "read1\tgeneA\t95.0\n"
-        good_line = _blast_line(pident=95.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100)
-        detected, _, _ = self._run([bad_line, good_line])
+        good_lines = _blast_lines(
+            pident=95.0, qstart=1, qend=100, qlen=100,
+            sstart=1, send=100, slen=100,
+        )
+        detected, _, _ = self._run([bad_line, good_lines])
         assert "geneA" in detected
 
     def test_thirteen_column_line_skipped_without_aborting(self):
@@ -1236,9 +1324,11 @@ class TestParseBlastResultsIntegration:
             "read_bad", "geneA", 95.0, 100, 0, 0,
             1, 100, 1, 100, 1e-20, 100.0, 100,
         ]) + "\n"
-        good_line = _blast_line(qseqid="read_good", pident=95.0, qstart=1, qend=100, qlen=100,
-                                sstart=1, send=100, slen=100)
-        detected, _, _ = self._run([thirteen_cols, good_line])
+        good_lines = _blast_lines(
+            qseqid_prefix="read_good", pident=95.0, qstart=1, qend=100,
+            qlen=100, sstart=1, send=100, slen=100,
+        )
+        detected, _, _ = self._run([thirteen_cols, good_lines])
         assert "geneA" in detected
 
     def test_malformed_numeric_row_does_not_abort_later_hits(self):
@@ -1247,11 +1337,11 @@ class TestParseBlastResultsIntegration:
             qseqid="read_bad", pident=95.0, qstart=1, qend=100,
             qlen=100, sstart=1, send=100, slen=100,
         ).replace("\t95.0\t", "\tnot-a-number\t", 1)
-        good_line = _blast_line(
-            qseqid="read_good", pident=95.0, qstart=1, qend=100,
+        good_lines = _blast_lines(
+            qseqid_prefix="read_good", pident=95.0, qstart=1, qend=100,
             qlen=100, sstart=1, send=100, slen=100,
         )
-        detected, _, _ = self._run([malformed, good_line])
+        detected, _, _ = self._run([malformed, good_lines])
         assert "geneA" in detected
 
     def test_min_num_reads_threshold(self):
@@ -1268,10 +1358,10 @@ class TestParseBlastResultsIntegration:
         wf = _make_workflow(query_min_coverage=40.0, query_min_identity=80.0,
                             detection_min_coverage=80.0)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as fh:
-            fh.write(_blast_line(qseqid="r1", pident=95.0, qstart=1, qend=100,
-                                 qlen=100, sstart=1, send=100, slen=100))
-            fh.write(_blast_line(qseqid="r2", pident=95.0, qstart=1, qend=100,
-                                 qlen=100, sstart=1, send=100, slen=100))
+            fh.write(_blast_lines(
+                qseqid_prefix="r", pident=95.0, qstart=1, qend=100,
+                qlen=100, sstart=1, send=100, slen=100,
+            ))
             tmp_path = Path(fh.name)
         try:
             detected, gene_reads = wf.parse_blast_results(tmp_path, "db", "blastn", count_only=True)
@@ -1279,8 +1369,8 @@ class TestParseBlastResultsIntegration:
             tmp_path.unlink(missing_ok=True)
 
         assert "geneA" in detected
-        assert gene_reads["geneA"]["all_count"] == 2
-        assert gene_reads["geneA"]["passing_count"] == 2
+        assert gene_reads["geneA"]["all_count"] == 3
+        assert gene_reads["geneA"]["passing_count"] == 3
         assert "all" not in gene_reads["geneA"]
         assert wf.gene_stats["db"]["blastn"]["geneA"].avg_identity == 95.0
 
@@ -1310,7 +1400,7 @@ class TestParseBlastResultsIntegration:
             path.unlink(missing_ok=True)
 
         stats = wf.gene_stats["db"]["blastn"]["geneA"]
-        assert "geneA" in detected
+        assert "geneA" not in detected
         assert gene_reads["geneA"]["passing_count"] == 1
         assert stats.num_sequences == 1
         assert stats.passing_read_support == 1
@@ -1569,9 +1659,12 @@ class TestThresholdConsistency:
             detection_min_coverage=80.0,
         )
         blast_file = tmp_path / "hits.tsv"
-        # Single read at 95%: avg_identity = 95, coverage = 100/100 = 100%
+        # Three reads at 95%: avg_identity = 95, 3x coverage = 100/100 = 100%
         blast_file.write_text(
-            _blast_line(pident=95.0, qstart=1, qend=100, qlen=100, sstart=1, send=100, slen=100) + "\n"
+            _blast_lines(
+                pident=95.0, qstart=1, qend=100, qlen=100,
+                sstart=1, send=100, slen=100,
+            )
         )
         detected, _ = wf.parse_blast_results(blast_file, "db", "blastn")
         assert "geneA" in detected, "Gene with avg_identity 95% must be detected"

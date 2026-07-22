@@ -1399,7 +1399,7 @@ class GeneVisualiser:
                         'Candidate_Allele_Detections',
                         'Exact_Allele_Detections',
                         'Profile_Detections', 'Strict_Detections',
-                        'Evidence_Warnings',
+                        'Always_Flagged', 'Evidence_Warnings',
                     }
                     tool_columns = [
                         column for column in (reader.fieldnames or [])
@@ -1536,6 +1536,7 @@ class GeneVisualiser:
             or best_status in EVIDENCE_PRESENT_STATUSES
             or any(status in EVIDENCE_PRESENT_STATUSES for status in statuses)
         )
+        always_flagged = self._int_field(row, 'Always_Flagged') > 0
         candidate_present = (
             self._int_field(row, 'Candidate_Allele_Detections') > 0
             or best_status == CANDIDATE_ALLELE_DETECTED
@@ -1548,7 +1549,7 @@ class GeneVisualiser:
         )
 
         if self.gene_selection == 'evidence':
-            return evidence_present
+            return evidence_present or always_flagged
         if self.gene_selection == 'candidate':
             return candidate_present
         if self.gene_selection == 'exact':

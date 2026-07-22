@@ -1,4 +1,4 @@
-# Assembly Graph Visualization Feature
+# Assembly Graph Visualisation Feature
 
 **Feature:** GFA format output for Bandage visualization  
 **Version:** v2.1.0  

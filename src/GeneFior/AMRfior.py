@@ -10,6 +10,14 @@ try:
     from .databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from .workflow import Workflow
     from .gene_stats import GeneStats
+    from .hamronization import (
+        add_hamronization_arguments,
+        export_from_options,
+        infer_sample_id,
+        parse_database_versions,
+        validate_database_versions,
+        validate_hamronization_request,
+    )
     from .utils import (
         handle_all_input_files,
         cleanup_all_temp_files,
@@ -21,6 +29,7 @@ try:
         diamond_mode_label,
         sample_temp_directory,
         workflow_has_success,
+        load_gene_id_file,
     )
 
 except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
@@ -28,6 +37,14 @@ except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
     from databases import RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES, gather_databases
     from workflow import Workflow
     from gene_stats import GeneStats
+    from hamronization import (
+        add_hamronization_arguments,
+        export_from_options,
+        infer_sample_id,
+        parse_database_versions,
+        validate_database_versions,
+        validate_hamronization_request,
+    )
     from utils import (
         handle_all_input_files,
         cleanup_all_temp_files,
@@ -39,6 +56,7 @@ except (ModuleNotFoundError, ImportError, NameError, TypeError) as error:
         diamond_mode_label,
         sample_temp_directory,
         workflow_has_success,
+        load_gene_id_file,
     )
 
 
@@ -177,6 +195,12 @@ Examples:
                               help='Ambiguous-best read fraction that triggers an allele warning (default: 0.50)')
     gene_detection_group.add_argument('--evidence-score-tie', type=float, default=1.0,
                               help='Absolute bit-score difference treated as a competitive tie (default: 1.0)')
+    gene_detection_group.add_argument(
+        '--always-flag-genes', '--always-flag-gene-list',
+        dest='always_flag_genes_file',
+        help='CSV/TSV/text file of database gene IDs to always surface for '
+             'review when any evidence exists. These genes are not counted as '
+             'detected unless they pass the normal thresholds.')
 
     # gene_detection_group.add_argument( '--max_target_seqs', dest='max_target_seqs', type=int, default=100,
     #                           help='Maximum number of "hits" to return per query sequence (default: 100)')
@@ -255,7 +279,19 @@ Examples:
                             version='AMRfíor ' + GENEFIOR_VERSION,
                             help='Show program version and exit')
 
+    add_hamronization_arguments(parser)
     options = parser.parse_args()
+    try:
+        options.database_versions = parse_database_versions(
+            options.database_version_specs
+        )
+        validate_hamronization_request(
+            options.hamronized_output,
+            options.hamronized_min_call,
+            options.detection_system,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     options.temp_directory_user_specified = bool(
         getattr(options, 'temp_directory', None)
@@ -412,6 +448,15 @@ Examples:
         if not databases:
             logger.error("Error: At least one database must be specified in databases.py or provided by the user")
             sys.exit(1)
+        try:
+            validate_database_versions(
+                options.hamronized_output,
+                databases.keys(),
+                options.database_versions,
+            )
+        except ValueError as exc:
+            logger.error(str(exc))
+            sys.exit(2)
 
         # Preflight: log which database tools (blastn/blastx/blastp/diamond) have database files available
         try:
@@ -560,6 +605,18 @@ Examples:
         logger.info(f"Legacy detection depth: {options.detection_min_depth}×")
         logger.info(f"Qualified evidence depth: {options.evidence_corroborating_depth}×")
         logger.info(f"Detection system: {options.detection_system}")
+        try:
+            options.always_flag_genes = load_gene_id_file(
+                getattr(options, 'always_flag_genes_file', None),
+                logger,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to load --always-flag-genes file: {exc}")
+            sys.exit(1)
+        if options.always_flag_genes:
+            logger.info(
+                f"Always-flag review genes: {len(options.always_flag_genes)}"
+            )
         # Reflect Genes-FASTA + --genes-type effects in displayed run modes
         eff_run_dna = run_dna
         eff_run_protein = run_protein
@@ -665,7 +722,13 @@ Examples:
                         'genes_type': ('protein' if getattr(sample_opts, 'genes_type', None) == 'aa' else getattr(sample_opts, 'genes_type', None)),
                         'report_fasta': getattr(options, 'report_fasta', None),
                         'threads': getattr(options, 'threads', None),
-                        'fastp_trim': getattr(options, 'fastp_trim', False)
+                        'fastp_trim': getattr(options, 'fastp_trim', False),
+                        'always_flag_genes_file': getattr(options, 'always_flag_genes_file', None),
+                        'always_flag_genes': sorted(getattr(options, 'always_flag_genes', set())),
+                        'hamronized_output': getattr(options, 'hamronized_output', None),
+                        'hamronized_min_call': getattr(options, 'hamronized_min_call', 'evidence'),
+                        'sample_id': sample_name,
+                        'database_versions': dict(getattr(options, 'database_versions', {})),
                     }
                     with open(os.path.join(sample_out, 'run_parameters.json'), 'w') as pf:
                         json.dump(params, pf, indent=2)
@@ -716,9 +779,19 @@ Examples:
                         evidence_min_unique_fraction=options.evidence_min_unique_fraction,
                         evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
                         evidence_score_tie=options.evidence_score_tie,
+                        always_flag_genes=getattr(options, 'always_flag_genes', set()),
                     )
 
                     results = workflow.run_workflow(sample_opts)
+                    export_from_options(
+                        sample_opts,
+                        sample_out,
+                        "AMRfior",
+                        GENEFIOR_VERSION.lstrip("v"),
+                        logger=logger,
+                        sample_id=sample_name,
+                        input_spec=input_spec,
+                    )
                     if not workflow_has_success(results):
                         failed_samples.append(sample_name)
                         logger.error(
@@ -797,6 +870,7 @@ Examples:
             evidence_min_unique_fraction=options.evidence_min_unique_fraction,
             evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
             evidence_score_tie=options.evidence_score_tie,
+            always_flag_genes=getattr(options, 'always_flag_genes', set()),
         )
 
         ###
@@ -823,6 +897,15 @@ Examples:
                 'evidence_min_unique_fraction': options.evidence_min_unique_fraction,
                 'evidence_ambiguity_fraction': options.evidence_ambiguity_fraction,
                 'evidence_score_tie': options.evidence_score_tie,
+                'always_flag_genes_file': getattr(options, 'always_flag_genes_file', None),
+                'always_flag_genes': sorted(getattr(options, 'always_flag_genes', set())),
+                'hamronized_output': getattr(options, 'hamronized_output', None),
+                'hamronized_min_call': getattr(options, 'hamronized_min_call', 'evidence'),
+                'sample_id': (
+                    getattr(options, 'sample_id', None)
+                    or infer_sample_id(options.input, options.output)
+                ),
+                'database_versions': dict(getattr(options, 'database_versions', {})),
                 'sensitivity': getattr(options, 'sensitivity', None),
                 'evalue': getattr(options, 'evalue', None),
                 'min_bitscore': getattr(options, 'min_bitscore', None),
@@ -840,6 +923,14 @@ Examples:
             logger.debug("Failed to write run parameters file to output: %s", getattr(options, 'output', ''))
 
         results = workflow.run_workflow(options)
+        export_from_options(
+            options,
+            options.output,
+            "AMRfior",
+            GENEFIOR_VERSION.lstrip("v"),
+            logger=logger,
+            input_spec=options.input,
+        )
 
         failed_tools = []
         all_failed = True

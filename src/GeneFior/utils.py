@@ -9,6 +9,7 @@ import shlex
 import time
 import tempfile
 import subprocess
+import csv
 
 
 def diamond_mode_label(sequence_type, genes_type=None):
@@ -43,6 +44,57 @@ def workflow_has_success(results):
             if success:
                 return True
     return False
+
+
+def load_gene_id_file(path, logger=None):
+    """Load database gene IDs from a one-column text, CSV, or TSV file.
+
+    If the first row contains a recognised header (Gene, Gene_ID, GeneID, or
+    ID), that column is used. Otherwise the first column is treated as the gene
+    ID column. Empty rows and comment rows beginning with # are ignored.
+    """
+    if not path:
+        return set()
+
+    file_path = os.path.abspath(os.path.expanduser(str(path)))
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"Gene ID list not found: {file_path}")
+
+    with open(file_path, 'r', newline='') as handle:
+        raw_lines = [
+            line for line in handle
+            if line.strip() and not line.lstrip().startswith('#')
+        ]
+
+    if not raw_lines:
+        if logger:
+            logger.warning(f"Gene ID list is empty: {file_path}")
+        return set()
+
+    first_line = raw_lines[0]
+    delimiter = '\t' if '\t' in first_line else ','
+    rows = list(csv.reader(raw_lines, delimiter=delimiter))
+    header_names = {'gene', 'gene_id', 'gene id', 'geneid', 'id'}
+    header = [cell.strip().lower() for cell in rows[0]]
+    id_column = 0
+    start_index = 0
+    for index, name in enumerate(header):
+        if name in header_names:
+            id_column = index
+            start_index = 1
+            break
+
+    gene_ids = set()
+    for row in rows[start_index:]:
+        if id_column >= len(row):
+            continue
+        gene_id = row[id_column].strip()
+        if gene_id:
+            gene_ids.add(gene_id)
+
+    if logger:
+        logger.info(f"Loaded {len(gene_ids)} always-flag gene ID(s) from {file_path}")
+    return gene_ids
 
 
 def run_fastp_for_paired_reads(options, r1_path, r2_path, logger):

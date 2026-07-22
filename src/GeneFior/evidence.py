@@ -83,11 +83,25 @@ class EvidenceCall:
 
 def infer_gene_family(gene: str) -> str:
     """Return a conservative family label from common AMR allele identifiers."""
-    family = gene.split("|")[-1].strip()
+    parts = [part.strip() for part in gene.split("|") if part.strip()]
+    if len(parts) > 1 and any(
+            re.fullmatch(r"ARO:\d+", part, flags=re.IGNORECASE)
+            for part in parts):
+        # CARD identifiers are emitted as "gene symbol|ARO accession". The
+        # accession is provenance, not a biological gene-family label.
+        family = next(
+            part for part in parts
+            if not re.fullmatch(r"ARO:\d+", part, flags=re.IGNORECASE)
+        )
+    else:
+        family = parts[-1] if parts else gene.strip()
     family = re.sub(r"_[0-9]+_[A-Z][A-Z0-9.]*$", "", family)
     family = re.sub(r"_[A-Z]{1,6}[0-9]+(?:\.[0-9]+)?$", "", family)
-    if family.lower().startswith("bla"):
-        family = re.sub(r"-[0-9]+$", "", family)
+    # Common AMR database symbols append an allele number either with a
+    # hyphen (SHV-52, OXA-48) or directly (aadA1, CmlA9). Preserve the named
+    # allele elsewhere, but group evidence at the stable family stem.
+    family = re.sub(r"-[0-9]+$", "", family)
+    family = re.sub(r"(?<=[A-Za-z])[0-9]+$", "", family)
     return family or gene
 
 
@@ -135,7 +149,10 @@ def legacy_thresholds_pass(stats, detection_min_coverage: float,
                            reads_mode: bool = True) -> bool:
     """Apply the relaxed binary detector with a true depth coverage gate."""
     identity_pass = profile or stats.avg_identity >= detection_min_identity
-    required_depth = max(3, int(detection_min_depth or 3)) if reads_mode else 1
+    required_depth = (
+        1 if profile or not reads_mode
+        else max(3, int(detection_min_depth or 3))
+    )
     sequence_support = stats.num_sequences
     return (
         stats.coverage_at_depth(required_depth) >= detection_min_coverage
@@ -156,7 +173,7 @@ def _qualified_thresholds_pass(stats, detection_min_coverage: float,
         if stats.passing_read_support > 0
         else stats.num_sequences
     )
-    depth = max(3, int(detection_depth or 3))
+    depth = max(1, int(detection_depth or 1))
     return (
         stats.coverage_at_depth(depth) >= detection_min_coverage
         and identity_pass
@@ -175,7 +192,10 @@ def classify_gene_legacy(
         reads_mode: bool = True) -> EvidenceCall:
     """Run the relaxed binary detector without allele claims."""
     modality = tool_modality(tool_name)
-    required_depth = max(3, int(detection_min_depth or 3)) if reads_mode else 1
+    required_depth = (
+        1 if modality == "profile" or not reads_mode
+        else max(3, int(detection_min_depth or 3))
+    )
     detection_depth_coverage = stats.coverage_at_depth(required_depth)
     detected = legacy_thresholds_pass(
         stats,
@@ -221,8 +241,8 @@ def classify_gene_evidence(
     warnings: List[str] = []
 
     detection_depth = (
-        max(3, int(config.corroborating_depth))
-        if reads_mode else 1
+        1 if is_profile or not reads_mode
+        else max(3, int(config.corroborating_depth))
     )
     detection_depth_coverage = stats.coverage_at_depth(detection_depth)
     identity_pass = is_profile or stats.avg_identity >= detection_min_identity
@@ -241,7 +261,7 @@ def classify_gene_evidence(
         profile=is_profile,
     )
 
-    corroborating_coverage = stats.coverage_at_depth(config.corroborating_depth)
+    corroborating_coverage = stats.coverage_at_depth(detection_depth)
     max_allowed_gap = max(
         config.max_internal_gap_bp,
         int(round(stats.gene_length * config.max_internal_gap_fraction)),
@@ -276,7 +296,7 @@ def classify_gene_evidence(
         warnings.append("LOW_READ_SUPPORT")
     if discontinuous:
         warnings.append("DISCONTINUOUS_COVERAGE")
-    if reads_mode and detection_depth_coverage < detection_min_coverage:
+    if reads_mode and not is_profile and detection_depth_coverage < detection_min_coverage:
         warnings.append("LOW_CORROBORATED_COVERAGE")
         if stats.gene_coverage >= detection_min_coverage:
             warnings.append("THRESHOLD_SENSITIVE")

@@ -86,6 +86,10 @@ def test_recompute_inherits_source_sequence_and_evidence_metadata(tmp_path):
         "query_min_identity": 91.0,
         "detection_min_coverage": 87.0,
         "evidence_corroborating_depth": 3,
+        "hamronized_output": "both",
+        "hamronized_min_call": "candidate",
+        "sample_id": "source-sample",
+        "database_versions": {"resfinder": "2026-01"},
     }))
     options = _options(
         tmp_path,
@@ -106,6 +110,9 @@ def test_recompute_inherits_source_sequence_and_evidence_metadata(tmp_path):
         evidence_min_unique_fraction=None,
         evidence_ambiguity_fraction=None,
         evidence_score_tie=None,
+        hamronized_output=None,
+        hamronized_min_call=None,
+        sample_id=None,
     )
 
     apply_source_run_defaults(options, logging.getLogger("test"))
@@ -117,6 +124,12 @@ def test_recompute_inherits_source_sequence_and_evidence_metadata(tmp_path):
     assert options.detection_min_coverage == 87.0
     assert options.detection_min_depth == 1
     assert options.evidence_corroborating_depth == 3
+    assert options.hamronized_output == "both"
+    assert options.hamronized_min_call == "candidate"
+    assert options.sample_id == "source-sample"
+    assert options.source_run_parameters["database_versions"] == {
+        "resfinder": "2026-01"
+    }
     assert options.tools == ["all"]
 
 

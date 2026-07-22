@@ -85,6 +85,7 @@ class Workflow:
                      hmmer_evalue: Optional[float] = None,
                      hmmer_threshold_mode: str = 'evalue',
                      hmmer_must_flag: bool = True,
+                     always_flag_genes: Optional[Set[str]] = None,
                      tools: Optional[List[str]] = None,
                      evidence_corroborating_depth: int = 3,
                      evidence_exact_identity: float = 100.0,
@@ -293,6 +294,7 @@ class Workflow:
         # fail coverage/min-reads gates are treated identically to all other genes and
         # the MUST-FLAG ALERT log block is suppressed.  True by default.
         self.hmmer_must_flag = hmmer_must_flag
+        self.always_flag_genes = set(always_flag_genes or [])
         # User-selected tools list (e.g. ['bowtie2', 'bwa']).
         # When provided, only the listed tools are run regardless of what databases
         # are available.  When None (not provided by caller) all available tools run
@@ -324,6 +326,7 @@ class Workflow:
             getattr(self, "detection_system", DETECTION_SYSTEM_QUALIFIED)
         )
         for gene, stats in stats_by_gene.items():
+            always_flagged = gene in getattr(self, 'always_flag_genes', set())
             if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
                 call = classify_gene_legacy(
                     gene=gene,
@@ -345,7 +348,13 @@ class Workflow:
                     detection_min_identity=self.detection_min_identity,
                     detection_min_num_reads=self.detection_min_num_reads,
                     reads_mode=not getattr(self, 'is_genes_fasta', False),
-                    must_flag_override=gene in must_flag_overrides,
+                    must_flag_override=(
+                        gene in must_flag_overrides or always_flagged
+                    ),
+                )
+            if always_flagged:
+                call.warnings = sorted(
+                    set(call.warnings + ["ALWAYS_FLAGGED_GENE"])
                 )
             if eligible_genes is not None and gene not in eligible_genes:
                 call.status = NOT_DETECTED
@@ -3271,7 +3280,7 @@ class Workflow:
                 'Best_Read_Support', 'Unique_Best_Read_Support',
                 'Ambiguous_Best_Read_Support', 'Evidence_Status',
                 'Evidence_Warnings', 'Family', 'Top_Database_Candidate',
-                'Competing_Alleles', 'Evidence_Present',
+                'Competing_Alleles', 'Always_Flagged', 'Evidence_Present',
                 'Candidate_Allele_Detected', 'Exact_Allele_Detected',
                 'Profile_Detected', 'Detection_System', 'Detected',
                 ]
@@ -3343,6 +3352,7 @@ class Workflow:
                     call.family if call else '',
                     call.best_allele if call else gene,
                     ';'.join(call.competing_alleles) if call else '',
+                    '1' if gene in getattr(self, 'always_flag_genes', set()) else '0',
                     '1' if call and call.evidence_present else '0',
                     '1' if call and call.candidate_allele_detected else '0',
                     '1' if call and call.exact_allele_detected else '0',
@@ -3461,6 +3471,7 @@ class Workflow:
                 'Exact_Allele_Detections',
                 'Profile_Detections',
                 'Strict_Detections',
+                'Always_Flagged',
                 'Evidence_Warnings',
             ])
             for gene in genes:
@@ -3504,6 +3515,7 @@ class Workflow:
                     exact_count,
                     profile_count,
                     strict_count,
+                    '1' if gene in getattr(self, 'always_flag_genes', set()) else '0',
                     ';'.join(warnings),
                 ])
         self.logger.info(f"Generated detection evidence matrix: {evidence_file}")
@@ -3515,6 +3527,7 @@ class Workflow:
                 'Tool', 'Detection_System', 'Evidence_Genes',
                 'Candidate_Allele_Genes', 'Exact_Allele_Genes',
                 'Profile_Genes', 'Exact_Or_Profile_Genes',
+                'Always_Flagged_Genes',
             ])
 
             def _summary_counts(tool=None):
@@ -3541,12 +3554,17 @@ class Workflow:
                 strict_genes = {
                     call.gene for call in selected if call.exact_detected
                 }
+                always_flagged_genes = {
+                    call.gene for call in selected
+                    if call.gene in getattr(self, 'always_flag_genes', set())
+                }
                 return (
                     len(evidence_genes),
                     len(candidate_genes),
                     len(exact_genes),
                     len(profile_genes),
                     len(strict_genes),
+                    len(always_flagged_genes),
                 )
 
             for tool in all_tools:

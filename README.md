@@ -35,8 +35,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.10.1 GeneFíor - The Multi-Tool Gene Detection Toolkit.
-
+GeneFíor v0.10.3 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 options:
   -h, --help            show this help message and exit
 
@@ -140,7 +139,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.10.1 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.10.3 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -271,6 +270,87 @@ each directory name as the database name in logs and output files. Directory
 names must therefore be unique. A single path retains the historical
 `user-provided-db` output label.
 
+### Always-flag gene review lists
+
+Use `--always-flag-genes <file>` (alias: `--always-flag-gene-list`) with
+GeneFior, AMRfior, or GeneFior-Recompute to provide a CSV, TSV, or plain text
+list of database gene IDs that should always be surfaced for review when any
+alignment evidence exists. The IDs must match the gene IDs used in the selected
+database outputs.
+
+The file can be a one-ID-per-line list, or a CSV/TSV table with a `Gene`,
+`Gene_ID`, `GeneID`, or `ID` column:
+
+```text
+Gene_ID	Reason
+blaCTX-M-1_1_DQ915955	priority review
+aac(3)-IIc_1_X54723	priority review
+```
+
+Always-flagged genes are not promoted to detected calls just because they are
+on the list. In qualified mode, weak flagged evidence is reported as
+`MUST_FLAG_REVIEW` with `Always_Flagged=1`, `Evidence_Present=0`, and
+`Detected=0`. If a flagged gene passes the normal evidence, candidate, or exact
+thresholds, it keeps that true status and is also marked with
+`Always_Flagged=1`. Gene-stats `--gene-selection evidence` includes these
+flagged review genes automatically.
+
+### PHA4GE hAMRonization output
+
+GeneFior, AMRfior, and GeneFior-Recompute can write positive AMR results in
+the [PHA4GE hAMRonization](https://github.com/pha4ge/hAMRonization) TSV or JSON
+schema. The exporter consolidates supporting search tools and writes one row
+per sample, reference database, and gene family. Normal GeneFior reports remain
+the detailed audit trail for tool-specific evidence, competing alleles, and
+warnings.
+
+```bash
+AMRfior \
+  -i reads_R1.fastq.gz,reads_R2.fastq.gz \
+  -st Paired-FASTQ \
+  -o results \
+  --hamronized-output both \
+  --hamronized-min-call evidence \
+  --sample-id isolate_001 \
+  --database-version resfinder=2026-01 \
+  --database-version card=4.0.1
+```
+
+The output files are `hamronized_report.tsv` and/or
+`hamronized_report.json`. `--hamronized-output` is optional and accepts `tsv`,
+`json`, or `both`. The minimum exported call can be selected with:
+
+- `evidence` (default): any call with `Evidence_Present=1`; legacy-relaxed
+  `Detected=1` calls are also supported.
+- `candidate`: candidate and exact nucleotide allele calls only.
+- `exact`: exact nucleotide allele calls only.
+
+`MUST_FLAG_REVIEW`, `PARTIAL_OR_DIVERGENT`, `NOT_DETECTED`, and low-evidence
+always-flag results are never exported as gene presence. Candidate or exact
+allele names are used only when that resolution tier passes; otherwise the
+gene-family name is reported with the top database accession retained as
+reference provenance.
+
+hAMRonization requires a reference database version. GeneFior does not guess
+one from a filename or installation date, so every selected database must have
+an explicit `--database-version DATABASE=VERSION` whenever harmonized output
+is requested. For a single custom GeneFior database the database label is
+`user-provided-db`; with multiple custom databases, each directory name is its
+database label.
+
+Paired inputs use the inferred common sample name unless `--sample-id` is
+provided. Batch runs always use each discovered sample name. Recompute inherits
+the harmonized format, minimum tier, sample ID, and database versions from the
+source `run_parameters.json`; explicitly supplied Recompute options override
+that metadata.
+
+For nucleotide-supported rows, `Gene_Length` is exported as
+`reference_gene_length`. Protein-search and protein-profile rows use
+`reference_protein_length`; their `sequence_identity` is amino-acid identity.
+The hAMRonization schema currently has no separate field identifying whether
+`sequence_identity` is nucleotide or amino-acid based, so GeneFior preferentially
+uses nucleotide evidence when otherwise equivalent calls are consolidated.
+
 ### Sensitivity presets map: 
 ```
 Sensitivity presets provide convenient combinations of parameters for different use cases. The presets map to specific parameter settings for DIAMOND and Bowtie2 as follows:
@@ -298,8 +378,9 @@ allele is present. Every tool now receives a qualified evidence call:
 - `MIXED_OR_MOSAIC`: discontinuous or threshold-sensitive evidence inconsistent with one coherent allele.
 - `PROFILE_DETECTED`: robust HMM profile evidence.
 - `MUST_FLAG_REVIEW`: a must-flag profile passed the significance filter but
-  failed ordinary evidence thresholds; it is flagged for review, not counted
-  as positive evidence.
+  failed ordinary evidence thresholds, or a user-listed always-flag gene has
+  some evidence but does not pass ordinary thresholds; it is flagged for
+  review, not counted as positive evidence.
 - `NOT_DETECTED`: insufficient evidence.
 
 Protein searches (`BLASTx`, `BLASTp`, and DIAMOND) cannot by themselves claim
@@ -323,6 +404,8 @@ Important output columns:
   thresholds for DNA `Genes-FASTA` input.
 - `Exact_Allele_Detected=1` means the named nucleotide allele was resolved.
 - `Profile_Detected=1` means a robust HMM profile was detected.
+- `Always_Flagged=1` means the gene was supplied through
+  `--always-flag-genes` and should be reviewed even if `Evidence_Present=0`.
 - `Detected` is retained as a backwards-compatible alias of
   `Evidence_Present`; it reports whether the user's detection thresholds pass.
 - `Evidence_Status` and `Evidence_Warnings` should be used for interpretation.
@@ -338,8 +421,8 @@ New per-database outputs:
 
 - `<database>_detection_matrix.tsv`: user-threshold evidence binary calls.
 - `<database>_evidence_matrix.tsv`: qualified per-tool evidence statuses.
-- `<database>_evidence_summary.tsv`: evidence, candidate-allele, and exact-allele
-  counts per tool and across all tools.
+- `<database>_evidence_summary.tsv`: evidence, candidate-allele, exact-allele,
+  and always-flagged review counts per tool and across all tools.
 - `<database>_allele_resolution.tsv`: family-level top database candidate and competing alleles.
 
 These qualified-only files and fields are produced only by
@@ -368,7 +451,7 @@ Detection-system compatibility:
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.10.1 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.10.3 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -432,7 +515,7 @@ Examples:
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.10.1 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.10.3 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -510,7 +593,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.10.1 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.10.3 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit
