@@ -1078,7 +1078,7 @@ def discover_samples_from_subdirs(parent_dir, sequence_type, logger, exclude_pat
     return samples
 
 
-def combine_detection_matrices(output_root, sample_names, logger):
+def combine_detection_matrices(input_dir,output_root, sample_names, logger):
     """Combine per-sample detection_matrix files into per-database combined matrices.
 
     Produces two outputs per database found in sample outputs:
@@ -1100,7 +1100,7 @@ def combine_detection_matrices(output_root, sample_names, logger):
     db_sample_files = {}
 
     for s in sample_names:
-        sdir = out_root / s
+        sdir = input_dir / s
         if not sdir.is_dir():
             continue
         for p in sdir.glob('*_detection_matrix.tsv'):

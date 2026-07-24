@@ -1,0 +1,117 @@
+2026-05-04 14:07:34,776 - INFO - Database tool availability (per selected database):
+2026-05-04 14:07:34,776 - INFO -   user-provided-db: BLASTn: Yes; BLASTx: Yes; BLASTp: Yes; DIAMOND: Yes
+2026-05-04 14:07:34,776 - INFO - ======================================================================
+2026-05-04 14:07:34,776 - INFO - Genefíor - The Gene Detection toolkit: v0.8.0
+2026-05-04 14:07:34,776 - INFO - Started at: 2026-05-04 14:07:34
+2026-05-04 14:07:34,776 - INFO - ======================================================================
+2026-05-04 14:07:34,776 - INFO - Threads: 4
+2026-05-04 14:07:34,776 - INFO - Database(s) chosen:
+2026-05-04 14:07:34,776 - INFO -   User-Provided: resfinder
+2026-05-04 14:07:34,776 - INFO -  Tool(s) chosen:
+2026-05-04 14:07:34,776 - INFO -   BLASTn: Yes
+2026-05-04 14:07:34,776 - INFO -   BLASTx: Yes
+2026-05-04 14:07:34,776 - INFO -   BLASTp: No
+2026-05-04 14:07:34,776 - INFO -   DIAMOND: Yes
+2026-05-04 14:07:34,776 - INFO -   Bowtie2: Yes
+2026-05-04 14:07:34,776 - INFO -   BWA: Yes
+2026-05-04 14:07:34,776 - INFO -   Minimap2: Yes
+2026-05-04 14:07:34,776 - INFO -   HMMER-Protein: No
+2026-05-04 14:07:34,776 - INFO -   HMMER-DNA: No
+2026-05-04 14:07:34,776 - INFO - Min query coverage: 40.0%
+2026-05-04 14:07:34,776 - INFO - Min query identity: 80.0%
+2026-05-04 14:07:34,776 - INFO - Min detection coverage: 80.0%
+2026-05-04 14:07:34,776 - INFO - Min detection identity: 80.0%
+2026-05-04 14:07:34,776 - INFO - Run DNA mode: True
+2026-05-04 14:07:34,777 - INFO - Run Protein mode: True
+2026-05-04 14:07:34,777 - INFO - Sensitivity parameters: default - None
+2026-05-04 14:07:34,777 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:07:34,777 - INFO - ======================================================================
+2026-05-04 14:07:34,777 - INFO - GeneFíor I/O processing...
+2026-05-04 14:07:34,777 - INFO - ======================================================================
+2026-05-04 14:07:34,777 - INFO - Input type: Single-FASTA
+2026-05-04 14:07:34,777 - INFO - Input file: test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz (5.58 MB)
+2026-05-04 14:07:34,777 - INFO - Copying FASTA to temp directory...
+2026-05-04 14:07:34,777 - INFO - Copying test_data/Single-FASTA/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz to temp directory test_data/outputs/out_single_new...
+2026-05-04 14:07:34,777 - INFO - File size: 5.58 MB
+2026-05-04 14:07:34,779 - INFO - Successfully copied to: test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:07:34,779 - INFO - FASTA will be read from temp directory: test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:07:34,779 - INFO - Output directory: test_data/outputs/out_single_new
+2026-05-04 14:07:34,779 - INFO - Temp directory: test_data/outputs/out_single_new
+2026-05-04 14:07:34,779 - INFO - Files tracked for cleanup: 1
+2026-05-04 14:07:34,779 - INFO -   - test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:07:34,779 - INFO - ======================================================================
+2026-05-04 14:07:34,779 - INFO - Configured max FASTA chunk size: 200.0 MiB (209715200 bytes)
+2026-05-04 14:07:34,779 - INFO - 
+### Processing User-provided-db Database ###
+2026-05-04 14:07:34,779 - INFO - Parameters for user-provided-db - BLASTn: blastn -query - -db test_data/tmp_user_dbs/resfinder/blast_dna/all_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40 -perc_identity 80.0
+2026-05-04 14:07:34,779 - INFO - gz_input=True, fasta=test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:07:41,150 - INFO - Filtered user-provided-db - BLASTn output test_data/outputs/out_single_new/raw_outputs/user-provided-db_blastn_results.tsv: kept 972/996 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 14:07:41,328 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTn: 100000
+2026-05-04 14:07:41,328 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTn: 972
+2026-05-04 14:07:41,328 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTn: 972
+2026-05-04 14:07:41,328 - INFO - Detected 14 genes in USER-PROVIDED-DB using BLASTn
+2026-05-04 14:07:41,328 - INFO -   Stats file: test_data/outputs/out_single_new/tool_stats/user-provided-db_BLASTn_stats.tsv
+2026-05-04 14:07:41,328 - INFO - Parameters for user-provided-db - BLASTx: blastx -query - -task blastx-fast -db test_data/tmp_user_dbs/resfinder/blast_aa/all_aa_blastdb -out - -outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen -num_threads 4 -qcov_hsp_perc 40
+2026-05-04 14:07:41,328 - INFO - gz_input=True, fasta=test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:50:47,326 - INFO - Filtered user-provided-db - BLASTx output test_data/outputs/out_single_new/raw_outputs/user-provided-db_blastx_results.tsv: kept 1544/43705 hits (identity>=80.0, qcov>=40.0%)
+2026-05-04 14:50:47,341 - INFO - Total reads processed in USER-PROVIDED-DB using BLASTx: 100000
+2026-05-04 14:50:47,342 - INFO - Reads that returned a hit in USER-PROVIDED-DB using BLASTx: 1544
+2026-05-04 14:50:47,342 - INFO - Reads passing thresholds in USER-PROVIDED-DB using BLASTx: 1544
+2026-05-04 14:50:47,342 - INFO - Detected 12 genes in USER-PROVIDED-DB using BLASTx
+2026-05-04 14:50:47,342 - INFO -   Stats file: test_data/outputs/out_single_new/tool_stats/user-provided-db_BLASTx_stats.tsv
+2026-05-04 14:50:47,342 - INFO - Checking if input FASTA ` test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz ` is gzipped and not broken...
+2026-05-04 14:50:47,428 - INFO - Input FASTA ` test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz ` appears to be a valid gzip file.
+2026-05-04 14:50:47,428 - INFO - Running user-provided-db - DIAMOND-BLASTX...
+2026-05-04 14:50:47,428 - INFO - Parameters for user-provided-db - DIAMOND-BLASTX: diamond blastx -q test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz -d test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd -o test_data/outputs/out_single_new/raw_outputs/user-provided-db_diamond_results.tsv -f 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen --header --id 80.0 --query-cover 40.0 -p 4
+2026-05-04 14:50:47,442 - ERROR - user-provided-db - DIAMOND-BLASTX failed with return code 1
+2026-05-04 14:50:47,442 - ERROR - Error message: diamond v2.1.9.163 (C) Max Planck Society for the Advancement of Science, Benjamin Buchfink, University of Tuebingen
+Documentation, support and updates available at http://www.diamondsearch.org
+Please cite: http://dx.doi.org/10.1038/s41592-021-01101-x Nature Methods (2021)
+
+#CPU threads: 4
+Scoring parameters: (Matrix=BLOSUM62 Lambda=0.267 K=0.041 Penalties=11/1)
+Temporary directory: test_data/outputs/out_single_new/raw_outputs
+#Target sequences to report alignments for: 25
+Opening the database... 
+Error opening file test_data/tmp_user_dbs/resfinder/diamond/all_aa_diamonddb.dmnd: No such file or directory
+
+2026-05-04 14:50:47,442 - INFO - Running user-provided-db - Bowtie2...
+2026-05-04 14:50:47,442 - INFO - Parameters for user-provided-db - Bowtie2: bowtie2 -f -U test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz -x test_data/tmp_user_dbs/resfinder/bowtie2/all_bowtie2db -S test_data/outputs/out_single_new/raw_outputs/user-provided-db_bowtie2_results.sam -p 4 --no-unal --met-file test_data/outputs/out_single_new/raw_outputs/user-provided-db_bowtie2_summary.txt
+2026-05-04 14:50:47,468 - ERROR - user-provided-db - Bowtie2 failed with return code 2
+2026-05-04 14:50:47,468 - ERROR - Error message: (ERR): "test_data/tmp_user_dbs/resfinder/bowtie2/all_bowtie2db" does not exist or is not a Bowtie 2 index
+Exiting now ...
+
+2026-05-04 14:50:47,469 - INFO - Running user-provided-db - BWA...
+2026-05-04 14:50:47,469 - INFO - Parameters for user-provided-db - BWA: bwa mem -t 4 -o test_data/outputs/out_single_new/raw_outputs/user-provided-db_bwa_results.sam test_data/tmp_user_dbs/resfinder/bwa/all_bwadb test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:50:47,471 - ERROR - user-provided-db - BWA failed with return code 1
+2026-05-04 14:50:47,471 - ERROR - Error message: [E::bwa_idx_load_from_disk] fail to locate the index files
+
+2026-05-04 14:50:47,471 - INFO - Generated detection matrix: test_data/outputs/out_single_new/user-provided-db_detection_matrix.tsv
+2026-05-04 14:50:47,471 - INFO -   Total genes detected: 15
+2026-05-04 14:50:47,471 - INFO -   Tools used: 2
+2026-05-04 14:50:47,471 - INFO - 
+======================================================================
+2026-05-04 14:50:47,471 - INFO - PIPELINE SUMMARY
+2026-05-04 14:50:47,471 - INFO - ======================================================================
+2026-05-04 14:50:47,471 - INFO - 
+USER-PROVIDED-DB:
+2026-05-04 14:50:47,471 - INFO -   ✓ BLASTn-DNA.................... 14 genes detected
+2026-05-04 14:50:47,471 - INFO -   ✓ BLASTx-AA..................... 12 genes detected
+2026-05-04 14:50:47,471 - INFO -   ✗ DIAMOND-AA.................... 0 genes detected
+2026-05-04 14:50:47,471 - INFO -   ✗ Bowtie2-DNA................... 0 genes detected
+2026-05-04 14:50:47,471 - INFO -   ✗ BWA-DNA....................... 0 genes detected
+2026-05-04 14:50:47,471 - INFO - ======================================================================
+2026-05-04 14:50:47,471 - INFO - Detection matrices saved to: test_data/outputs/out_single_new
+2026-05-04 14:50:47,471 - INFO - Tool statistics saved to: test_data/outputs/out_single_new/tool_stats
+2026-05-04 14:50:47,471 - INFO - Raw outputs saved to: test_data/outputs/out_single_new/raw_outputs
+2026-05-04 14:50:47,471 - INFO - ======================================================================
+2026-05-04 14:50:47,472 - INFO - Tool failure - DIAMOND-AA (database: user-provided-db): detected 0 genes
+2026-05-04 14:50:47,472 - WARNING -   -> DIAMOND-AA failed for user-provided-db
+2026-05-04 14:50:47,472 - INFO - Tool failure - Bowtie2-DNA (database: user-provided-db): detected 0 genes
+2026-05-04 14:50:47,472 - WARNING -   -> Bowtie2-DNA failed for user-provided-db
+2026-05-04 14:50:47,472 - INFO - Tool failure - BWA-DNA (database: user-provided-db): detected 0 genes
+2026-05-04 14:50:47,472 - WARNING -   -> BWA-DNA failed for user-provided-db
+2026-05-04 14:50:47,472 - INFO - Cleaning up temporary files...
+2026-05-04 14:50:47,472 - INFO - ======================================================================
+2026-05-04 14:50:47,472 - INFO - Removed temporary file: /home/nickd/Git/GeneFior/test_data/outputs/out_single_new/PN0204_0335_S329_L001_Aligned_Mapped_Removed_Sorted_R1_100k.fasta.gz
+2026-05-04 14:50:47,472 - INFO - Cleaned up 1 temporary file(s)

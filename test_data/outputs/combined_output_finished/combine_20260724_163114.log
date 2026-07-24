@@ -1,0 +1,5 @@
+2026-07-24 16:31:14,069 - INFO - Found 3 sample(s) to include in combine: out_single_fasta, out_single_fasta.prev, out_single_new
+2026-07-24 16:31:14,070 - INFO - Combined detection matrix written: /home/nickd/Git/GeneFior/test_data/outputs/combined_output_finished/user-provided-db_combined_detection_matrix.tsv
+2026-07-24 16:31:14,070 - INFO - Informative tools-per-sample combined matrix written: /home/nickd/Git/GeneFior/test_data/outputs/combined_output_finished/user-provided-db_combined_detection_matrix_tools.tsv
+2026-07-24 16:31:14,070 - INFO - Wrote combined matrices README: /home/nickd/Git/GeneFior/test_data/outputs/combined_output_finished/combined_detection_matrices_README.txt
+2026-07-24 16:31:14,070 - INFO - Combine completed successfully

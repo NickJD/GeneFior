@@ -102,7 +102,7 @@ Examples:
     logger.info(f"Found {len(sample_names)} sample(s) to include in combine: {', '.join(sample_names)}")
 
     try:
-        combine_detection_matrices(str(output_dir), sample_names, logger)
+        combine_detection_matrices(input_dir,str(output_dir), sample_names, logger)
         logger.info("Combine completed successfully")
         sys.exit(0)
     except Exception as e:
