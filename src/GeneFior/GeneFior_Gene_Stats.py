@@ -1398,6 +1398,7 @@ class GeneVisualiser:
                         'Evidence_Tools', 'Evidence_Detections',
                         'Candidate_Allele_Detections',
                         'Exact_Allele_Detections',
+                        'Exact_Protein_Detections',
                         'Profile_Detections', 'Strict_Detections',
                         'Always_Flagged', 'Evidence_Warnings',
                     }

@@ -131,11 +131,16 @@ if script_dir not in sys.path:
 
 if __package__:
     from .constants import GENEFIOR_VERSION  # type: ignore
+    from .GeneFior_Validate import validate_reconstruction  # type: ignore
 else:
     try:
         from constants import GENEFIOR_VERSION  # type: ignore
     except ImportError:
         GENEFIOR_VERSION = "unknown"
+    try:
+        from GeneFior_Validate import validate_reconstruction  # type: ignore
+    except ImportError:
+        validate_reconstruction = None
 
 # ── logging ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -650,9 +655,9 @@ _BLAST_DEFAULT_FIELDS = [
 def _parse_blast_tabular(
     tsv_path: str,
     gene_name: str,
-    query_seqs: Dict[str, str],
-    field_names: Optional[List[str]] = None,
-) -> Tuple[int, Dict[str, str], List[dict]]:
+    query_seqs: dict[str, str],
+    field_names: Optional[list[str]] = None,
+) -> tuple[int, dict[str, str], list[dict]]:
     """
     Parse a BLAST / DIAMOND tabular output file (format 6 or custom).
 
@@ -734,12 +739,12 @@ def _parse_blast_tabular(
                 and i_sseq is not None and i_sseq < len(cols)
                 and cols[i_qseq] not in ("", "N/A", "*", "-")
             ):
-                # Prefer pre-aligned sequences from the tabular file
+                # Prefer pre-aligned sequences from the tabular file.
+                # BLAST's qseq/sseq values already reflect the aligned hit
+                # orientation, so reverse-strand rows must not be reversed again.
                 qseq_aln = cols[i_qseq].upper()
                 sseq_aln = cols[i_sseq].upper()
                 seq = qseq_aln.replace("-", "")
-                if reverse_hit:
-                    seq = _reverse_complement(seq)
                 cigar = _blast_aligned_to_cigar(qseq_aln, sseq_aln)
             else:
                 # Fall back to extracting the aligned slice from the query FASTA
@@ -1476,13 +1481,13 @@ class GeneReconstructor:
         # BLAST / DIAMOND mode
         blast_tsv: Optional[str] = None,
         query_fasta: Optional[str] = None,
-        blast_format: Optional[List[str]] = None,
+        blast_format: Optional[list[str]] = None,
     ):
         # Validate parameters
         if min_depth < 1:
             raise ValueError(f"min_depth must be >= 1, got {min_depth}")
         if not (0.0 < min_freq <= 1.0):
-            raise ValueError(f"min_freq must be in (0.0, 1.0], got {min_freq}")
+           raise ValueError(f"min_freq must be in (0.0, 1.0], got {min_freq}")
         if not (0.0 < min_insertion_freq <= 1.0):
             raise ValueError(f"min_insertion_freq must be in (0.0, 1.0], got {min_insertion_freq}")
         if not (0.0 < min_bimodal_freq < 0.5):
@@ -2720,31 +2725,32 @@ class GeneReconstructor:
         _write_validation_report(tool_dir / f"{gene_safe}_validation.txt", all_vals, self.gene_name)
 
         # Deeper biological-plausibility check (ORF integrity, GC content, etc.)
-        try:
-            artifact_report = validate_reconstruction(
-                consensus=consensus_ref,
-                reference=used_ref,
-                per_pos=per_pos,
-                alignments=alignments,
-                variants=variants,
-                gene_name=self.gene_name,
-                gene_type="coding",
-            )
-            if artifact_report:
-                (tool_dir / f"{gene_safe}_artifact_validation.txt").write_text(
-                    artifact_report.summary_report(), encoding="utf-8"
+        if validate_reconstruction is not None:
+            try:
+                artifact_report = validate_reconstruction(
+                    consensus=consensus_ref,
+                    reference=used_ref,
+                    per_pos=per_pos,
+                    alignments=alignments,
+                    variants=variants,
+                    gene_name=self.gene_name,
+                    gene_type="coding",
                 )
-                status_val = artifact_report.overall_status.value
-                logger.info(
-                    f"  Artifact validation: {status_val} "
-                    f"(score: {artifact_report.overall_score:.0f}/100)"
-                )
-                if status_val == "FAIL":
-                    logger.warning("  ⚠  Artifact validation FAILED — sequence may not be biologically real.")
-                elif status_val == "WARNING":
-                    logger.warning("  ⚠  Artifact validation warnings — review artifact report.")
-        except Exception as exc:
-            logger.warning(f"  Could not run artifact validation: {exc}")
+                if artifact_report:
+                    (tool_dir / f"{gene_safe}_artifact_validation.txt").write_text(
+                        artifact_report.summary_report(), encoding="utf-8"
+                    )
+                    status_val = artifact_report.overall_status.value
+                    logger.info(
+                        f"  Artifact validation: {status_val} "
+                        f"(score: {artifact_report.overall_score:.0f}/100)"
+                    )
+                    if status_val == "FAIL":
+                        logger.warning("  ⚠  Artifact validation FAILED — sequence may not be biologically real.")
+                    elif status_val == "WARNING":
+                        logger.warning("  ⚠  Artifact validation warnings — review artifact report.")
+            except Exception as exc:
+                logger.warning(f"  Could not run artifact validation: {exc}")
 
         if self.emit_plots:
             self._plot_reconstruction(

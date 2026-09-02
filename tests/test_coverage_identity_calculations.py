@@ -1220,6 +1220,7 @@ class TestParseBlastResultsIntegration:
         assert "Evidence_Present" in reader.fieldnames
         assert "Candidate_Allele_Detected" in reader.fieldnames
         assert "Exact_Allele_Detected" in reader.fieldnames
+        assert "Exact_Protein_Detected" in reader.fieldnames
         assert "Detection_System" in reader.fieldnames
         assert "Detection_Depth" in reader.fieldnames
         assert "Detection_Depth_Coverage" in reader.fieldnames

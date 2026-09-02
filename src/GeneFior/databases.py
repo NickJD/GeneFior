@@ -184,23 +184,26 @@ def gather_databases(base_dir: Path, tools: Dict[str, str]) -> Dict[str, Dict[st
             if category_name == "bowtie2":
                 # Special handling for bowtie2 category.
                 # Bowtie2 index files are named <base>.1.bt2, <base>.2.bt2,
-                # <base>.rev.1.bt2, etc.  The previous code used split('.')[0]
-                # which incorrectly discarded everything after the first dot in the
-                # filename (e.g. VFDB_setA_nt.fas_bowtie2db -> VFDB_setA_nt).
-                # Instead, locate the .1.bt2 primary index file and strip that
+                # <base>.rev.1.bt2, etc. Large indexes may use the '.bt2l' suffix
+                # (e.g. '.1.bt2l'). Locate a primary index file and strip the
                 # known suffix to recover the exact basename bowtie2 expects.
                 for tool, tag in tool_tags.items():
                     if tool == "bowtie2":
-                        # Primary index always ends in <tag>.1.bt2
+                        # Try common primary index suffixes (.1.bt2 and .1.bt2l)
                         primary_files = list(category_dir.rglob(f"*{tag}.1.bt2"))
                         if not primary_files:
-                            # Fallback: any .bt2 file – derive base via tag position
-                            primary_files = sorted(category_dir.rglob(f"*{tag}*.bt2"))
+                            primary_files = list(category_dir.rglob(f"*{tag}.1.bt2l"))
+                        if not primary_files:
+                            # Fallback: any .bt2 or .bt2l file – derive base via tag position
+                            primary_files = sorted(category_dir.rglob(f"*{tag}*.bt2*"))
                         if primary_files:
                             base = str(primary_files[0])
                             if base.endswith('.1.bt2'):
                                 # Clean strip: remove the '.1.bt2' suffix
                                 databases[category_name][tool] = base[:-len('.1.bt2')]
+                            elif base.endswith('.1.bt2l'):
+                                # Large-index variant
+                                databases[category_name][tool] = base[:-len('.1.bt2l')]
                             else:
                                 # Fallback: find the tag in the path and cut there
                                 tag_end = base.rfind(tag)

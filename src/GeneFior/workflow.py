@@ -18,13 +18,52 @@ import re
 from typing import Optional
 
 
+_WHOLE_GENOME_CONTIG_AFFIXES = (
+    'contig', 'ctg', 'chromosome', 'chrom', 'chr', 'scaffold',
+    'scaf', 'replicon', 'segment', 'plasmid',
+)
+_WHOLE_GENOME_CONTIG_SUFFIX_RE = re.compile(
+    r'(?P<genome>.+?)(?:[_-](?P<contig>(?:'
+    + '|'.join(_WHOLE_GENOME_CONTIG_AFFIXES)
+    + r')(?:[_-]?[A-Za-z0-9.-]+)?))$',
+    re.IGNORECASE,
+)
+
+
+def split_whole_genome_reference(reference: str) -> Tuple[str, str]:
+    """Split a whole-genome reference into genome and contig identifiers.
+
+    Explicit separators are preferred. Underscore and hyphen splitting is
+    only enabled when the suffix is a recognised contig affix, which avoids
+    merging arbitrary references that merely share a naming prefix.
+    Unrecognised names remain single-contig genomes.
+    """
+    value = str(reference).strip()
+    for separator in ('::', '|', '#', '/'):
+        if separator in value:
+            genome, contig = value.split(separator, 1)
+            if genome and contig:
+                return genome, contig
+    match = _WHOLE_GENOME_CONTIG_SUFFIX_RE.match(value)
+    if match:
+        return match.group('genome'), match.group('contig')
+    return value, value
+
+
 try:
     from .gene_stats import GeneStats
     from .evidence import (
         EvidenceConfig,
         DETECTION_SYSTEM_LEGACY_RELAXED,
         DETECTION_SYSTEM_QUALIFIED,
+        EXACT_PROTEIN_DETECTED,
         NOT_DETECTED,
+        WHOLE_GENOME_MAPPED,
+        WHOLE_GENOME_PARTIAL,
+        WHOLE_GENOME_NEAR_COMPLETE,
+        WHOLE_GENOME_COMPLETE,
+        MIXED_OR_MOSAIC,
+        PARTIAL_OR_DIVERGENT,
         best_status,
         classify_gene_evidence,
         classify_gene_legacy,
@@ -40,7 +79,14 @@ except (ModuleNotFoundError, ImportError) as error:
         EvidenceConfig,
         DETECTION_SYSTEM_LEGACY_RELAXED,
         DETECTION_SYSTEM_QUALIFIED,
+        EXACT_PROTEIN_DETECTED,
         NOT_DETECTED,
+        WHOLE_GENOME_MAPPED,
+        WHOLE_GENOME_PARTIAL,
+        WHOLE_GENOME_NEAR_COMPLETE,
+        WHOLE_GENOME_COMPLETE,
+        MIXED_OR_MOSAIC,
+        PARTIAL_OR_DIVERGENT,
         best_status,
         classify_gene_evidence,
         classify_gene_legacy,
@@ -97,7 +143,8 @@ class Workflow:
                      evidence_min_unique_fraction: float = 0.10,
                      evidence_ambiguity_fraction: float = 0.50,
                      evidence_score_tie: float = 1.0,
-                     detection_system: str = DETECTION_SYSTEM_QUALIFIED):
+                     detection_system: str = DETECTION_SYSTEM_QUALIFIED,
+                     db_whole_genome: bool = False):
 
                  
         ### Handle input FASTA and FASTQ
@@ -210,6 +257,10 @@ class Workflow:
         self.is_genes_fasta = (sequence_type == 'Genes-FASTA')
         # Store any detected/declared genes alphabet type ('dna'|'protein'|None)
         self.detected_genes_type = None
+        # Whether the provided database(s) are whole-genome references. When True,
+        # downstream logic should prefer read-mapping tools and compute per-base
+        # coverage summaries instead of gene-centric detection metrics.
+        self.db_whole_genome = bool(db_whole_genome)
 
 
         self.run_dna = run_dna
@@ -263,8 +314,8 @@ class Workflow:
             for db_name in self.databases.keys()
         }
         # Qualified evidence calls parallel the strict legacy boolean matrix.
-        # detections=True now means an exact nucleotide allele or a robust HMM
-        # profile call; lower-confidence evidence remains visible here.
+        # detections=True means threshold-passing evidence; the status records
+        # whether it is an allele, protein, profile, or whole-genome mapping call.
         self.evidence_calls = {
             db_name: defaultdict(dict)
             for db_name in self.databases.keys()
@@ -351,6 +402,7 @@ class Workflow:
                     must_flag_override=(
                         gene in must_flag_overrides or always_flagged
                     ),
+                    whole_genome=getattr(self, 'db_whole_genome', False),
                 )
             if always_flagged:
                 call.warnings = sorted(
@@ -1816,7 +1868,11 @@ class Workflow:
         # Parse results
         detected, gene_reads = self.parse_bam_results(sorted_bam_file, database, tool_name)
         self.write_tool_stats(database, tool_name, gene_reads)
-
+        # Generate per-base coverage for this mapping result (best-effort)
+        try:
+            self.generate_coverage_from_bam(sorted_bam_file, database, tool_name)
+        except Exception:
+            self.logger.debug(f"Coverage generation failed or skipped for {database} using {tool_name}")
 
         return success, detected
 
@@ -1887,6 +1943,11 @@ class Workflow:
         # Parse results
         detected, gene_reads = self.parse_bam_results(sorted_bam, database, tool_name)
         self.write_tool_stats(database, tool_name, gene_reads)
+        # Generate per-base coverage for this mapping result (best-effort)
+        try:
+            self.generate_coverage_from_bam(sorted_bam, database, tool_name)
+        except Exception:
+            self.logger.debug(f"Coverage generation failed or skipped for {database} using {tool_name}")
 
         return success, detected
 
@@ -1957,6 +2018,11 @@ class Workflow:
         # Parse results
         detected, gene_reads = self.parse_bam_results(sorted_bam, database, tool_name)
         self.write_tool_stats(database, tool_name, gene_reads)
+        # Generate per-base coverage for this mapping result (best-effort)
+        try:
+            self.generate_coverage_from_bam(sorted_bam, database, tool_name)
+        except Exception:
+            self.logger.debug(f"Coverage generation failed or skipped for {database} using {tool_name}")
 
         return success, detected
 
@@ -2648,8 +2714,70 @@ class Workflow:
 
         return detected_genes, gene_reads
 
+    def generate_coverage_from_bam(self, sorted_bam: Path, database: str, tool_name: str) -> None:
+        """Generate sparse bedGraph coverage (non-zero positions) from a sorted/indexed BAM.
+
+        Preference order:
+        1. Use bedtools genomecov -ibam <bam> -bg to produce bedGraph (only non-zero regions).
+        2. Fallback to samtools depth -a and stream-filter non-zero positions, converting to bedGraph.
+
+        Writes file to the sample output directory named '<database>_<tool>_coverage.bedgraph' and
+        includes a header row (chrom, start, end, depth) so the visualiser can read it as a tabular file.
+        """
+        try:
+            if not sorted_bam.exists():
+                self.logger.debug(f"Coverage generation skipped: BAM not found: {sorted_bam}")
+                return
+            out_file = self.output_dir / f"{database}_{tool_name.lower()}_coverage.bedgraph"
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Try bedtools genomecov first
+            bedtools_cmd = ['bedtools', 'genomecov', '-ibam', str(sorted_bam), '-bg']
+            try:
+                self.logger.info(f"Generating bedGraph coverage (bedtools) for {database} using {tool_name}: {out_file}")
+                with open(out_file, 'w') as fh:
+                    # Write a header so visualiser can parse column names
+                    fh.write('chrom\tstart\tend\tdepth\n')
+                    proc = subprocess.run(bedtools_cmd, check=True, stdout=fh, stderr=subprocess.PIPE, text=True)
+                    if proc.stderr:
+                        self.logger.debug(f"bedtools genomecov stderr: {proc.stderr}")
+                self.logger.info(f"Wrote bedGraph coverage file: {out_file}")
+                return
+            except FileNotFoundError:
+                self.logger.debug('bedtools not found; falling back to samtools depth')
+            except subprocess.CalledProcessError as e:
+                self.logger.debug(f'bedtools genomecov failed: {e}; falling back to samtools depth')
+
+            # Fallback: samtools depth -> convert to bedGraph by emitting only depth>0 positions
+            self.logger.info(f"Generating bedGraph coverage (samtools fallback) for {database} using {tool_name}: {out_file}")
+            with open(out_file, 'w') as fh:
+                fh.write('chrom\tstart\tend\tdepth\n')
+                proc = subprocess.Popen(['samtools', 'depth', '-a', str(sorted_bam)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    parts = line.rstrip('\n').split('\t')
+                    if len(parts) < 3:
+                        continue
+                    chrom = parts[0]
+                    try:
+                        pos = int(parts[1])
+                        depth = float(parts[2])
+                    except Exception:
+                        continue
+                    if depth <= 0:
+                        continue
+                    # Convert 1-based samtools pos to 0-based bedGraph interval [pos-1, pos)
+                    fh.write(f"{chrom}\t{pos-1}\t{pos}\t{depth}\n")
+                _, stderr = proc.communicate()
+                if stderr:
+                    self.logger.debug(f"samtools depth stderr: {stderr}")
+            self.logger.info(f"Wrote bedGraph coverage file: {out_file}")
+        except Exception as e:
+            self.logger.warning(f"Failed to generate coverage for {database} ({tool_name}): {e}")
+
     def parse_bam_results(self, bam_file: Path, database: str, tool_name: str,
                           count_only: bool = False, read_store=None) -> Set[str]:
+
         """Parse BAM (samtools view) and collect per-gene stats.
 
         Uses CIGAR to compute aligned positions and per-read identity; detection
@@ -3270,7 +3398,8 @@ class Workflow:
                 'Base_Coverage', 'Detection_Depth',
                 'Detection_Depth_Coverage', 'Median_Depth',
                 'Depth_CV', 'Num_Internal_Gaps', 'Longest_Internal_Gap',
-                'Longest_Covered_Run', 'Avg_Identity',
+                'Num_Gaps', 'Longest_Gap', 'Longest_Covered_Run',
+                'Avg_Identity',
             ]
             if detection_system == DETECTION_SYSTEM_LEGACY_RELAXED:
                 header = metric_header + ['Detected']
@@ -3282,7 +3411,8 @@ class Workflow:
                 'Evidence_Warnings', 'Family', 'Top_Database_Candidate',
                 'Competing_Alleles', 'Always_Flagged', 'Evidence_Present',
                 'Candidate_Allele_Detected', 'Exact_Allele_Detected',
-                'Profile_Detected', 'Detection_System', 'Detected',
+                'Exact_Protein_Detected', 'Profile_Detected',
+                'Detection_System', 'Detected',
                 ]
             writer.writerow(header)
 
@@ -3327,6 +3457,8 @@ class Workflow:
                     f"{stats.depth_cv:.4f}",
                     stats.num_internal_gaps,
                     stats.longest_internal_gap,
+                    stats.num_gaps,
+                    stats.longest_gap,
                     stats.longest_covered_run,
                     f"{stats.avg_identity:.2f}",
                 ]
@@ -3356,6 +3488,7 @@ class Workflow:
                     '1' if call and call.evidence_present else '0',
                     '1' if call and call.candidate_allele_detected else '0',
                     '1' if call and call.exact_allele_detected else '0',
+                    '1' if call and call.status == EXACT_PROTEIN_DETECTED else '0',
                     '1' if call and call.profile_detected else '0',
                     detection_system,
                     '1' if detected else '0'
@@ -3426,6 +3559,8 @@ class Workflow:
             self._remove_qualified_reports(database)
         else:
             self.generate_evidence_matrix(database)
+        if getattr(self, 'db_whole_genome', False):
+            self.generate_genome_mapping_summary(database)
 
     def _remove_qualified_reports(self, database: str):
         """Remove stale qualified-only outputs from a legacy result directory."""
@@ -3439,6 +3574,198 @@ class Workflow:
                 self.logger.info(f"Removed stale qualified report: {path}")
             except FileNotFoundError:
                 pass
+
+    def generate_genome_mapping_summary(self, database: str):
+        """Write contig-level detail and aggregated multi-contig genome calls."""
+        columns = [
+            'Genome_ID', 'Contig_ID', 'Contig_Count', 'Reference_Length',
+            'Tool', 'Coverage_1x', 'Coverage_2x', 'Coverage_3x',
+            'Coverage_5x', 'Coverage_10x', 'Mean_Depth', 'Median_Depth',
+            'Depth_CV', 'Mean_Identity', 'Mapped_Read_Support',
+            'Passing_Read_Support', 'Best_Read_Support',
+            'Unique_Best_Read_Support', 'Ambiguous_Best_Read_Support',
+            'Num_Gaps', 'Longest_Gap', 'Num_Internal_Gaps',
+            'Longest_Internal_Gap', 'Detection_Depth',
+            'Detection_Depth_Coverage', 'Detection_Min_Coverage',
+            'Detection_Min_Identity', 'Evidence_Status', 'Evidence_Warnings',
+        ]
+        database_stats = self.gene_stats.get(database, {})
+        contig_file = self.output_dir / f'{database}_contig_mapping_summary.tsv'
+        genome_file = self.output_dir / f'{database}_genome_mapping_summary.tsv'
+        grouped = defaultdict(list)
+        detection_depth = (
+            self.evidence_config.corroborating_depth
+            if not getattr(self, 'is_genes_fasta', False)
+            else 1
+        )
+
+        with open(contig_file, 'w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t')
+            writer.writerow(columns)
+            for tool_name in sorted(database_stats):
+                for reference in sorted(database_stats[tool_name]):
+                    stats = database_stats[tool_name][reference]
+                    genome_id, contig_id = split_whole_genome_reference(reference)
+                    grouped[(tool_name, genome_id)].append((contig_id, stats))
+                    call = self.evidence_calls.get(database, {}).get(reference, {}).get(tool_name)
+                    writer.writerow(self._mapping_summary_row(
+                        genome_id, contig_id, 1, tool_name, stats,
+                        detection_depth, call.status if call else NOT_DETECTED,
+                        call.warning_text() if call else '',
+                        self.detection_min_coverage, self.detection_min_identity,
+                    ))
+
+        with open(genome_file, 'w', newline='') as handle:
+            writer = csv.writer(handle, delimiter='\t')
+            writer.writerow(columns + ['Aggregation_Level', 'Contig_List'])
+            for (tool_name, genome_id), records in sorted(grouped.items()):
+                metrics = self._aggregate_genome_mapping(records, detection_depth)
+                writer.writerow(self._mapping_summary_row(
+                    genome_id, ','.join(metrics.contigs), metrics.contig_count,
+                    tool_name, metrics, detection_depth, metrics.status,
+                    ';'.join(metrics.warnings), self.detection_min_coverage,
+                    self.detection_min_identity,
+                ) + ['GENOME', ','.join(metrics.contigs)])
+        self.logger.info(f'Generated contig mapping summary: {contig_file}')
+        self.logger.info(f'Generated whole-genome mapping summary: {genome_file}')
+
+    @staticmethod
+    def _mapping_summary_row(genome_id, contig_id, contig_count, tool_name,
+                             stats, detection_depth, status, warnings,
+                             detection_min_coverage, detection_min_identity):
+        coverage = lambda depth: stats.coverage_at_depth(depth)
+        return [
+            genome_id, contig_id, contig_count, stats.gene_length, tool_name,
+            f'{coverage(1):.2f}', f'{coverage(2):.2f}', f'{coverage(3):.2f}',
+            f'{coverage(5):.2f}', f'{coverage(10):.2f}',
+            f'{stats.base_depth:.2f}', f'{stats.median_depth:.2f}',
+            f'{stats.depth_cv:.4f}', f'{stats.avg_identity:.2f}',
+            stats.mapped_read_support, stats.passing_read_support,
+            stats.best_read_support, stats.unique_best_read_support,
+            stats.ambiguous_best_read_support, stats.num_gaps,
+            stats.longest_gap, stats.num_internal_gaps,
+            stats.longest_internal_gap, detection_depth,
+            f'{coverage(detection_depth):.2f}',
+            f'{detection_min_coverage:.2f}', f'{detection_min_identity:.2f}',
+            status, warnings,
+        ]
+
+    def _aggregate_genome_mapping(self, records, detection_depth):
+        """Aggregate contigs using reference-length-weighted base metrics."""
+        total_length = sum(max(0, s.gene_length) for _, s in records)
+        depth_hist = defaultdict(int)
+        total_depth = total_depth_sq = 0
+        identity_total = sequence_total = 0
+        totals = defaultdict(int)
+        longest_gap = longest_internal_gap = 0
+        num_gaps = num_internal_gaps = 0
+        discontinuous = False
+        contigs = [name for name, _ in records]
+        for _, stats in records:
+            for start, end, depth in stats._iter_depth_segments():
+                span = max(0, end - start)
+                depth_hist[depth] += span
+                total_depth += depth * span
+                total_depth_sq += depth * depth * span
+            identity_total += stats.identity_sum or (stats.avg_identity * stats.num_sequences)
+            sequence_total += stats.num_sequences
+            for field in ('mapped_read_support', 'passing_read_support',
+                          'best_read_support', 'unique_best_read_support',
+                          'ambiguous_best_read_support'):
+                totals[field] += getattr(stats, field, 0)
+            num_gaps += stats.num_gaps
+            num_internal_gaps += stats.num_internal_gaps
+            longest_gap = max(longest_gap, stats.longest_gap)
+            longest_internal_gap = max(longest_internal_gap, stats.longest_internal_gap)
+            max_gap = max(
+                self.evidence_config.max_internal_gap_bp,
+                int(stats.gene_length * self.evidence_config.max_internal_gap_fraction),
+            )
+            discontinuous |= (
+                stats.num_internal_gaps > 1 or stats.longest_internal_gap > max_gap
+            )
+
+        if total_length:
+            coverage = {
+                depth: sum(span for level, span in depth_hist.items() if level >= depth)
+                / total_length * 100
+                for depth in (1, 2, 3, 5, 10)
+            }
+            mean_depth = total_depth / total_length
+            variance = max(0.0, total_depth_sq / total_length - mean_depth ** 2)
+            depth_cv = (variance ** 0.5 / mean_depth) if mean_depth else 0.0
+            midpoint = (total_length + 1) / 2
+            running = 0
+            median_depth = 0.0
+            for depth in sorted(depth_hist):
+                running += depth_hist[depth]
+                if running >= midpoint:
+                    median_depth = float(depth)
+                    break
+        else:
+            coverage = {depth: 0.0 for depth in (1, 2, 3, 5, 10)}
+            mean_depth = median_depth = depth_cv = 0.0
+
+        mean_identity = identity_total / sequence_total if sequence_total else 0.0
+        detection_coverage = coverage.get(detection_depth, 0.0)
+        passes = (
+            detection_coverage >= self.detection_min_coverage
+            and mean_identity >= self.detection_min_identity
+            and totals['passing_read_support'] >= self.detection_min_num_reads
+        )
+        partial_signal = coverage[1] >= self.evidence_config.partial_min_coverage
+        complete = (
+            passes
+            and coverage[1] >= 100.0 - 1e-9
+            and detection_coverage >= 95.0
+            and not discontinuous
+        )
+        near_complete = passes and detection_coverage >= 80.0
+        if complete:
+            status = WHOLE_GENOME_COMPLETE
+        elif near_complete:
+            status = WHOLE_GENOME_NEAR_COMPLETE
+        elif partial_signal:
+            status = WHOLE_GENOME_PARTIAL
+        elif passes:
+            status = MIXED_OR_MOSAIC
+        else:
+            status = NOT_DETECTED
+        warnings = []
+        if detection_coverage < self.detection_min_coverage:
+            warnings.append('LOW_CORROBORATED_COVERAGE')
+        if mean_identity < self.detection_min_identity:
+            warnings.append('LOW_MEAN_IDENTITY')
+        if totals['passing_read_support'] < self.detection_min_num_reads:
+            warnings.append('LOW_READ_SUPPORT')
+        if discontinuous:
+            warnings.append('DISCONTINUOUS_COVERAGE')
+        result = GeneStats(gene_name=','.join(contigs), gene_length=total_length)
+        result._coverage_by_depth = coverage
+        result.gene_coverage = coverage[1]
+        result.coverage_2x = coverage[2]
+        result.coverage_3x = coverage[3]
+        result.coverage_5x = coverage[5]
+        result.coverage_10x = coverage[10]
+        result.base_depth = mean_depth
+        result.median_depth = median_depth
+        result.depth_cv = depth_cv
+        result.avg_identity = mean_identity
+        result.identity_sum = identity_total
+        result.num_sequences = sequence_total
+        result.num_gaps = num_gaps
+        result.longest_gap = longest_gap
+        result.num_internal_gaps = num_internal_gaps
+        result.longest_internal_gap = longest_internal_gap
+        for field, value in totals.items():
+            setattr(result, field, value)
+        result.detection_min_coverage = self.detection_min_coverage
+        result.detection_min_identity = self.detection_min_identity
+        result.status = status
+        result.warnings = warnings
+        result.contigs = contigs
+        result.contig_count = len(contigs)
+        return result
 
     def generate_evidence_matrix(self, database: str):
         """Write qualified per-tool calls and family-level allele resolution."""
@@ -3469,6 +3796,7 @@ class Workflow:
                 'Evidence_Detections',
                 'Candidate_Allele_Detections',
                 'Exact_Allele_Detections',
+                'Exact_Protein_Detections',
                 'Profile_Detections',
                 'Strict_Detections',
                 'Always_Flagged',
@@ -3483,6 +3811,10 @@ class Workflow:
                 exact_count = sum(
                     1 for tool in all_tools
                     if tool in calls and calls[tool].exact_allele_detected
+                )
+                exact_protein_count = sum(
+                    1 for tool in all_tools
+                    if tool in calls and calls[tool].status == EXACT_PROTEIN_DETECTED
                 )
                 candidate_count = sum(
                     1 for tool in all_tools
@@ -3513,6 +3845,7 @@ class Workflow:
                     evidence_count,
                     candidate_count,
                     exact_count,
+                    exact_protein_count,
                     profile_count,
                     strict_count,
                     '1' if gene in getattr(self, 'always_flag_genes', set()) else '0',
@@ -3526,7 +3859,8 @@ class Workflow:
             writer.writerow([
                 'Tool', 'Detection_System', 'Evidence_Genes',
                 'Candidate_Allele_Genes', 'Exact_Allele_Genes',
-                'Profile_Genes', 'Exact_Or_Profile_Genes',
+                'Exact_Protein_Genes', 'Profile_Genes',
+                'Exact_Or_Profile_Genes',
                 'Always_Flagged_Genes',
             ])
 
@@ -3543,6 +3877,10 @@ class Workflow:
                 exact_genes = {
                     call.gene for call in selected
                     if call.exact_allele_detected
+                }
+                exact_protein_genes = {
+                    call.gene for call in selected
+                    if call.status == EXACT_PROTEIN_DETECTED
                 }
                 candidate_genes = {
                     call.gene for call in selected
@@ -3562,6 +3900,7 @@ class Workflow:
                     len(evidence_genes),
                     len(candidate_genes),
                     len(exact_genes),
+                    len(exact_protein_genes),
                     len(profile_genes),
                     len(strict_genes),
                     len(always_flagged_genes),
@@ -3582,6 +3921,7 @@ class Workflow:
             writer.writerow([
                 'Family', 'Tool', 'Status', 'Top_Database_Candidate',
                 'Candidate_Allele_Resolved', 'Exact_Allele_Resolved',
+                'Exact_Protein_Resolved',
                 'Competing_Alleles', 'Warnings',
             ])
             for tool in sorted(self.family_calls.get(database, {})):
@@ -3594,6 +3934,7 @@ class Workflow:
                         summary['best_allele'],
                         '1' if summary['candidate_allele_resolved'] else '0',
                         '1' if summary['exact_allele_resolved'] else '0',
+                        '1' if summary['exact_protein_resolved'] else '0',
                         ';'.join(summary['competing_alleles']),
                         ';'.join(summary['warnings']),
                     ])
@@ -3602,6 +3943,20 @@ class Workflow:
 
     def run_workflow(self,options):
         results = {}
+
+        if self.db_whole_genome:
+            # Whole-genome references are nucleotide mapping targets, not
+            # gene/allele databases. Keep the run mapping-oriented even when
+            # Workflow is called directly rather than through the CLI.
+            requested_tools = set(self.tools or [])
+            allowed_tools = {'minimap2', 'bowtie2', 'bwa'}
+            if 'blastn' in requested_tools or 'all' in requested_tools:
+                allowed_tools.add('blastn')
+            self.tools = sorted(
+                tool for tool in requested_tools if tool in allowed_tools
+            ) or sorted({'minimap2', 'bowtie2', 'bwa'})
+            self.run_dna = True
+            self.run_protein = False
 
         # If user indicated the inputs are full-length gene FASTA(s), adjust internal
         # flags: force Single-FASTA sequence type and (optionally) restrict which

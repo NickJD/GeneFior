@@ -4,6 +4,11 @@ from typing import Dict, Iterable, List, Tuple
 
 
 EXACT_ALLELE_DETECTED = "EXACT_ALLELE_DETECTED"
+EXACT_PROTEIN_DETECTED = "EXACT_PROTEIN_DETECTED"
+WHOLE_GENOME_MAPPED = "WHOLE_GENOME_MAPPED"
+WHOLE_GENOME_PARTIAL = "WHOLE_GENOME_PARTIAL"
+WHOLE_GENOME_NEAR_COMPLETE = "WHOLE_GENOME_NEAR_COMPLETE"
+WHOLE_GENOME_COMPLETE = "WHOLE_GENOME_COMPLETE"
 CANDIDATE_ALLELE_DETECTED = "CANDIDATE_ALLELE_DETECTED"
 ALLELE_LIKE = "ALLELE_LIKE"
 FAMILY_DETECTED = "FAMILY_DETECTED"
@@ -26,6 +31,11 @@ DETECTION_SYSTEMS = {
 POSITIVE_EXACT_STATUSES = {EXACT_ALLELE_DETECTED, PROFILE_DETECTED}
 EVIDENCE_PRESENT_STATUSES = {
     EXACT_ALLELE_DETECTED,
+    EXACT_PROTEIN_DETECTED,
+    WHOLE_GENOME_MAPPED,
+    WHOLE_GENOME_PARTIAL,
+    WHOLE_GENOME_NEAR_COMPLETE,
+    WHOLE_GENOME_COMPLETE,
     CANDIDATE_ALLELE_DETECTED,
     ALLELE_LIKE,
     FAMILY_DETECTED,
@@ -71,6 +81,10 @@ class EvidenceCall:
     @property
     def exact_allele_detected(self) -> bool:
         return self.status == EXACT_ALLELE_DETECTED
+
+    @property
+    def exact_protein_detected(self) -> bool:
+        return self.status == EXACT_PROTEIN_DETECTED
 
     @property
     def candidate_allele_detected(self) -> bool:
@@ -233,7 +247,8 @@ def classify_gene_evidence(
         detection_min_identity: float,
         detection_min_num_reads: int,
         reads_mode: bool = True,
-        must_flag_override: bool = False) -> EvidenceCall:
+        must_flag_override: bool = False,
+        whole_genome: bool = False) -> EvidenceCall:
     """Classify one gene without yet resolving competition inside its family."""
     family = infer_gene_family(gene)
     modality = tool_modality(tool_name)
@@ -344,6 +359,7 @@ def classify_gene_evidence(
     )
     nucleotide_candidate_diagnostics = (
         modality == "nucleotide"
+        and not whole_genome
         and (
             base_pass
             or (
@@ -384,10 +400,20 @@ def classify_gene_evidence(
             status = NOT_DETECTED
     elif discontinuous:
         status = MIXED_OR_MOSAIC
+    elif whole_genome:
+        status = WHOLE_GENOME_MAPPED
     elif modality == "profile":
         status = PROFILE_DETECTED
     elif modality == "protein":
-        if ambiguity_fraction >= config.ambiguity_warning_fraction:
+        protein_exact_pass = (
+            base_pass
+            and not discontinuous
+            and stats.gene_coverage >= 100.0 - 1e-9
+            and stats.avg_identity >= 100.0 - 1e-9
+        )
+        if protein_exact_pass:
+            status = EXACT_PROTEIN_DETECTED
+        elif ambiguity_fraction >= config.ambiguity_warning_fraction:
             status = FAMILY_DETECTED
         else:
             status = ALLELE_LIKE
@@ -475,6 +501,7 @@ def resolve_family_calls(
                 call.best_allele = best_gene
                 if call.status in (
                         EXACT_ALLELE_DETECTED,
+                        EXACT_PROTEIN_DETECTED,
                         CANDIDATE_ALLELE_DETECTED):
                     call.status = FAMILY_DETECTED
                     call.exact_detected = False
@@ -494,6 +521,9 @@ def resolve_family_calls(
             "candidate_allele_resolved": (
                 best_call.candidate_allele_detected and not unresolved
             ),
+            "exact_protein_resolved": (
+                best_call.status == EXACT_PROTEIN_DETECTED and not unresolved
+            ),
             "warnings": sorted(set(best_call.warnings)),
         }
     return summaries
@@ -505,6 +535,11 @@ def status_rank(status: str) -> int:
         PROFILE_DETECTED: 7,
         LEGACY_RELAXED_DETECTED: 7,
         CANDIDATE_ALLELE_DETECTED: 6,
+        EXACT_PROTEIN_DETECTED: 7,
+        WHOLE_GENOME_PARTIAL: 3,
+        WHOLE_GENOME_MAPPED: 4,
+        WHOLE_GENOME_NEAR_COMPLETE: 5,
+        WHOLE_GENOME_COMPLETE: 6,
         ALLELE_LIKE: 5,
         FAMILY_DETECTED: 4,
         MIXED_OR_MOSAIC: 3,

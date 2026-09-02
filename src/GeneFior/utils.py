@@ -1242,6 +1242,11 @@ def combine_detection_matrices(input_dir,output_root, sample_names, logger):
                             except (TypeError, ValueError):
                                 evidence_present = status in {
                                     'EXACT_ALLELE_DETECTED',
+                                    'EXACT_PROTEIN_DETECTED',
+                                    'WHOLE_GENOME_MAPPED',
+                                    'WHOLE_GENOME_PARTIAL',
+                                    'WHOLE_GENOME_NEAR_COMPLETE',
+                                    'WHOLE_GENOME_COMPLETE',
                                     'CANDIDATE_ALLELE_DETECTED',
                                     'ALLELE_LIKE',
                                     'FAMILY_DETECTED',
@@ -1265,7 +1270,7 @@ def combine_detection_matrices(input_dir,output_root, sample_names, logger):
                     'Gene', *ordered_samples,
                     'Evidence_Samples', 'Candidate_Allele_Samples',
                     'Exact_Allele_Samples', 'Profile_Samples',
-                    'Strict_Samples',
+                    'Exact_Protein_Samples', 'Strict_Samples',
                 ])
                 for gene in sorted(all_genes):
                     statuses = [
@@ -1282,6 +1287,10 @@ def combine_detection_matrices(input_dir,output_root, sample_names, logger):
                         status == 'EXACT_ALLELE_DETECTED'
                         for status in statuses
                     )
+                    exact_protein_samples = sum(
+                        status == 'EXACT_PROTEIN_DETECTED'
+                        for status in statuses
+                    )
                     candidate_samples = sum(
                         status == 'CANDIDATE_ALLELE_DETECTED'
                         for status in statuses
@@ -1293,7 +1302,8 @@ def combine_detection_matrices(input_dir,output_root, sample_names, logger):
                     writer.writerow([
                         gene, *statuses,
                         evidence_samples, candidate_samples, exact_samples,
-                        profile_samples, exact_samples + profile_samples,
+                        exact_protein_samples, profile_samples,
+                        exact_samples + profile_samples,
                     ])
             created_files.append(str(combined_evidence))
             logger.info(

@@ -370,6 +370,11 @@ GeneFíor no longer treats union coverage alone as proof that one exact database
 allele is present. Every tool now receives a qualified evidence call:
 
 - `EXACT_ALLELE_DETECTED`: literal nucleotide allele support with 100% mean identity, full-length coverage, and allele-resolving support.
+- `EXACT_PROTEIN_DETECTED`: a protein reference was matched at 100% amino-acid identity and full-length coverage. This is an exact protein match, not proof of an exact nucleotide allele, because synonymous DNA differences are not visible at the protein level.
+- `WHOLE_GENOME_PARTIAL`: some of the combined genome has mapping evidence, but coverage or quality is insufficient for a near-complete call.
+- `WHOLE_GENOME_NEAR_COMPLETE`: the combined contigs pass the configured identity, depth, and read-support thresholds and reach at least 80% coverage at the detection depth.
+- `WHOLE_GENOME_COMPLETE`: the combined contigs have full 1x coverage, at least 95% coverage at the detection depth, and no internal coverage gaps beyond the configured tolerance.
+- `WHOLE_GENOME_MAPPED`: legacy per-reference mapping status retained for compatibility; new genome-level summaries use the graded statuses above.
 - `CANDIDATE_ALLELE_DETECTED`: nucleotide allele candidate with full-length support, mean identity at least 98% by default, and allele-resolving support. For read inputs, every base must be covered at least 3x by default; for full-length `Genes-FASTA` DNA input, one full-length query sequence can support the candidate.
 - `ALLELE_LIKE`: strong evidence close to the named allele, but candidate or exact identity is unresolved.
 - `FAMILY_DETECTED`: the gene family is strongly supported, but reads do not distinguish its alleles.
@@ -385,13 +390,38 @@ allele is present. Every tool now receives a qualified evidence call:
 
 Protein searches (`BLASTx`, `BLASTp`, and DIAMOND) cannot by themselves claim
 an exact nucleotide allele because synonymous differences are invisible.
-Their strongest normal result is therefore `ALLELE_LIKE` or
-`FAMILY_DETECTED`. Nucleotide read tools can make a candidate call when every
+Their strongest normal result is therefore `EXACT_PROTEIN_DETECTED`,
+`ALLELE_LIKE`, or `FAMILY_DETECTED`. `EXACT_PROTEIN_DETECTED` requires 100%
+amino-acid identity and full-length protein coverage, but it does not set
+`Exact_Allele_Detected` because synonymous DNA differences are invisible.
+Nucleotide read tools can make a candidate call when every
 base is covered at least `--evidence-candidate-depth` times and the mean
 identity is at least `--evidence-candidate-identity`. Full-length DNA
 `Genes-FASTA` input uses full-length 1x allele coverage instead of read-depth
 corroboration. Exact calls are stricter: candidate support plus literal 100%
 identity.
+
+Whole-genome references can be selected with `--db-whole-genome`. These runs
+are mapping-oriented: the default tool set is `minimap2`, `bowtie2`, and `bwa`
+(with `blastn` available when explicitly requested), while protein searches
+and gene/allele resolution are disabled. Mapping statistics and per-base
+coverage are still reported, with positive genome calls labelled with the
+graded whole-genome statuses above rather than as gene or allele detections.
+
+Whole-genome runs write both `<database>_contig_mapping_summary.tsv` and
+`<database>_genome_mapping_summary.tsv`. The contig report retains each
+reference sequence. The genome report combines contigs that use an explicit
+`genome|contig`/`genome::contig` separator or a recognised suffix such as
+`genome_contig_1`, `genome_scaffold_2`, or `genome_chr_1`; unrecognised names
+remain separate single-contig genomes. Combined metrics are weighted by
+contig length and include 1x/2x/3x/5x/10x coverage, mean and median depth,
+depth CV, mean identity, mapped/passing/unique read support, total and
+internal gap counts, longest gap lengths, detection-depth coverage, and the
+final evidence status. `WHOLE_GENOME_PARTIAL` starts at 20% combined 1x
+coverage. `WHOLE_GENOME_NEAR_COMPLETE` requires at least 80% combined coverage
+at the detection depth (3x by default), plus identity and read-support
+thresholds. `WHOLE_GENOME_COMPLETE` additionally requires 100% combined 1x
+coverage, at least 95% coverage at the detection depth, and no internal gaps.
 
 Important output columns:
 
@@ -403,6 +433,7 @@ Important output columns:
   for read inputs, or under full-length 1x coverage and candidate-identity
   thresholds for DNA `Genes-FASTA` input.
 - `Exact_Allele_Detected=1` means the named nucleotide allele was resolved.
+- `Exact_Protein_Detected=1` means the named protein reference was matched exactly; it does not mean the underlying nucleotide allele was resolved.
 - `Profile_Detected=1` means a robust HMM profile was detected.
 - `Always_Flagged=1` means the gene was supplied through
   `--always-flag-genes` and should be reviewed even if `Evidence_Present=0`.

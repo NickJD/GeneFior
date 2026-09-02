@@ -157,6 +157,10 @@ Examples:
                           help='Path to a user-provided database directory in the format produced by build_databases.sh. '
                                'Supply multiple independent databases as a comma-separated list. '
                                'Not required when --hmmer-only is used with --hmmer-db and/or --hmmer-dna-db.')
+    # Indicate the provided database(s) are whole-genome (not gene-centric). When set, mapping tools and reporting
+    # will be adjusted (e.g., generate whole-genome coverage plots instead of per-gene heatmaps).
+    required_group.add_argument('--db-whole-genome', dest='db_whole_genome', action='store_true', default=False,
+                        help='Indicate that the provided database(s) represent whole-genome references (not gene databases).')
     required_group.add_argument('-o', '--output', required=True,
                         help='Output directory for results')
 
@@ -559,10 +563,19 @@ Examples:
                         options.sequence_type, getattr(options, 'genes_type', None)
                     )
                     dm = 'Yes' if db_map.get('diamond') else 'No'
-                    logger.info(
-                        f"  {db_name}: BLASTn: {bn}; BLASTx: {bx}; "
-                        f"BLASTp: {bp}; {diamond_label}: {dm}"
-                    )
+                    mm = 'Yes' if db_map.get('minimap2') else 'No'
+                    bt2 = 'Yes' if db_map.get('bowtie2') else 'No'
+                    # If user declared the DB is whole-genome, prefer mapping tools in the log
+                    if getattr(options, 'db_whole_genome', False):
+                        logger.info(
+                            f"  {db_name}: minimap2: {mm}; bowtie2: {bt2}; BLASTn: {bn}; BLASTx: {bx}; "
+                            f"BLASTp: {bp}; {diamond_label}: {dm}"
+                        )
+                    else:
+                        logger.info(
+                            f"  {db_name}: BLASTn: {bn}; BLASTx: {bx}; "
+                            f"BLASTp: {bp}; {diamond_label}: {dm}"
+                        )
                 except Exception:
                     logger.debug(f"Failed to inspect database mapping for {db_name}")
         except Exception:
@@ -849,6 +862,7 @@ Examples:
                         'hamronized_min_call': getattr(options, 'hamronized_min_call', 'evidence'),
                         'sample_id': sample_name,
                         'database_versions': dict(getattr(options, 'database_versions', {})),
+                        'db_whole_genome': getattr(options, 'db_whole_genome', False),
                     }
                     with open(os.path.join(sample_out, 'run_parameters.json'), 'w') as pf:
                         json.dump(params, pf, indent=2)
@@ -859,6 +873,28 @@ Examples:
                     # Perform per-sample input handling and workflow run
                     handle_all_input_files(sample_opts, logger)
                     # Recreate workflow for sample
+                    # If the user declared the database as whole-genome, restrict the default tools
+                    # to read-mappers only. Allow blastn only if explicitly requested (or if 'all' was requested).
+                    # Remove protein-focused tools (diamond, blastx, blastp, hmmer_protein) since the
+                    # whole-genome DB is nucleotide-only.
+                    tools_to_pass = list(options.tools) if options.tools is not None else None
+                    if getattr(options, 'db_whole_genome', False):
+                        explicit_tools = set(tools_to_pass or [])
+                        # mapping tools we allow by default
+                        mapping_tools = {'minimap2', 'bowtie2', 'bwa'}
+                        allowed = set(mapping_tools)
+                        # If user explicitly asked for blastn or asked for 'all', include blastn
+                        if 'blastn' in explicit_tools or 'all' in explicit_tools:
+                            allowed.add('blastn')
+                        # Filter provided tools to allowed set; if None (no tools list) default to mapping_tools
+                        if tools_to_pass is None:
+                            tools_to_pass = sorted(list(mapping_tools))
+                        else:
+                            tools_to_pass = [t for t in tools_to_pass if t in allowed]
+                            if not tools_to_pass:
+                                # Fallback to mapping tools if filtering removed everything
+                                tools_to_pass = sorted(list(mapping_tools))
+
                     workflow = Workflow(
                         input_fasta=sample_opts.input_fasta,
                         input_fastq=sample_opts.input_fastq,
@@ -894,7 +930,7 @@ Examples:
                         hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
                         hmmer_must_flag=not getattr(options, 'no_must_flag', False),
                         always_flag_genes=getattr(options, 'always_flag_genes', set()),
-                        tools=options.tools,
+                        tools=tools_to_pass,
                         evidence_corroborating_depth=options.evidence_corroborating_depth,
                         evidence_exact_identity=options.evidence_exact_identity,
                         evidence_candidate_depth=options.evidence_candidate_depth,
@@ -905,6 +941,7 @@ Examples:
                         evidence_min_unique_fraction=options.evidence_min_unique_fraction,
                         evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
                         evidence_score_tie=options.evidence_score_tie,
+                        db_whole_genome=getattr(options, 'db_whole_genome', False),
                     )
 
                     results = workflow.run_workflow(sample_opts)
@@ -957,6 +994,16 @@ Examples:
         max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 200.0))
         logger.info(f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 200.0)} MiB ({max_fasta_chunk_bytes} bytes)")
 
+        single_tools = list(options.tools) if options.tools is not None else None
+        if getattr(options, 'db_whole_genome', False):
+            requested_tools = set(single_tools or [])
+            allowed_tools = {'minimap2', 'bowtie2', 'bwa'}
+            if 'blastn' in requested_tools or 'all' in requested_tools:
+                allowed_tools.add('blastn')
+            single_tools = sorted(
+                tool for tool in requested_tools if tool in allowed_tools
+            ) or sorted({'minimap2', 'bowtie2', 'bwa'})
+
         workflow = Workflow(
             input_fasta=options.input_fasta,
             input_fastq=options.input_fastq,
@@ -992,7 +1039,7 @@ Examples:
             hmmer_threshold_mode=getattr(options, 'hmmer_threshold_mode', 'evalue'),
             hmmer_must_flag=not getattr(options, 'no_must_flag', False),
             always_flag_genes=getattr(options, 'always_flag_genes', set()),
-            tools=options.tools,
+            tools=single_tools,
             evidence_corroborating_depth=options.evidence_corroborating_depth,
             evidence_exact_identity=options.evidence_exact_identity,
             evidence_candidate_depth=options.evidence_candidate_depth,
@@ -1003,6 +1050,7 @@ Examples:
             evidence_min_unique_fraction=options.evidence_min_unique_fraction,
             evidence_ambiguity_fraction=options.evidence_ambiguity_fraction,
             evidence_score_tie=options.evidence_score_tie,
+            db_whole_genome=getattr(options, 'db_whole_genome', False),
         )
 
         ###
@@ -1049,6 +1097,7 @@ Examples:
                     or infer_sample_id(options.input, options.output)
                 ),
                 'database_versions': dict(getattr(options, 'database_versions', {})),
+                'db_whole_genome': getattr(options, 'db_whole_genome', False),
             }
             with open(os.path.join(outdir, 'run_parameters.json'), 'w') as pf:
                 json.dump(params, pf, indent=2)

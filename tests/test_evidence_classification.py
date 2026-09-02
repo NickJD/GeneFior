@@ -2,6 +2,8 @@ from GeneFior.evidence import (
     ALLELE_LIKE,
     CANDIDATE_ALLELE_DETECTED,
     EXACT_ALLELE_DETECTED,
+    EXACT_PROTEIN_DETECTED,
+    WHOLE_GENOME_MAPPED,
     FAMILY_DETECTED,
     LEGACY_RELAXED_DETECTED,
     MIXED_OR_MOSAIC,
@@ -173,7 +175,7 @@ def test_legacy_mode_preserves_historical_hsp_counting_for_min_reads():
     assert legacy.evidence_present
 
 
-def test_full_protein_coverage_remains_allele_like_not_exact():
+def test_full_protein_coverage_is_exact_at_protein_level_not_nucleotide_level():
     stats = GeneStats("blaCTX-M-1_1_DQ915955")
     for _ in range(5):
         stats.add_hit(1, 292, 100.0, 292)
@@ -187,9 +189,11 @@ def test_full_protein_coverage_remains_allele_like_not_exact():
 
     call = _classify(stats, tool="DIAMOND-BLASTX")
 
-    assert call.status == ALLELE_LIKE
+    assert call.status == EXACT_PROTEIN_DETECTED
     assert call.evidence_present
     assert not call.exact_detected
+    assert call.exact_protein_detected
+    assert not call.exact_allele_detected
 
 
 def test_exact_nucleotide_call_requires_correlated_unique_support():
@@ -337,7 +341,7 @@ def test_full_length_dna_gene_can_be_exact_at_one_x_coverage():
     assert call.exact_allele_detected
 
 
-def test_full_length_protein_gene_does_not_claim_nucleotide_allele():
+def test_full_length_protein_gene_is_exact_protein_not_nucleotide_allele():
     stats = GeneStats("blaCTX-M-1_1_DQ915955")
     stats.add_hit(1, 292, 100.0, 292)
     stats.add_read_support(mapped=True, passing=True, best=True)
@@ -354,11 +358,37 @@ def test_full_length_protein_gene_does_not_claim_nucleotide_allele():
         reads_mode=False,
     )
 
-    assert call.status == ALLELE_LIKE
+    assert call.status == EXACT_PROTEIN_DETECTED
     assert call.evidence_present
     assert not call.candidate_allele_detected
     assert not call.exact_allele_detected
+    assert call.exact_protein_detected
     assert "PROTEIN_ONLY_ALLELE_AMBIGUITY" in call.warnings
+
+
+def test_whole_genome_mapping_does_not_claim_gene_or_allele_resolution():
+    stats = GeneStats("chromosome_1")
+    for _ in range(3):
+        stats.add_hit(1, 1000, 99.5, 1000)
+        stats.add_read_support(mapped=True, passing=True, best=True)
+    stats.finalise()
+
+    call = classify_gene_evidence(
+        gene="chromosome_1",
+        tool_name="BWA",
+        stats=stats,
+        config=EvidenceConfig(),
+        detection_min_coverage=80.0,
+        detection_min_identity=80.0,
+        detection_min_num_reads=1,
+        reads_mode=True,
+        whole_genome=True,
+    )
+
+    assert call.status == WHOLE_GENOME_MAPPED
+    assert call.evidence_present
+    assert not call.exact_allele_detected
+    assert not call.candidate_allele_detected
 
 
 def test_partial_high_identity_mapping_is_not_positive_evidence():
