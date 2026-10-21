@@ -1,0 +1,12 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: erm(X)_4_NC_005206
+# Tool: BWA
+# Multi-version: single
+# Consensus length: 855 bp
+P	consensus		*	LN:i:855	FC:i:274
+# Read: MNG003:266:H7WTVDRX2:1:2116:25418:11130/1 pos:405-656
+# Read: MNG003:266:H7WTVDRX2:2:2266:5195:34726/1 pos:805-856
+# Read: MNG003:266:H7WTVDRX2:2:2120:21070:30123/2 pos:809-856
+# Read: MNG003:266:H7WTVDRX2:2:2120:21233:30812/2 pos:809-856
+# Read: MNG003:266:H7WTVDRX2:1:2116:25418:11130/2 pos:826-856

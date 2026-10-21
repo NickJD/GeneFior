@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: aph(6)-Id_1_M28829
+Generated: 2026-10-15T15:32:59.967506
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            837 bp
+    Covered positions:      0 (0.0%)
+    N positions:            100.0%
+  Depth
+    Mean depth:             0.0x
+    Depth CV:               0.0%  (uniform)
+  Read support
+    Support score:          0.0%
+  Reference comparison
+    Identity vs reference:  0.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   0 nt
+    Reference length:       837 nt
+    Difference:             -837 nt  (-100.0%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 837 nt (-100.0%). Codon structure INVALID: no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

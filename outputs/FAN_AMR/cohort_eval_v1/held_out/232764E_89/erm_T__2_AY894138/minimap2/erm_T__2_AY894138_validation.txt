@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: erm(T)_2_AY894138
+Generated: 2026-10-15T15:44:25.656123
+======================================================================
+
+  Sequence: consensus
+  Grade:    B  — Good reconstruction, minor gaps or low depth in some regions.
+
+  Coverage
+    Gene length:            735 bp
+    Covered positions:      734 (99.86%)
+    N positions:            0.14%
+  Depth
+    Mean depth:             494.6x
+    Depth CV:               82.6%  (uneven)
+  Read support
+    Support score:          99.97%
+  Reference comparison
+    Identity vs reference:  99.86%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1029 nt
+    Reference length:       735 nt
+    Difference:             +294 nt  (+40.0%)
+    Extension captured 5ʹ:  147 nt
+    Extension captured 3ʹ:  147 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 294 nt (+40.0%). Extension captured: 5ʹ +147 nt, 3ʹ +147 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

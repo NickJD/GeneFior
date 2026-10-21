@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: ant(6)-Ia_1_AF330699
+Generated: 2026-10-15T15:41:45.913694
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            909 bp
+    Covered positions:      471 (51.82%)
+    N positions:            48.18%
+  Depth
+    Mean depth:             67.4x
+    Depth CV:               125.1%  (uneven)
+  Read support
+    Support score:          99.96%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1275 nt
+    Reference length:       909 nt
+    Difference:             +366 nt  (+40.3%)
+    Extension captured 5ʹ:  183 nt
+    Extension captured 3ʹ:  183 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 366 nt (+40.3%). Extension captured: 5ʹ +183 nt, 3ʹ +183 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

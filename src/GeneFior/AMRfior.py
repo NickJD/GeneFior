@@ -248,8 +248,8 @@ Examples:
                                   '(columns: ID, Description, Must flag). '
                                   'Example: /path/to/biorisk_annotations.csv')
     runtime_group = parser.add_argument_group('Runtime Parameters')
-    runtime_group.add_argument('-t', '--threads', type=int, default=4,
-                              help='Number of threads to use (default: 4)')
+    runtime_group.add_argument('-t', '--threads', type=int, default=8,
+                              help='Number of threads to use (default: 8)')
     runtime_group.add_argument('--chunk-jobs', type=int, default=None,
                                help='Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1')
     runtime_group.add_argument('--chunk-threads-per-job', type=int, default=None,

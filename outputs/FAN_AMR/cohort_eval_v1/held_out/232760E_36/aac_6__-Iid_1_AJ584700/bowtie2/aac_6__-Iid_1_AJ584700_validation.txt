@@ -1,0 +1,90 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: aac(6')-Iid_1_AJ584700
+Generated: 2026-10-15T15:40:46.762172
+======================================================================
+
+  Sequence: consensus
+  Grade:    C*  — Multiple versions detected — this is the blended consensus.  See haplotype FASTA for individual versions.
+
+  Coverage
+    Gene length:            549 bp
+    Covered positions:      549 (100.0%)
+    N positions:            0.0%
+  Depth
+    Mean depth:             46.7x
+    Depth CV:               34.6%  (uniform)
+  Read support
+    Support score:          99.71%
+  Reference comparison
+    Identity vs reference:  99.27%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.86%
+  Length vs reference
+    Status:                 MATCHES_REFERENCE
+    Reconstructed length:   549 nt
+    Reference length:       549 nt
+    Difference:             +0 nt  (+0.0%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Reconstructed length equals reference length (549 nt).
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    B  — Good reconstruction, minor gaps or low depth in some regions.
+
+  Coverage
+    Gene length:            549 bp
+    Covered positions:      500 (91.07%)
+    N positions:            8.93%
+  Depth
+    Mean depth:             6.6x
+    Depth CV:               36.1%  (uniform)
+  Read support
+    Support score:          99.66%
+  Reference comparison
+    Identity vs reference:  99.6%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.86%
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_2
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            549 bp
+    Covered positions:      0 (0.0%)
+    N positions:            100.0%
+  Depth
+    Mean depth:             0.9x
+    Depth CV:               113.2%  (uneven)
+  Read support
+    Support score:          0.0%
+  Reference comparison
+    Identity vs reference:  0.0%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.86%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

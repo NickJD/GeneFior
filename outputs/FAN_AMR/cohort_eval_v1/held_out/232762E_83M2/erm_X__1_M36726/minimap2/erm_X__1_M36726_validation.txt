@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: erm(X)_1_M36726
+Generated: 2026-10-15T15:41:26.437507
+======================================================================
+
+  Sequence: consensus
+  Grade:    B  — Good reconstruction, minor gaps or low depth in some regions.
+
+  Coverage
+    Gene length:            855 bp
+    Covered positions:      798 (93.33%)
+    N positions:            6.67%
+  Depth
+    Mean depth:             48.9x
+    Depth CV:               91.9%  (uneven)
+  Read support
+    Support score:          99.97%
+  Reference comparison
+    Identity vs reference:  99.37%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   970 nt
+    Reference length:       855 nt
+    Difference:             +115 nt  (+13.5%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  171 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 115 nt (+13.5%). Extension captured: 5ʹ +0 nt, 3ʹ +171 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

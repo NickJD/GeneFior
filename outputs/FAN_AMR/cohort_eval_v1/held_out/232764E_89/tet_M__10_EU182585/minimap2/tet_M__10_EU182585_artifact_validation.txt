@@ -1,0 +1,59 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(M)_10_EU182585
+Length: 1920 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Partial ORF detected (5 internal stops)
+    • orf_length: 228
+    • frame: -3
+    • coverage: 52.1%
+    • internal_stops: 5
+  Recommendations:
+    → Check for sequencing errors at stop codon positions
+    → Verify gene boundaries and check for frameshifts
+    → Gene may be truncated or annotation may be incorrect
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (38.1%)
+    • gc_percent: 38.1%
+    • reference_gc: 36.6%
+    • difference: 1.6%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=31.2%)
+    • mean_depth: 4.2×
+    • median_depth: 5.0×
+    • cv_percent: 31.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (52%/48%)
+    • forward_reads: 418
+    • reverse_reads: 384
+    • forward_percent: 52.1%
+    • reverse_percent: 47.9%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.5%)
+    • identity_percent: 99.5%
+    • matches: 436
+    • valid_positions: 438
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (1484/1484)
+    • total_variants: 1484
+    • high_quality: 0
+    • low_quality: 1484
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 1484 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

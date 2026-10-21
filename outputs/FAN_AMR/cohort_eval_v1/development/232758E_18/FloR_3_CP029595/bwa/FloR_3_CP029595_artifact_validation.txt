@@ -1,0 +1,55 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: FloR_3_CP029595
+Length: 1215 bp
+Overall Status: FAIL
+Overall Score: 87.9/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 1038 bp)
+    • orf_length: 1038
+    • frame: 0
+    • coverage: 100.0%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (58.3%)
+    • gc_percent: 58.3%
+    • reference_gc: 58.3%
+    • difference: 0.1%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=62.6%)
+    • mean_depth: 19.0×
+    • median_depth: 14.0×
+    • cv_percent: 62.6%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (46%/54%)
+    • forward_reads: 58
+    • reverse_reads: 69
+    • forward_percent: 45.7%
+    • reverse_percent: 54.3%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.9%)
+    • identity_percent: 99.9%
+    • matches: 1038
+    • valid_positions: 1039
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (176/177)
+    • total_variants: 177
+    • high_quality: 1
+    • low_quality: 176
+    • high_qual_percent: 0.6%
+  Recommendations:
+    → 176 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

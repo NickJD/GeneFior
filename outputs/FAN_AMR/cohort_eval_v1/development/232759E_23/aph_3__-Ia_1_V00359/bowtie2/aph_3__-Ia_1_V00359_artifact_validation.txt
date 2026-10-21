@@ -1,0 +1,58 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: aph(3')-Ia_1_V00359
+Length: 816 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (75/100)
+  ORF mostly intact with minor issues (coverage 90.2%)
+    • orf_length: 222
+    • frame: 0
+    • coverage: 90.2%
+    • internal_stops: 0
+  Recommendations:
+    → Verify gene boundaries and check for frameshifts
+    → Gene may be truncated or annotation may be incorrect
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (44.7%)
+    • gc_percent: 44.7%
+    • reference_gc: 43.9%
+    • difference: 0.8%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=53.5%)
+    • mean_depth: 3.0×
+    • median_depth: 4.0×
+    • cv_percent: 53.5%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (58%/42%)
+    • forward_reads: 155
+    • reverse_reads: 111
+    • forward_percent: 58.3%
+    • reverse_percent: 41.7%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 246
+    • valid_positions: 246
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (570/570)
+    • total_variants: 570
+    • high_quality: 0
+    • low_quality: 570
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 570 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

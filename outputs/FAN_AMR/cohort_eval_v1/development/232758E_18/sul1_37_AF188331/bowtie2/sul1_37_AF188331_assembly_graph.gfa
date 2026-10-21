@@ -1,0 +1,10 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: sul1_37_AF188331
+# Tool: Bowtie2
+# Multi-version: single
+# Consensus length: 840 bp
+P	consensus		*	LN:i:840	FC:i:0
+# Read: MNG003:261:H7WV3DRX2:1:2265:30382:18286/1 pos:551-802
+# Read: MNG003:261:H7WV3DRX2:1:2164:17996:22608/1 pos:588-839
+# Read: MNG003:261:H7WV3DRX2:2:2236:20781:22200/2 pos:605-841

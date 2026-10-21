@@ -1,0 +1,9 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: blaTEM-11_1_AY874537
+# Tool: Bowtie2
+# Multi-version: single
+# Consensus length: 861 bp
+P	consensus		*	LN:i:861	FC:i:0
+# Read: MNG003:261:H7WV3DRX2:1:2163:10610:19836/2 pos:142-393
+# Read: MNG003:261:H7WV3DRX2:1:2266:9977:3803/1 pos:237-329

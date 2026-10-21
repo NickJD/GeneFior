@@ -1,0 +1,9 @@
+source	position_1based	reference	observed	type
+reconstruction	1	A	T	SNP
+reconstruction	3	G	N	AMBIGUITY
+reconstruction	4	G	B	AMBIGUITY
+reconstruction	585	C	T	SNP
+reconstruction	659	A	G	SNP
+reconstruction	660	A	G	SNP
+long_read_ground_truth	585	C	T	SNP
+enhanced_contig_ground_truth	585	C	T	SNP

@@ -1,0 +1,63 @@
+======================================================================
+GENEFIOR GENE RECONSTRUCTION REPORT
+Generated:       2026-10-15T14:42:07.428211
+GeneFior output: /Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232759E_23
+Min depth:       3
+Min freq:        0.5
+Reference FASTA: src/GeneFior/databases/resfinder/all.gz
+Boundary ext:    20%  codon-aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+======================================================================
+
+Gene: FloR_4_CP136914
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          134
+    Gene length:           1215 bp
+    Covered positions:     496 / 1215 (40.82%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     719
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 99.96%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (496 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232759E_23/FloR_4_CP136914/bowtie2
+  Tool: BWA
+    Reads mapped:          207
+    Gene length:           1215 bp
+    Covered positions:     365 / 1215 (30.04%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     850
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 99.99%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1579 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232759E_23/FloR_4_CP136914/bwa
+  Tool: Minimap2
+    Reads mapped:          286
+    Gene length:           1215 bp
+    Covered positions:     785 / 1215 (64.61%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     430
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 C  (read-support 99.98%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1603 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232759E_23/FloR_4_CP136914/minimap2
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; see haplotypes file
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference
+  SHORTER_IN_SAMPLE  — Sample gene shorter; grade adjusted when codon-valid
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference (captured)

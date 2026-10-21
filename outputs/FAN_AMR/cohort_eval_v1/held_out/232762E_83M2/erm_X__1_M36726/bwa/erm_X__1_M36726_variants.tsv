@@ -1,0 +1,9 @@
+Position	Ref_Base	Sample_Base	Type	Depth	Freq_pct
+18	G	C	SNP	9	100.0
+422	C	G	SNP	10	100.0
+423	G	C	SNP	10	100.0
+487	T	C	SNP	11	100.0
+488	C	A	SNP	11	100.0
+643	-	G	insertion	68	101.49
+675	T	C	SNP	73	100.0
+730	T	N	low_coverage	0	0.0

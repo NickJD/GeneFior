@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(L)_3_M11036
+Generated: 2026-10-15T15:45:05.411632
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1377 bp
+    Covered positions:      170 (12.35%)
+    N positions:            87.65%
+  Depth
+    Mean depth:             0.7x
+    Depth CV:               258.6%  (uneven)
+  Read support
+    Support score:          99.89%
+  Reference comparison
+    Identity vs reference:  99.41%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      1
+    Mean minor-allele freq: 33.33%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1727 nt
+    Reference length:       1377 nt
+    Difference:             +350 nt  (+25.4%)
+    Extension captured 5ʹ:  203 nt
+    Extension captured 3ʹ:  147 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 350 nt (+25.4%). Extension captured: 5ʹ +203 nt, 3ʹ +147 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

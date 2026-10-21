@@ -1,0 +1,62 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: erm(T)_1_M64090
+Length: 735 bp
+Overall Status: FAIL
+Overall Score: 66.4/100
+======================================================================
+
+✗ ORF Integrity: FAIL (25/100)
+  ORF severely disrupted (coverage 48.1%, 6 stops)
+    • orf_length: 153
+    • frame: 2
+    • coverage: 48.1%
+    • internal_stops: 6
+  Recommendations:
+    → Check for sequencing errors at stop codon positions
+    → Verify gene boundaries and check for frameshifts
+    → Gene may be truncated or annotation may be incorrect
+
+✗ GC Content: FAIL (25/100)
+  GC content highly unusual (24.5%) - possible artifact
+    • gc_percent: 24.5%
+    • reference_gc: 25.3%
+    • difference: 0.9%
+  Recommendations:
+    → Check for contamination or adapter sequences
+    → Verify gene identity with BLAST
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=69.2%)
+    • mean_depth: 3.5×
+    • median_depth: 2.0×
+    • cv_percent: 69.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (51%/49%)
+    • forward_reads: 328
+    • reverse_reads: 314
+    • forward_percent: 51.1%
+    • reverse_percent: 48.9%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 319
+    • valid_positions: 319
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (416/416)
+    • total_variants: 416
+    • high_quality: 0
+    • low_quality: 416
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 416 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: FloR_4_CP136914
+Generated: 2026-10-15T15:37:47.603226
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1215 bp
+    Covered positions:      673 (55.39%)
+    N positions:            44.61%
+  Depth
+    Mean depth:             7.9x
+    Depth CV:               138.1%  (uneven)
+  Read support
+    Support score:          99.98%
+  Reference comparison
+    Identity vs reference:  99.85%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   945 nt
+    Reference length:       1215 nt
+    Difference:             -270 nt  (-22.2%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  166 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 270 nt (-22.2%). Codon structure INVALID: no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

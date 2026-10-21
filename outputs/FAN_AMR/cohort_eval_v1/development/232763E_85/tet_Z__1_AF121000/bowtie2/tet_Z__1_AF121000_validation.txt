@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(Z)_1_AF121000
+Generated: 2026-10-15T15:40:42.825487
+======================================================================
+
+  Sequence: consensus
+  Grade:    A  — High-confidence reconstruction.  Single version detected.
+
+  Coverage
+    Gene length:            1155 bp
+    Covered positions:      1153 (99.83%)
+    N positions:            0.17%
+  Depth
+    Mean depth:             57.3x
+    Depth CV:               38.9%  (uniform)
+  Read support
+    Support score:          99.91%
+  Reference comparison
+    Identity vs reference:  99.74%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      3
+    Mean minor-allele freq: 27.78%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   1153 nt
+    Reference length:       1155 nt
+    Difference:             -2 nt  (-0.2%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 2 nt (-0.2%). Codon structure INVALID: length 1153 not divisible by 3; no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

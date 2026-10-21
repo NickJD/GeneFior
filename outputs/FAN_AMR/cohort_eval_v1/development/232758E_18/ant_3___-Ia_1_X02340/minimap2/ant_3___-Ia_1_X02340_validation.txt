@@ -1,0 +1,49 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: ant(3'')-Ia_1_X02340
+Generated: 2026-10-15T15:25:51.993386
+======================================================================
+
+  Sequence: consensus
+  Grade:    C  — Moderate confidence.  Check depth and coverage uniformity.
+
+  Coverage
+    Gene length:            972 bp
+    Covered positions:      774 (79.63%)
+    N positions:            20.37%
+  Depth
+    Mean depth:             60.1x
+    Depth CV:               139.2%  (uneven)
+  Read support
+    Support score:          99.86%
+  Reference comparison
+    Identity vs reference:  99.74%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      1
+    Mean minor-allele freq: 24.72%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   970 nt
+    Reference length:       972 nt
+    Difference:             -2 nt  (-0.2%)
+    Extension captured 5ʹ:  195 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Start / stop codons:    absent / TAA
+    Note: Sample gene is SHORTER than reference by 2 nt (-0.2%). Codon structure INVALID: length 970 not divisible by 3; no canonical start codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

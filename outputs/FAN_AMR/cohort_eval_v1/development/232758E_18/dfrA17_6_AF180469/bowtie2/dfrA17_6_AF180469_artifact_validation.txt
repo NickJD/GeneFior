@@ -1,0 +1,52 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: dfrA17_6_AF180469
+Length: 474 bp
+Overall Status: FAIL
+Overall Score: 45.0/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Sequence too short for reliable ORF analysis
+    • clean_length: 0
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✗ Coverage Uniformity: FAIL (0/100)
+  No coverage detected
+
+⚠ Strand Bias: WARNING (50/100)
+  Moderate strand bias (25%/75%)
+    • forward_reads: 1
+    • reverse_reads: 3
+    • forward_percent: 25.0%
+    • reverse_percent: 75.0%
+
+✗ Reference Identity: FAIL (25/100)
+  Very low identity to reference (0.0%) - wrong gene or contamination
+    • identity_percent: 0.0%
+    • matches: 0
+    • valid_positions: 0
+  Recommendations:
+    → Verify gene identity with BLAST against database
+    → Consider possibility of:
+    →   - Different species/strain
+    →   - Horizontal gene transfer variant
+    →   - Wrong reference gene
+    →   - Contamination
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (474/474)
+    • total_variants: 474
+    • high_quality: 0
+    • low_quality: 474
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 474 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

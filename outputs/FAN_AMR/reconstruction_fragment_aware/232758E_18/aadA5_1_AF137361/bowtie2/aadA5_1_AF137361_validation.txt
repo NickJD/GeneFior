@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: aadA5_1_AF137361
+Generated: 2026-10-15T14:42:32.027639
+======================================================================
+
+  Sequence: consensus
+  Grade:    A  — High-confidence reconstruction.  Single version detected.
+
+  Coverage
+    Gene length:            789 bp
+    Covered positions:      773 (97.97%)
+    N positions:            2.03%
+  Depth
+    Mean depth:             42.9x
+    Depth CV:               51.5%  (uneven)
+  Read support
+    Support score:          99.97%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      2
+    Mean minor-allele freq: 40.0%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   776 nt
+    Reference length:       789 nt
+    Difference:             -13 nt  (-1.6%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 13 nt (-1.6%). Codon structure INVALID: length 776 not divisible by 3; no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

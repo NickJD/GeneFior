@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(M)_10_EU182585
+Generated: 2026-10-15T15:45:44.467658
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1920 bp
+    Covered positions:      438 (22.81%)
+    N positions:            77.19%
+  Depth
+    Mean depth:             1.1x
+    Depth CV:               175.8%  (uneven)
+  Read support
+    Support score:          99.95%
+  Reference comparison
+    Identity vs reference:  99.54%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      1
+    Mean minor-allele freq: 20.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   2163 nt
+    Reference length:       1920 nt
+    Difference:             +243 nt  (+12.7%)
+    Extension captured 5ʹ:  58 nt
+    Extension captured 3ʹ:  185 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 243 nt (+12.7%). Extension captured: 5ʹ +58 nt, 3ʹ +185 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

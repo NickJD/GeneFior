@@ -1,0 +1,51 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: cmx_1_U85507
+Length: 1176 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 1173 bp)
+    • orf_length: 1173
+    • frame: 0
+    • coverage: 99.7%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (63.6%)
+    • gc_percent: 63.6%
+    • reference_gc: 63.6%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=16.2%)
+    • mean_depth: 122.7×
+    • median_depth: 125.0×
+    • cv_percent: 16.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (54%/46%)
+    • forward_reads: 398
+    • reverse_reads: 336
+    • forward_percent: 54.2%
+    • reverse_percent: 45.8%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.8%)
+    • identity_percent: 99.8%
+    • matches: 1174
+    • valid_positions: 1176
+
+✓ Variant Quality: PASS (100/100)
+  All 2 variants are high quality
+    • total_variants: 2
+    • high_quality: 2
+    • low_quality: 0
+    • high_qual_percent: 100.0%

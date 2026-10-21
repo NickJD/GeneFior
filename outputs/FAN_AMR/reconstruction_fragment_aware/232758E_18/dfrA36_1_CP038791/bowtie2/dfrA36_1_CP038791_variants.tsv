@@ -1,0 +1,6 @@
+Position	Ref_Base	Sample_Base	Type	Depth	Freq_pct
+1	T	N	low_coverage	2	0.0
+2	T	A	SNP	4	50.0
+3	G	T	SNP	5	80.0
+585	C	V	ambiguous	8	37.5
+588	A	T	SNP	3	66.67

@@ -1,0 +1,105 @@
+======================================================================
+GENEFIOR GENE RECONSTRUCTION REPORT
+Generated:       2026-10-15T15:40:46.462478
+GeneFior output: /Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232763E_85
+Min depth:       3
+Min freq:        0.5
+Reference FASTA: src/GeneFior/databases/resfinder/all.gz
+Boundary ext:    20%  codon-aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+======================================================================
+
+Gene: cmx_1_U85507
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          300
+    Gene length:           1176 bp
+    Covered positions:     1176 / 1176 (100.0%)
+    SNPs (vs reference):   5
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         multi (7 informative sites)
+    Haplotypes produced:   1
+    Grade:                 C*  (read-support 99.88%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (1175 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2
+  Tool: BWA
+    Reads mapped:          428
+    Gene length:           1176 bp
+    Covered positions:     1176 / 1176 (100.0%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.94%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1612 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa
+  Tool: Minimap2
+    Reads mapped:          421
+    Gene length:           1176 bp
+    Covered positions:     1176 / 1176 (100.0%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.94%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1584 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2
+
+Gene: tet(Z)_1_AF121000
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          290
+    Gene length:           1155 bp
+    Covered positions:     1153 / 1155 (99.83%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     2
+    Reference source:      provided FASTA
+    Multi-version:         uncertain (3 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.91%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (1153 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2
+  Tool: BWA
+    Reads mapped:          485
+    Gene length:           1155 bp
+    Covered positions:     1155 / 1155 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.92%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1595 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bwa
+  Tool: Minimap2
+    Reads mapped:          478
+    Gene length:           1155 bp
+    Covered positions:     1155 / 1155 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.92%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1585 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/minimap2
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; see haplotypes file
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference
+  SHORTER_IN_SAMPLE  — Sample gene shorter; grade adjusted when codon-valid
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference (captured)

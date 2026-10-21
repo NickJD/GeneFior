@@ -35,7 +35,7 @@ pip install genefior
 ## Menu for GeneFíor (GeneFíor or GeneFíor):
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 ```commandline
-GeneFíor v0.10.3 GeneFíor - The Multi-Tool Gene Detection Toolkit.
+GeneFíor v0.11.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
 options:
   -h, --help            show this help message and exit
 
@@ -100,7 +100,7 @@ Tool-Specific Parameters:
 
 Runtime Parameters:
   -t THREADS, --threads THREADS
-                        Number of threads to use (default: 4)
+                        Number of threads to use (default: 8)
   --chunk-jobs CHUNK_JOBS
                         Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1
   --chunk-threads-per-job CHUNK_THREADS_PER_JOB
@@ -139,7 +139,7 @@ All 3 databases are prepackaged and formatted as part of the bioconda installati
 BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
 
 ```commandline
-GeneFíor v0.10.3 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
+GeneFíor v0.11.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
 
 options:
   -h, --help            show this help message and exit
@@ -210,7 +210,7 @@ Tool-Specific Parameters:
 
 Runtime Parameters:
   -t THREADS, --threads THREADS
-                        Number of threads to use (default: 4)
+                        Number of threads to use (default: 8)
   --chunk-jobs CHUNK_JOBS
                         Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1
   --chunk-threads-per-job CHUNK_THREADS_PER_JOB
@@ -269,6 +269,74 @@ Each directory must contain its own tool-specific subdirectories, such as
 each directory name as the database name in logs and output files. Directory
 names must therefore be unique. A single path retains the historical
 `user-provided-db` output label.
+
+### Traditional metagenomic read-to-protein-gene abundance (RPKM)
+
+`GeneFior-Metagenomic` is a focused DIAMOND `blastx` workflow for mapping
+short DNA reads against a prepared amino-acid gene database, assigning each
+read to its closest threshold-passing reference, and reporting read counts,
+gene breadth, and RPKM. Single-end input or two paired-end files are accepted;
+paired reads are counted as individual reads in both the numerator and total
+read denominator.
+
+```bash
+GeneFior-Metagenomic \
+  -i reads_R1.fastq.gz reads_R2.fastq.gz \
+  --database /data/gene_db/proteins.dmnd \
+  --reference-fasta /data/gene_db/proteins.faa \
+  --gene-lengths /data/gene_db/gene_lengths.tsv \
+  --annotations /data/gene_db/classification.tsv \
+  --identity-thresholds /data/gene_db/identity_thresholds.tsv \
+  --sample-id sample_001 \
+  --query-coverage 80 \
+  --minimum-identity 50 \
+  --require-diamond-version 2.1.6 \
+  --minimum-reads 1 \
+  --threads 12 \
+  --include-zeroes \
+  --output-dir results/sample_001
+```
+
+Read hits must cover **more than** the configured fraction of the read
+(default 80%). Identity defaults to 50%. The cited analysis's group-specific
+60% cutoffs are included as defaults, and any gene group can be configured in
+a CSV or TSV passed with `--identity-thresholds`. The table requires
+`pattern` and `minimum_identity`; `match_type` (`exact`, `contains`, `regex`,
+or `all_terms`) and `group_name` are optional. For example:
+
+```csv
+pattern,minimum_identity,match_type,group_name
+coxL,60,contains,CoxL
+my_custom_family,72,contains,My custom family
+gene_0042,65,exact,Curated allele 0042
+^hydrogenase.*group 4,60,regex,Group 4 hydrogenases
+```
+
+Custom rules take precedence over defaults; exact ID matches are checked before
+other custom rules, whose row order is retained. Use
+`--no-default-identity-exceptions` when the supplied table should be the only
+source of group-specific cutoffs. Every read is assigned once to its highest bit-score qualifying
+reference; ties are retained in the read-assignment table and resolved by
+reference ID for the abundance count. RPKM is
+`read_count / (total_input_reads / 1,000,000) / (gene_length_kb)`. Since the
+reference is amino-acid sequence, coding length defaults to three nucleotide
+bases per amino acid. Supply `--gene-lengths` with `gene_id` and `length_bp`
+columns to use exact nucleotide gene lengths for RPKM. The report records which
+length source was used. `gene_breadth_coverage_pct` is the union of mapped
+subject amino-acid intervals. The default `--minimum-gene-coverage 0` leaves
+the article's query-cover threshold as the coverage filter; a higher value can
+be set to require a minimum fraction of the target gene covered.
+
+Outputs include `diamond_hits*.raw.tsv`, `best_read_assignments.tsv`, and
+`gene_abundance_rpkm.tsv`. The optional annotation TSV must be tab-separated
+and have a `gene_id` column; `classification`, `subgroup`, `family`, and
+`hyddb_classification` are copied into the abundance report when present. This
+allows curated HydDB labels to be supplied for hydrogenases rather than
+inferring their subgroup from sequence IDs. The threshold scheme follows the
+analysis described in [Science, DOI 10.1126/science.adu2182](https://doi.org/10.1126/science.adu2182).
+The actual DIAMOND version, input read counts, thresholds, commands, and RPKM
+formula are recorded in `metagenomic_run_manifest.json`; use
+`--require-diamond-version` to enforce the cited version.
 
 ### Always-flag gene review lists
 
@@ -482,7 +550,7 @@ Detection-system compatibility:
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.10.3 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.11.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -546,7 +614,7 @@ Examples:
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.10.3 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.11.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -624,7 +692,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.10.3 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.11.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit

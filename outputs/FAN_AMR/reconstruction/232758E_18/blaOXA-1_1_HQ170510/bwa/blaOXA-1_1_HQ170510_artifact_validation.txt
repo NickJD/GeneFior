@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: blaOXA-1_1_HQ170510
+Length: 831 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 828 bp)
+    • orf_length: 828
+    • frame: 0
+    • coverage: 99.6%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (34.5%)
+    • gc_percent: 34.5%
+    • reference_gc: 34.5%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=25.2%)
+    • mean_depth: 82.6×
+    • median_depth: 85.0×
+    • cv_percent: 25.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (54%/46%)
+    • forward_reads: 163
+    • reverse_reads: 140
+    • forward_percent: 53.8%
+    • reverse_percent: 46.2%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 831
+    • valid_positions: 831
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

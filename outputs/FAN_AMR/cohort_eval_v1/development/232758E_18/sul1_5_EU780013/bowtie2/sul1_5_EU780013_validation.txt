@@ -1,0 +1,69 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: sul1_5_EU780013
+Generated: 2026-10-15T15:29:53.057143
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            867 bp
+    Covered positions:      269 (31.03%)
+    N positions:            68.97%
+  Depth
+    Mean depth:             7.8x
+    Depth CV:               143.5%  (uneven)
+  Read support
+    Support score:          99.81%
+  Reference comparison
+    Identity vs reference:  99.63%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      3
+    Mean minor-allele freq: 38.33%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   269 nt
+    Reference length:       867 nt
+    Difference:             -598 nt  (-69.0%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 598 nt (-69.0%). Codon structure INVALID: length 269 not divisible by 3; no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            867 bp
+    Covered positions:      182 (20.99%)
+    N positions:            79.01%
+  Depth
+    Mean depth:             0.8x
+    Depth CV:               160.0%  (uneven)
+  Read support
+    Support score:          99.82%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      3
+    Mean minor-allele freq: 38.33%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

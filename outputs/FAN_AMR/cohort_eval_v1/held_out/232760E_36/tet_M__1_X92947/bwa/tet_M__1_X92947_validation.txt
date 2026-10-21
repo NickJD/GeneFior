@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(M)_1_X92947
+Generated: 2026-10-15T15:41:06.967105
+======================================================================
+
+  Sequence: consensus
+  Grade:    B  — Good reconstruction, minor gaps or low depth in some regions.
+
+  Coverage
+    Gene length:            1920 bp
+    Covered positions:      1643 (85.57%)
+    N positions:            14.43%
+  Depth
+    Mean depth:             26.5x
+    Depth CV:               72.4%  (uneven)
+  Read support
+    Support score:          99.97%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      1
+    Mean minor-allele freq: 20.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   2231 nt
+    Reference length:       1920 nt
+    Difference:             +311 nt  (+16.2%)
+    Extension captured 5ʹ:  148 nt
+    Extension captured 3ʹ:  163 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 311 nt (+16.2%). Extension captured: 5ʹ +148 nt, 3ʹ +163 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

@@ -1,0 +1,493 @@
+{
+  "generated_at_utc": "2026-10-15T15:54:19.440520+00:00",
+  "scope": "consensus reconstructions passing against both assembly sources",
+  "qc_passing_mapper_assembly_comparisons": 46,
+  "qc_passing_sample_gene_groups": 10,
+  "three_way_high_quality_reconstructions": 19,
+  "inputs": [
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/enhanced_contigs/232758E_18.fasta",
+      "size_bytes": 4909429,
+      "modified_time_ns": 1673209765000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/enhanced_contigs/232761E_63.fasta",
+      "size_bytes": 5279348,
+      "modified_time_ns": 1673209747000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/enhanced_contigs/232763E_85.fasta",
+      "size_bytes": 2796507,
+      "modified_time_ns": 1673209763000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232758E_18/resfinder_allele_resolution.tsv",
+      "size_bytes": 10480,
+      "modified_time_ns": 1790963191000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232761E_63/resfinder_allele_resolution.tsv",
+      "size_bytes": 11475,
+      "modified_time_ns": 1790964007000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232763E_85/resfinder_allele_resolution.tsv",
+      "size_bytes": 922,
+      "modified_time_ns": 1790964196000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/long_reads/232758E/assembly.fasta",
+      "size_bytes": 4902479,
+      "modified_time_ns": 1673900134000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/long_reads/232761E/assembly.fasta",
+      "size_bytes": 5276962,
+      "modified_time_ns": 1673906738000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/long_reads/232763E/assembly.fasta",
+      "size_bytes": 2795205,
+      "modified_time_ns": 1673965665000000000
+    },
+    {
+      "path": "outputs/FAN_AMR/architect/cohort_eval_v1/development/assembly/architect_evaluation.tsv",
+      "size_bytes": 397428,
+      "modified_time_ns": 1792078164625195443
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 985,
+      "modified_time_ns": 1792074331263007725
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20514,
+      "modified_time_ns": 1792074331263840794
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1861,
+      "modified_time_ns": 1792074331264492741
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_variants.tsv",
+      "size_bytes": 480,
+      "modified_time_ns": 1792074331264004333
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 1311,
+      "modified_time_ns": 1792074336332206214
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20614,
+      "modified_time_ns": 1792074336333045454
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792074336333680614
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 1311,
+      "modified_time_ns": 1792074341629684957
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20619,
+      "modified_time_ns": 1792074341630563327
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792074341631124865
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_consensus.fasta",
+      "size_bytes": 1357,
+      "modified_time_ns": 1792074357215608500
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_depth.tsv",
+      "size_bytes": 21398,
+      "modified_time_ns": 1792074357216897960
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_validation.txt",
+      "size_bytes": 1811,
+      "modified_time_ns": 1792074357217835919
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_variants.tsv",
+      "size_bytes": 568,
+      "modified_time_ns": 1792074357217191293
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 853,
+      "modified_time_ns": 1792074422302247561
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_depth.tsv",
+      "size_bytes": 17721,
+      "modified_time_ns": 1792074422303378650
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_validation.txt",
+      "size_bytes": 2965,
+      "modified_time_ns": 1792074422304163237
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_variants.tsv",
+      "size_bytes": 177,
+      "modified_time_ns": 1792074422303604068
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 1123,
+      "modified_time_ns": 1792074427354444736
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_depth.tsv",
+      "size_bytes": 17986,
+      "modified_time_ns": 1792074427355169156
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_validation.txt",
+      "size_bytes": 1806,
+      "modified_time_ns": 1792074427355844784
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_variants.tsv",
+      "size_bytes": 72,
+      "modified_time_ns": 1792074427355381115
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 1123,
+      "modified_time_ns": 1792074432181089970
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_depth.tsv",
+      "size_bytes": 17973,
+      "modified_time_ns": 1792074432181881390
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_validation.txt",
+      "size_bytes": 1806,
+      "modified_time_ns": 1792074432182577143
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_variants.tsv",
+      "size_bytes": 72,
+      "modified_time_ns": 1792074432182098808
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 783,
+      "modified_time_ns": 1792074482989685747
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15375,
+      "modified_time_ns": 1792074482990501917
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 3151,
+      "modified_time_ns": 1792074482991111837
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_variants.tsv",
+      "size_bytes": 154,
+      "modified_time_ns": 1792074482990645585
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1792074487985652158
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15379,
+      "modified_time_ns": 1792074487986446829
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792074487987026290
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1792074492734591497
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15376,
+      "modified_time_ns": 1792074492735256750
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792074492735754086
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_consensus.fasta",
+      "size_bytes": 1420,
+      "modified_time_ns": 1792074598023178026
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_depth.tsv",
+      "size_bytes": 22719,
+      "modified_time_ns": 1792074598024082488
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_validation.txt",
+      "size_bytes": 1852,
+      "modified_time_ns": 1792074598024705616
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_variants.tsv",
+      "size_bytes": 71,
+      "modified_time_ns": 1792074598024241281
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_consensus.fasta",
+      "size_bytes": 1846,
+      "modified_time_ns": 1792074679030086220
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_depth.tsv",
+      "size_bytes": 31650,
+      "modified_time_ns": 1792074679031271185
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_validation.txt",
+      "size_bytes": 1813,
+      "modified_time_ns": 1792074679031968479
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_variants.tsv",
+      "size_bytes": 946,
+      "modified_time_ns": 1792074679031457310
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/bwa/aph_3__-Ia_3_EF015636_consensus.fasta",
+      "size_bytes": 1356,
+      "modified_time_ns": 1792075127468018548
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/bwa/aph_3__-Ia_3_EF015636_depth.tsv",
+      "size_bytes": 21256,
+      "modified_time_ns": 1792075127469017636
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/bwa/aph_3__-Ia_3_EF015636_validation.txt",
+      "size_bytes": 1814,
+      "modified_time_ns": 1792075127470079350
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/bwa/aph_3__-Ia_3_EF015636_variants.tsv",
+      "size_bytes": 71,
+      "modified_time_ns": 1792075127469316763
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/minimap2/aph_3__-Ia_3_EF015636_consensus.fasta",
+      "size_bytes": 1328,
+      "modified_time_ns": 1792075129792576046
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/minimap2/aph_3__-Ia_3_EF015636_depth.tsv",
+      "size_bytes": 21278,
+      "modified_time_ns": 1792075129793534717
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/minimap2/aph_3__-Ia_3_EF015636_validation.txt",
+      "size_bytes": 1814,
+      "modified_time_ns": 1792075129794127511
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/aph_3__-Ia_3_EF015636/minimap2/aph_3__-Ia_3_EF015636_variants.tsv",
+      "size_bytes": 71,
+      "modified_time_ns": 1792075129793693801
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 781,
+      "modified_time_ns": 1792075171904150423
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15226,
+      "modified_time_ns": 1792075171905035010
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1870,
+      "modified_time_ns": 1792075171905722888
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_variants.tsv",
+      "size_bytes": 640,
+      "modified_time_ns": 1792075171905226261
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1792075174426304389
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15325,
+      "modified_time_ns": 1792075174427028643
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792075174427557312
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1792075176750223674
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15325,
+      "modified_time_ns": 1792075176750982261
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232761E_63/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1792075176751566014
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2/cmx_1_U85507_consensus.fasta",
+      "size_bytes": 1375,
+      "modified_time_ns": 1792075238890803253
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2/cmx_1_U85507_depth.tsv",
+      "size_bytes": 31019,
+      "modified_time_ns": 1792075238892098717
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2/cmx_1_U85507_validation.txt",
+      "size_bytes": 2528,
+      "modified_time_ns": 1792075238893312473
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2/cmx_1_U85507_variants.tsv",
+      "size_bytes": 203,
+      "modified_time_ns": 1792075238892230384
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa/cmx_1_U85507_consensus.fasta",
+      "size_bytes": 1820,
+      "modified_time_ns": 1792075240740587146
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa/cmx_1_U85507_depth.tsv",
+      "size_bytes": 31020,
+      "modified_time_ns": 1792075240741706942
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa/cmx_1_U85507_validation.txt",
+      "size_bytes": 1808,
+      "modified_time_ns": 1792075240742270278
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa/cmx_1_U85507_variants.tsv",
+      "size_bytes": 92,
+      "modified_time_ns": 1792075240741842276
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2/cmx_1_U85507_consensus.fasta",
+      "size_bytes": 1791,
+      "modified_time_ns": 1792075242630893895
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2/cmx_1_U85507_depth.tsv",
+      "size_bytes": 31013,
+      "modified_time_ns": 1792075242632047401
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2/cmx_1_U85507_validation.txt",
+      "size_bytes": 1808,
+      "modified_time_ns": 1792075242632686987
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2/cmx_1_U85507_variants.tsv",
+      "size_bytes": 92,
+      "modified_time_ns": 1792075242632204318
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2/tet_Z__1_AF121000_consensus.fasta",
+      "size_bytes": 1359,
+      "modified_time_ns": 1792075242823915510
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2/tet_Z__1_AF121000_depth.tsv",
+      "size_bytes": 30427,
+      "modified_time_ns": 1792075242825104724
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2/tet_Z__1_AF121000_validation.txt",
+      "size_bytes": 1870,
+      "modified_time_ns": 1792075242825748602
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2/tet_Z__1_AF121000_variants.tsv",
+      "size_bytes": 166,
+      "modified_time_ns": 1792075242825266475
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bwa/tet_Z__1_AF121000_consensus.fasta",
+      "size_bytes": 1807,
+      "modified_time_ns": 1792075244623664376
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bwa/tet_Z__1_AF121000_depth.tsv",
+      "size_bytes": 30574,
+      "modified_time_ns": 1792075244624853173
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bwa/tet_Z__1_AF121000_validation.txt",
+      "size_bytes": 1813,
+      "modified_time_ns": 1792075244625432551
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/minimap2/tet_Z__1_AF121000_consensus.fasta",
+      "size_bytes": 1797,
+      "modified_time_ns": 1792075246438862357
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/minimap2/tet_Z__1_AF121000_depth.tsv",
+      "size_bytes": 30576,
+      "modified_time_ns": 1792075246440171989
+    },
+    {
+      "path": "outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/minimap2/tet_Z__1_AF121000_validation.txt",
+      "size_bytes": 1813,
+      "modified_time_ns": 1792075246440788616
+    },
+    {
+      "path": "src/GeneFior/databases/resfinder/all.gz",
+      "size_bytes": 369910,
+      "modified_time_ns": 1774811947235838401
+    }
+  ],
+  "outputs": [
+    "reconstruction-snp-profiles.png",
+    "reconstruction-snp-evidence.tsv",
+    "reconstruction-allele-evidence.png",
+    "reconstruction-allele-evidence.tsv",
+    "reconstruction-boundaries.png",
+    "three_way/three_way_visualisation_summary.tsv",
+    "per-reconstruction PNG and differences TSV files under three_way/sample/gene/"
+  ]
+}

@@ -1,0 +1,37 @@
+======================================================================
+GENEFIOR GENE RECONSTRUCTION REPORT
+Generated:       2026-10-15T15:24:20.175425
+GeneFior output: /Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232757E_7
+Min depth:       3
+Min freq:        0.5
+Reference FASTA: src/GeneFior/databases/resfinder/all.gz
+Boundary ext:    20%  codon-aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+======================================================================
+
+Gene: fosB_5_AJ605334
+  Status: ok
+  Tool: BWA
+    Reads mapped:          6
+    Gene length:           417 bp
+    Covered positions:     30 / 417 (7.19%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     387
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 100.0%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (181 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/development/232757E_7/fosB_5_AJ605334/bwa
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; see haplotypes file
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference
+  SHORTER_IN_SAMPLE  — Sample gene shorter; grade adjusted when codon-valid
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference (captured)

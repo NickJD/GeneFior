@@ -1,0 +1,58 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: aph(3')-Ia_3_EF015636
+Length: 816 bp
+Overall Status: FAIL
+Overall Score: 80.7/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Partial ORF detected (3 internal stops)
+    • orf_length: 312
+    • frame: 2
+    • coverage: 81.2%
+    • internal_stops: 3
+  Recommendations:
+    → Check for sequencing errors at stop codon positions
+    → Verify gene boundaries and check for frameshifts
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (46.9%)
+    • gc_percent: 46.9%
+    • reference_gc: 44.5%
+    • difference: 2.4%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=52.8%)
+    • mean_depth: 3.8×
+    • median_depth: 3.0×
+    • cv_percent: 52.8%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (44%/56%)
+    • forward_reads: 69
+    • reverse_reads: 88
+    • forward_percent: 43.9%
+    • reverse_percent: 56.1%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 386
+    • valid_positions: 386
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (430/430)
+    • total_variants: 430
+    • high_quality: 0
+    • low_quality: 430
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 430 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

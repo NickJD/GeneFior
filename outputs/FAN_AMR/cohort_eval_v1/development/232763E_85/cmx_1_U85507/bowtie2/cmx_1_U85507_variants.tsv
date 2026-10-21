@@ -1,0 +1,8 @@
+Position	Ref_Base	Sample_Base	Type	Depth	Freq_pct
+1	A	N	ambiguous	7	42.86
+3	G	C	SNP	8	50.0
+174	C	G	SNP	44	100.0
+322	T	C	SNP	57	100.0
+1173	T	H	ambiguous	11	36.36
+1174	T	C	SNP	10	60.0
+1176	A	C	SNP	6	100.0

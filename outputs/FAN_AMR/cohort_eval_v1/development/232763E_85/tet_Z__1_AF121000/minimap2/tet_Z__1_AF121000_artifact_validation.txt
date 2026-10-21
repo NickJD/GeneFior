@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(Z)_1_AF121000
+Length: 1155 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 1152 bp)
+    • orf_length: 1152
+    • frame: 0
+    • coverage: 99.7%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (64.7%)
+    • gc_percent: 64.7%
+    • reference_gc: 64.7%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=11.2%)
+    • mean_depth: 78.4×
+    • median_depth: 79.0×
+    • cv_percent: 11.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (54%/46%)
+    • forward_reads: 259
+    • reverse_reads: 219
+    • forward_percent: 54.2%
+    • reverse_percent: 45.8%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 1155
+    • valid_positions: 1155
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

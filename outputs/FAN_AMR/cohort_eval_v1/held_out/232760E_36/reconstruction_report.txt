@@ -1,0 +1,189 @@
+======================================================================
+GENEFIOR GENE RECONSTRUCTION REPORT
+Generated:       2026-10-15T15:41:19.196462
+GeneFior output: /Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232760E_36
+Min depth:       3
+Min freq:        0.5
+Reference FASTA: src/GeneFior/databases/resfinder/all.gz
+Boundary ext:    20%  codon-aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+======================================================================
+
+Gene: aac(6')-Iid_1_AJ584700
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          131
+    Gene length:           549 bp
+    Covered positions:     549 / 549 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         multi (7 informative sites)
+    Haplotypes produced:   2
+    Grade:                 C*  (read-support 99.71%)
+    Length vs reference:   MATCHES_REFERENCE  (549 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/aac_6__-Iid_1_AJ584700/bowtie2
+  Tool: BWA
+    Reads mapped:          296
+    Gene length:           549 bp
+    Covered positions:     549 / 549 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.98%)
+    Length vs reference:   LONGER_IN_SAMPLE  (771 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/aac_6__-Iid_1_AJ584700/bwa
+  Tool: Minimap2
+    Reads mapped:          293
+    Gene length:           549 bp
+    Covered positions:     549 / 549 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.98%)
+    Length vs reference:   LONGER_IN_SAMPLE  (771 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/aac_6__-Iid_1_AJ584700/minimap2
+
+Gene: tet(M)_13_AM990992
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          81
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (0 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__13_AM990992/bowtie2
+  Tool: BWA
+    Reads mapped:          96
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2035 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__13_AM990992/bwa
+  Tool: Minimap2
+    Reads mapped:          107
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2114 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__13_AM990992/minimap2
+
+Gene: tet(M)_1_X92947
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          265
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (0 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__1_X92947/bowtie2
+  Tool: BWA
+    Reads mapped:          431
+    Gene length:           1920 bp
+    Covered positions:     1643 / 1920 (85.57%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     277
+    Reference source:      provided FASTA
+    Multi-version:         single (1 informative sites)
+    Haplotypes produced:   0
+    Grade:                 B  (read-support 99.97%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2231 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__1_X92947/bwa
+  Tool: Minimap2
+    Reads mapped:          401
+    Gene length:           1920 bp
+    Covered positions:     1049 / 1920 (54.64%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     871
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 99.97%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2286 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__1_X92947/minimap2
+
+Gene: tet(M)_9_X56353
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          130
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (0 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__9_X56353/bowtie2
+  Tool: BWA
+    Reads mapped:          146
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2222 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__9_X56353/bwa
+  Tool: Minimap2
+    Reads mapped:          137
+    Gene length:           1920 bp
+    Covered positions:     0 / 1920 (0.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     1920
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 F  (read-support 0.0%)
+    Length vs reference:   LONGER_IN_SAMPLE  (2184 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/cohort_eval_v1/held_out/232760E_36/tet_M__9_X56353/minimap2
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; see haplotypes file
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference
+  SHORTER_IN_SAMPLE  — Sample gene shorter; grade adjusted when codon-valid
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference (captured)

@@ -1,0 +1,11 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: dfrA17_6_AF180469
+# Tool: Bowtie2
+# Multi-version: single
+# Consensus length: 474 bp
+P	consensus		*	LN:i:474	FC:i:0
+# Read: MNG003:261:H7WV3DRX2:1:2142:14615:25050/1 pos:160-411
+# Read: MNG003:261:H7WV3DRX2:2:2115:28465:33098/1 pos:199-450
+# Read: MNG003:261:H7WV3DRX2:2:2239:19560:16078/1 pos:199-450
+# Read: MNG003:261:H7WV3DRX2:1:2253:11514:36777/2 pos:203-454

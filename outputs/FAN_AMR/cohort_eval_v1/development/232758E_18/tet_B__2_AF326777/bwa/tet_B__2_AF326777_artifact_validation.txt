@@ -1,0 +1,55 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(B)_2_AF326777
+Length: 1206 bp
+Overall Status: FAIL
+Overall Score: 87.9/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 1173 bp)
+    • orf_length: 1173
+    • frame: 0
+    • coverage: 100.0%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (43.2%)
+    • gc_percent: 43.2%
+    • reference_gc: 43.4%
+    • difference: 0.2%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=58.9%)
+    • mean_depth: 37.7×
+    • median_depth: 33.0×
+    • cv_percent: 58.9%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (52%/48%)
+    • forward_reads: 206
+    • reverse_reads: 191
+    • forward_percent: 51.9%
+    • reverse_percent: 48.1%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 1174
+    • valid_positions: 1174
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (32/32)
+    • total_variants: 32
+    • high_quality: 0
+    • low_quality: 32
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 32 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

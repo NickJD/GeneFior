@@ -1,0 +1,69 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: blaOXA-1_1_HQ170510
+Generated: 2026-10-02T20:28:19.295075
+======================================================================
+
+  Sequence: consensus
+  Grade:    C*  — Multiple versions detected — this is the blended consensus.  See haplotype FASTA for individual versions.
+
+  Coverage
+    Gene length:            831 bp
+    Covered positions:      831 (100.0%)
+    N positions:            0.24%
+  Depth
+    Mean depth:             60.5x
+    Depth CV:               33.8%  (uniform)
+  Read support
+    Support score:          99.62%
+  Reference comparison
+    Identity vs reference:  99.76%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 31.24%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   830 nt
+    Reference length:       831 nt
+    Difference:             -1 nt  (-0.1%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 1 nt (-0.1%). Codon structure INVALID: length 830 not divisible by 3; no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            831 bp
+    Covered positions:      474 (57.04%)
+    N positions:            42.96%
+  Depth
+    Mean depth:             5.6x
+    Depth CV:               101.6%  (uneven)
+  Read support
+    Support score:          99.29%
+  Reference comparison
+    Identity vs reference:  99.79%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 31.24%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

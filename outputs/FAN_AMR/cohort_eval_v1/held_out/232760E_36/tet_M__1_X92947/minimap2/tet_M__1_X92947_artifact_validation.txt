@@ -1,0 +1,62 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(M)_1_X92947
+Length: 1920 bp
+Overall Status: FAIL
+Overall Score: 75.7/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Partial ORF detected (6 internal stops)
+    • orf_length: 756
+    • frame: 1
+    • coverage: 72.2%
+    • internal_stops: 6
+  Recommendations:
+    → Check for sequencing errors at stop codon positions
+    → Verify gene boundaries and check for frameshifts
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (36.7%)
+    • gc_percent: 36.7%
+    • reference_gc: 36.0%
+    • difference: 0.7%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✗ Coverage Uniformity: FAIL (40/100)
+  Coverage highly variable (CV=106.6%) with 1 discontinuities
+    • mean_depth: 14.5×
+    • median_depth: 6.0×
+    • cv_percent: 106.6%
+    • discontinuities: 1
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+    → Coverage discontinuities at positions: [1248]
+    → Check for chimeric assembly or misalignment
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (51%/49%)
+    • forward_reads: 206
+    • reverse_reads: 195
+    • forward_percent: 51.4%
+    • reverse_percent: 48.6%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 1049
+    • valid_positions: 1049
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (871/871)
+    • total_variants: 871
+    • high_quality: 0
+    • low_quality: 871
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 871 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

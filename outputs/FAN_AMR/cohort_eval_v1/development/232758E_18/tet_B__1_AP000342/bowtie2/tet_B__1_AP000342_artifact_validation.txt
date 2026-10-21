@@ -1,0 +1,56 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(B)_1_AP000342
+Length: 1206 bp
+Overall Status: FAIL
+Overall Score: 66.4/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Sequence too short for reliable ORF analysis
+    • clean_length: 0
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=21.6%)
+    • mean_depth: 1.1×
+    • median_depth: 1.0×
+    • cv_percent: 21.6%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (47%/53%)
+    • forward_reads: 65
+    • reverse_reads: 73
+    • forward_percent: 47.1%
+    • reverse_percent: 52.9%
+
+✗ Reference Identity: FAIL (25/100)
+  Very low identity to reference (0.0%) - wrong gene or contamination
+    • identity_percent: 0.0%
+    • matches: 0
+    • valid_positions: 0
+  Recommendations:
+    → Verify gene identity with BLAST against database
+    → Consider possibility of:
+    →   - Different species/strain
+    →   - Horizontal gene transfer variant
+    →   - Wrong reference gene
+    →   - Contamination
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (1206/1206)
+    • total_variants: 1206
+    • high_quality: 0
+    • low_quality: 1206
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 1206 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

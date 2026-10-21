@@ -1,0 +1,57 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: sul1_14_AJ517791
+Length: 840 bp
+Overall Status: FAIL
+Overall Score: 45.0/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Sequence too short for reliable ORF analysis
+    • clean_length: 0
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✗ Coverage Uniformity: FAIL (0/100)
+  No coverage detected
+
+⚠ Strand Bias: WARNING (50/100)
+  Moderate strand bias (80%/20%)
+    • forward_reads: 4
+    • reverse_reads: 1
+    • forward_percent: 80.0%
+    • reverse_percent: 20.0%
+  Recommendations:
+    → Severe strand bias may indicate:
+    →   - Strand-specific library prep
+    →   - Systematic sequencing errors
+    →   - Reference sequence on wrong strand
+
+✗ Reference Identity: FAIL (25/100)
+  Very low identity to reference (0.0%) - wrong gene or contamination
+    • identity_percent: 0.0%
+    • matches: 0
+    • valid_positions: 0
+  Recommendations:
+    → Verify gene identity with BLAST against database
+    → Consider possibility of:
+    →   - Different species/strain
+    →   - Horizontal gene transfer variant
+    →   - Wrong reference gene
+    →   - Contamination
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (840/840)
+    • total_variants: 840
+    • high_quality: 0
+    • low_quality: 840
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 840 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

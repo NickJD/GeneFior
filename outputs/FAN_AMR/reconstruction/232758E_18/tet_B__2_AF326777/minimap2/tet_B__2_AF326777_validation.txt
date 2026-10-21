@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(B)_2_AF326777
+Generated: 2026-10-02T20:24:03.229195
+======================================================================
+
+  Sequence: consensus
+  Grade:    A  — High-confidence reconstruction.  Single version detected.
+
+  Coverage
+    Gene length:            1206 bp
+    Covered positions:      1206 (100.0%)
+    N positions:            0.0%
+  Depth
+    Mean depth:             66.8x
+    Depth CV:               27.1%  (uniform)
+  Read support
+    Support score:          99.61%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1608 nt
+    Reference length:       1206 nt
+    Difference:             +402 nt  (+33.3%)
+    Extension captured 5ʹ:  198 nt
+    Extension captured 3ʹ:  204 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 402 nt (+33.3%). Extension captured: 5ʹ +198 nt, 3ʹ +204 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

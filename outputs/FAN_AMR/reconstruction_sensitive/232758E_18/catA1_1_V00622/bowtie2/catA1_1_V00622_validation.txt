@@ -1,0 +1,69 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: catA1_1_V00622
+Generated: 2026-10-15T14:41:13.841091
+======================================================================
+
+  Sequence: consensus
+  Grade:    C*  — Multiple versions detected — this is the blended consensus.  See haplotype FASTA for individual versions.
+
+  Coverage
+    Gene length:            660 bp
+    Covered positions:      660 (100.0%)
+    N positions:            0.15%
+  Depth
+    Mean depth:             116.2x
+    Depth CV:               43.3%  (uniform)
+  Read support
+    Support score:          99.72%
+  Reference comparison
+    Identity vs reference:  99.24%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.75%
+  Length vs reference
+    Status:                 MATCHES_REFERENCE
+    Reconstructed length:   660 nt
+    Reference length:       660 nt
+    Difference:             +0 nt  (+0.0%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Reconstructed length equals reference length (660 nt).
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            660 bp
+    Covered positions:      230 (34.85%)
+    N positions:            65.15%
+  Depth
+    Mean depth:             4.4x
+    Depth CV:               106.6%  (uneven)
+  Read support
+    Support score:          99.35%
+  Reference comparison
+    Identity vs reference:  98.7%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.75%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

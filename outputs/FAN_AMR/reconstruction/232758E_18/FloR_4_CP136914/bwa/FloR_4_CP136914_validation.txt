@@ -1,0 +1,90 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: FloR_4_CP136914
+Generated: 2026-10-02T20:23:09.691448
+======================================================================
+
+  Sequence: consensus
+  Grade:    A  — High-confidence reconstruction.  Single version detected.
+
+  Coverage
+    Gene length:            1215 bp
+    Covered positions:      1215 (100.0%)
+    N positions:            0.0%
+  Depth
+    Mean depth:             28.6x
+    Depth CV:               69.4%  (uneven)
+  Read support
+    Support score:          99.56%
+  Reference comparison
+    Identity vs reference:  99.84%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      4
+    Mean minor-allele freq: 28.21%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1649 nt
+    Reference length:       1215 nt
+    Difference:             +434 nt  (+35.7%)
+    Extension captured 5ʹ:  219 nt
+    Extension captured 3ʹ:  215 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 434 nt (+35.7%). Extension captured: 5ʹ +219 nt, 3ʹ +215 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1215 bp
+    Covered positions:      417 (34.32%)
+    N positions:            65.68%
+  Depth
+    Mean depth:             2.3x
+    Depth CV:               120.8%  (uneven)
+  Read support
+    Support score:          99.79%
+  Reference comparison
+    Identity vs reference:  99.52%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      4
+    Mean minor-allele freq: 28.21%
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_2
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1215 bp
+    Covered positions:      251 (20.66%)
+    N positions:            79.34%
+  Depth
+    Mean depth:             1.4x
+    Depth CV:               151.9%  (uneven)
+  Read support
+    Support score:          99.77%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      4
+    Mean minor-allele freq: 28.21%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

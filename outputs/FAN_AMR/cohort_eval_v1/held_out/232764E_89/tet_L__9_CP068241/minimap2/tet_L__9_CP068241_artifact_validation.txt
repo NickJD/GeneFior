@@ -1,0 +1,54 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(L)_9_CP068241
+Length: 1377 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 93 bp)
+    • orf_length: 93
+    • frame: 0
+    • coverage: 96.9%
+    • internal_stops: 0
+  Recommendations:
+    → Gene may be truncated or annotation may be incorrect
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=45.7%)
+    • mean_depth: 2.1×
+    • median_depth: 2.0×
+    • cv_percent: 45.7%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (53%/47%)
+    • forward_reads: 124
+    • reverse_reads: 111
+    • forward_percent: 52.8%
+    • reverse_percent: 47.2%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.0%)
+    • identity_percent: 99.0%
+    • matches: 95
+    • valid_positions: 96
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (1282/1282)
+    • total_variants: 1282
+    • high_quality: 0
+    • low_quality: 1282
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 1282 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

@@ -1,0 +1,276 @@
+======================================================================
+GENEFIOR GENE RECONSTRUCTION REPORT
+Generated:       2026-10-15T14:41:54.183104
+GeneFior output: /Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232758E_18
+Min depth:       3
+Min freq:        0.5
+Reference FASTA: src/GeneFior/databases/resfinder/all.gz
+Boundary ext:    20%  codon-aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+======================================================================
+
+Gene: FloR_4_CP136914
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          84
+    Gene length:           1215 bp
+    Covered positions:     1052 / 1215 (86.58%)
+    SNPs (vs reference):   3
+    Insertions:            0
+    Low-cov positions:     163
+    Reference source:      provided FASTA
+    Multi-version:         single (2 informative sites)
+    Haplotypes produced:   0
+    Grade:                 B  (read-support 99.61%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (1123 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/FloR_4_CP136914/bowtie2
+  Tool: BWA
+    Reads mapped:          169
+    Gene length:           1215 bp
+    Covered positions:     1215 / 1215 (100.0%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         uncertain (4 informative sites)
+    Haplotypes produced:   2
+    Grade:                 A  (read-support 99.56%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1649 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/FloR_4_CP136914/bwa
+  Tool: Minimap2
+    Reads mapped:          158
+    Gene length:           1215 bp
+    Covered positions:     1215 / 1215 (100.0%)
+    SNPs (vs reference):   2
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (2 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.59%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1593 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/FloR_4_CP136914/minimap2
+
+Gene: aadA5_1_AF137361
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          156
+    Gene length:           789 bp
+    Covered positions:     787 / 789 (99.75%)
+    SNPs (vs reference):   3
+    Insertions:            1
+    Low-cov positions:     2
+    Reference source:      provided FASTA
+    Multi-version:         multi (4 informative sites)
+    Haplotypes produced:   0
+    Grade:                 C*  (read-support 99.71%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (787 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/aadA5_1_AF137361/bowtie2
+  Tool: BWA
+    Reads mapped:          234
+    Gene length:           789 bp
+    Covered positions:     789 / 789 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.77%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1107 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/aadA5_1_AF137361/bwa
+  Tool: Minimap2
+    Reads mapped:          231
+    Gene length:           789 bp
+    Covered positions:     789 / 789 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.77%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1107 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/aadA5_1_AF137361/minimap2
+
+Gene: blaOXA-1_1_HQ170510
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          208
+    Gene length:           831 bp
+    Covered positions:     831 / 831 (100.0%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         multi (7 informative sites)
+    Haplotypes produced:   1
+    Grade:                 C*  (read-support 99.62%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (830 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/blaOXA-1_1_HQ170510/bowtie2
+  Tool: BWA
+    Reads mapped:          303
+    Gene length:           831 bp
+    Covered positions:     831 / 831 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.73%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1149 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/blaOXA-1_1_HQ170510/bwa
+  Tool: Minimap2
+    Reads mapped:          289
+    Gene length:           831 bp
+    Covered positions:     831 / 831 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.73%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1141 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/blaOXA-1_1_HQ170510/minimap2
+
+Gene: catA1_1_V00622
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          314
+    Gene length:           660 bp
+    Covered positions:     660 / 660 (100.0%)
+    SNPs (vs reference):   3
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         multi (7 informative sites)
+    Haplotypes produced:   1
+    Grade:                 C*  (read-support 99.72%)
+    Length vs reference:   MATCHES_REFERENCE  (660 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/catA1_1_V00622/bowtie2
+  Tool: BWA
+    Reads mapped:          597
+    Gene length:           660 bp
+    Covered positions:     660 / 660 (100.0%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.69%)
+    Length vs reference:   LONGER_IN_SAMPLE  (924 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/catA1_1_V00622/bwa
+  Tool: Minimap2
+    Reads mapped:          584
+    Gene length:           660 bp
+    Covered positions:     660 / 660 (100.0%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.7%)
+    Length vs reference:   LONGER_IN_SAMPLE  (924 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/catA1_1_V00622/minimap2
+
+Gene: dfrA36_1_CP038791
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          151
+    Gene length:           588 bp
+    Covered positions:     588 / 588 (100.0%)
+    SNPs (vs reference):   4
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         multi (5 informative sites)
+    Haplotypes produced:   2
+    Grade:                 C*  (read-support 99.63%)
+    Length vs reference:   MATCHES_REFERENCE  (588 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/dfrA36_1_CP038791/bowtie2
+  Tool: BWA
+    Reads mapped:          263
+    Gene length:           588 bp
+    Covered positions:     588 / 588 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.76%)
+    Length vs reference:   LONGER_IN_SAMPLE  (828 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/dfrA36_1_CP038791/bwa
+  Tool: Minimap2
+    Reads mapped:          262
+    Gene length:           588 bp
+    Covered positions:     588 / 588 (100.0%)
+    SNPs (vs reference):   0
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 A  (read-support 99.76%)
+    Length vs reference:   LONGER_IN_SAMPLE  (828 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/dfrA36_1_CP038791/minimap2
+
+Gene: sul1_5_EU780013
+  Status: ok
+  Tool: Bowtie2
+    Reads mapped:          59
+    Gene length:           867 bp
+    Covered positions:     729 / 867 (84.08%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     138
+    Reference source:      provided FASTA
+    Multi-version:         uncertain (7 informative sites)
+    Haplotypes produced:   1
+    Grade:                 B  (read-support 99.58%)
+    Length vs reference:   SHORTER_IN_SAMPLE  (859 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/sul1_5_EU780013/bowtie2
+  Tool: BWA
+    Reads mapped:          255
+    Gene length:           867 bp
+    Covered positions:     867 / 867 (100.0%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     0
+    Reference source:      provided FASTA
+    Multi-version:         single (0 informative sites)
+    Haplotypes produced:   0
+    Grade:                 B  (read-support 99.74%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1215 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/sul1_5_EU780013/bwa
+  Tool: Minimap2
+    Reads mapped:          224
+    Gene length:           867 bp
+    Covered positions:     820 / 867 (94.58%)
+    SNPs (vs reference):   1
+    Insertions:            0
+    Low-cov positions:     47
+    Reference source:      provided FASTA
+    Multi-version:         uncertain (3 informative sites)
+    Haplotypes produced:   0
+    Grade:                 B  (read-support 99.77%)
+    Length vs reference:   LONGER_IN_SAMPLE  (1010 nt reconstructed)  codon-valid: False
+    Output:                outputs/FAN_AMR/reconstruction_sensitive/232758E_18/sul1_5_EU780013/minimap2
+
+Gene: tet_B__2_AF326777
+  Status: ok
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; see haplotypes file
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference
+  SHORTER_IN_SAMPLE  — Sample gene shorter; grade adjusted when codon-valid
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference (captured)

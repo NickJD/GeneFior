@@ -1,0 +1,8 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: fosB2_1_AE016879
+# Tool: Minimap2
+# Multi-version: single
+# Consensus length: 420 bp
+P	consensus		*	LN:i:420	FC:i:27
+# Read: MNG003:261:H7WV3DRX2:1:2251:5593:23422/1 pos:120-147

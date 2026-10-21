@@ -1,0 +1,69 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(Z)_1_AF121000
+Generated: 2026-10-15T15:41:36.847475
+======================================================================
+
+  Sequence: consensus
+  Grade:    A  — High-confidence reconstruction.  Single version detected.
+
+  Coverage
+    Gene length:            1155 bp
+    Covered positions:      1155 (100.0%)
+    N positions:            0.09%
+  Depth
+    Mean depth:             98.6x
+    Depth CV:               34.8%  (uniform)
+  Read support
+    Support score:          99.91%
+  Reference comparison
+    Identity vs reference:  99.65%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      9
+    Mean minor-allele freq: 28.25%
+  Length vs reference
+    Status:                 MATCHES_REFERENCE
+    Reconstructed length:   1155 nt
+    Reference length:       1155 nt
+    Difference:             +0 nt  (+0.0%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Reconstructed length equals reference length (1155 nt).
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    C  — Moderate confidence.  Check depth and coverage uniformity.
+
+  Coverage
+    Gene length:            1155 bp
+    Covered positions:      733 (63.46%)
+    N positions:            36.54%
+  Depth
+    Mean depth:             4.1x
+    Depth CV:               59.1%  (uneven)
+  Read support
+    Support score:          99.81%
+  Reference comparison
+    Identity vs reference:  99.86%
+  Multi-version analysis
+    Classification:         uncertain
+    Informative sites:      9
+    Mean minor-allele freq: 28.25%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

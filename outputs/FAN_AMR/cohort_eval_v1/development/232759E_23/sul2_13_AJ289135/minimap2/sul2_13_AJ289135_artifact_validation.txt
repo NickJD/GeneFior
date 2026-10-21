@@ -1,0 +1,52 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: sul2_13_AJ289135
+Length: 816 bp
+Overall Status: FAIL
+Overall Score: 48.6/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Sequence too short for reliable ORF analysis
+    • clean_length: 0
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✗ Coverage Uniformity: FAIL (0/100)
+  No coverage detected
+
+⚠ Strand Bias: WARNING (75/100)
+  Minor strand bias (39%/61%)
+    • forward_reads: 17
+    • reverse_reads: 27
+    • forward_percent: 38.6%
+    • reverse_percent: 61.4%
+
+✗ Reference Identity: FAIL (25/100)
+  Very low identity to reference (0.0%) - wrong gene or contamination
+    • identity_percent: 0.0%
+    • matches: 0
+    • valid_positions: 0
+  Recommendations:
+    → Verify gene identity with BLAST against database
+    → Consider possibility of:
+    →   - Different species/strain
+    →   - Horizontal gene transfer variant
+    →   - Wrong reference gene
+    →   - Contamination
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (816/816)
+    • total_variants: 816
+    • high_quality: 0
+    • low_quality: 816
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 816 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

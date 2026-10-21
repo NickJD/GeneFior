@@ -1,0 +1,50 @@
+======================================================================
+SAMPLE vs REFERENCE DIVERGENCE ANALYSIS
+======================================================================
+
+⚠  IMPORTANT: Divergence from reference is EXPECTED and GOOD!
+
+This report shows how the reconstructed SAMPLE sequence differs
+from the DATABASE REFERENCE. These differences represent REAL BIOLOGY:
+  • Strain/species variation
+  • Natural mutations
+  • Selective adaptation
+  • Allelic differences
+
+The reference is an ALIGNMENT SCAFFOLD - consensus from YOUR READS!
+
+======================================================================
+
+Gene: tet(B)_1_AP000342
+Sample length: 1206 bp
+Reference length: 1206 bp
+
+----------------------------------------------------------------------
+DIVERGENCE SUMMARY
+----------------------------------------------------------------------
+
+Identity:        100.00%
+Divergence:      0.00%
+
+Classification:  NEARLY_IDENTICAL
+Interpretation:  Sample nearly identical to reference (< 1% divergence)
+
+SNPs:            0
+Insertions:      0 bp
+Deletions:       0 bp
+Identical:       246
+Ambiguous (N):   960
+
+----------------------------------------------------------------------
+METHODOLOGY
+----------------------------------------------------------------------
+
+Sample sequence reconstruction:
+  1. Reference used as ALIGNMENT TARGET
+  2. Reads aligned to reference coordinates
+  3. Consensus called from READ PILEUP (NOT reference!)
+  4. Most common read base = sample consensus
+
+All differences are supported by actual sample reads.
+This is the TRUE sample sequence, not reference-forced!
+

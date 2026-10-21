@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: ant(6)-Ia_1_AF330699
+Length: 909 bp
+Overall Status: WARNING
+Overall Score: 96.4/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 906 bp)
+    • orf_length: 906
+    • frame: 0
+    • coverage: 99.7%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (36.2%)
+    • gc_percent: 36.2%
+    • reference_gc: 36.2%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=60.2%)
+    • mean_depth: 106.7×
+    • median_depth: 86.0×
+    • cv_percent: 60.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (53%/47%)
+    • forward_reads: 396
+    • reverse_reads: 352
+    • forward_percent: 52.9%
+    • reverse_percent: 47.1%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 909
+    • valid_positions: 909
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

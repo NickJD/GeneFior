@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: tet(L)_2_M29725
+Generated: 2026-10-15T15:44:55.679396
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            1377 bp
+    Covered positions:      174 (12.64%)
+    N positions:            87.36%
+  Depth
+    Mean depth:             0.7x
+    Depth CV:               268.6%  (uneven)
+  Read support
+    Support score:          99.89%
+  Reference comparison
+    Identity vs reference:  99.43%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      1
+    Mean minor-allele freq: 33.33%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1778 nt
+    Reference length:       1377 nt
+    Difference:             +401 nt  (+29.1%)
+    Extension captured 5ʹ:  183 nt
+    Extension captured 3ʹ:  218 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 401 nt (+29.1%). Extension captured: 5ʹ +183 nt, 3ʹ +218 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

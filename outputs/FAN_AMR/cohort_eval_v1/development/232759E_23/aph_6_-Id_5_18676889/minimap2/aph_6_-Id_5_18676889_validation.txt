@@ -1,0 +1,48 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: aph(6)-Id_5_18676889
+Generated: 2026-10-15T15:33:55.530471
+======================================================================
+
+  Sequence: consensus
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            837 bp
+    Covered positions:      0 (0.0%)
+    N positions:            100.0%
+  Depth
+    Mean depth:             0.3x
+    Depth CV:               141.5%  (uneven)
+  Read support
+    Support score:          0.0%
+  Reference comparison
+    Identity vs reference:  0.0%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1123 nt
+    Reference length:       837 nt
+    Difference:             +286 nt  (+34.2%)
+    Extension captured 5ʹ:  118 nt
+    Extension captured 3ʹ:  168 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is LONGER than reference by 286 nt (+34.2%). Extension captured: 5ʹ +118 nt, 3ʹ +168 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

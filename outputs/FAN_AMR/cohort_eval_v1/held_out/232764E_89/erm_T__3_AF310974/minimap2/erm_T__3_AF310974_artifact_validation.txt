@@ -1,0 +1,60 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: erm(T)_3_AF310974
+Length: 735 bp
+Overall Status: FAIL
+Overall Score: 73.6/100
+======================================================================
+
+⚠ ORF Integrity: WARNING (50/100)
+  Partial ORF detected (5 internal stops)
+    • orf_length: 645
+    • frame: 1
+    • coverage: 88.1%
+    • internal_stops: 5
+  Recommendations:
+    → Check for sequencing errors at stop codon positions
+    → Verify gene boundaries and check for frameshifts
+
+⚠ GC Content: WARNING (75/100)
+  GC content unusual but possible (25.5%)
+    • gc_percent: 25.5%
+    • reference_gc: 25.6%
+    • difference: 0.1%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (50/100)
+  Coverage highly variable (CV=98.4%)
+    • mean_depth: 732.2×
+    • median_depth: 422.0×
+    • cv_percent: 98.4%
+    • discontinuities: 0
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (58%/42%)
+    • forward_reads: 3124
+    • reverse_reads: 2224
+    • forward_percent: 58.4%
+    • reverse_percent: 41.6%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 733
+    • valid_positions: 733
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (2/2)
+    • total_variants: 2
+    • high_quality: 0
+    • low_quality: 2
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 2 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

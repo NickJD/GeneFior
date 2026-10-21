@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: aac(6')-Iid_1_AJ584700
+Length: 549 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 546 bp)
+    • orf_length: 546
+    • frame: 0
+    • coverage: 99.5%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (42.6%)
+    • gc_percent: 42.6%
+    • reference_gc: 42.6%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=16.3%)
+    • mean_depth: 91.6×
+    • median_depth: 89.0×
+    • cv_percent: 16.3%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (51%/49%)
+    • forward_reads: 150
+    • reverse_reads: 143
+    • forward_percent: 51.2%
+    • reverse_percent: 48.8%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 549
+    • valid_positions: 549
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

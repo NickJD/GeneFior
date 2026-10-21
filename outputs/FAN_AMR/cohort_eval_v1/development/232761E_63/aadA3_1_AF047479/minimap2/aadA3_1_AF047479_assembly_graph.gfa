@@ -1,0 +1,8 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: aadA3_1_AF047479
+# Tool: Minimap2
+# Multi-version: single
+# Consensus length: 792 bp
+P	consensus		*	LN:i:792	FC:i:48
+# Read: MNG003:261:H7WV3DRX2:2:2239:21432:13839/2 pos:745-793

@@ -1,0 +1,6 @@
+Position	Ref_Base	Sample_Base	Type	Depth	Freq_pct
+1	G	N	low_coverage	1	0.0
+2	T	H	ambiguous	3	33.33
+3	G	A	SNP	7	57.14
+1154	A	G	SNP	4	100.0
+1155	A	N	low_coverage	1	0.0

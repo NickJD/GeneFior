@@ -1,0 +1,49 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: sul1_5_EU780013
+Generated: 2026-10-15T15:29:58.024431
+======================================================================
+
+  Sequence: consensus
+  Grade:    B  — Good reconstruction, minor gaps or low depth in some regions.
+
+  Coverage
+    Gene length:            867 bp
+    Covered positions:      867 (100.0%)
+    N positions:            0.0%
+  Depth
+    Mean depth:             47.6x
+    Depth CV:               98.3%  (uneven)
+  Read support
+    Support score:          99.94%
+  Reference comparison
+    Identity vs reference:  99.88%
+  Multi-version analysis
+    Classification:         single
+    Informative sites:      0
+    Mean minor-allele freq: 0.0%
+  Length vs reference
+    Status:                 LONGER_IN_SAMPLE
+    Reconstructed length:   1215 nt
+    Reference length:       867 nt
+    Difference:             +348 nt  (+40.1%)
+    Extension captured 5ʹ:  174 nt
+    Extension captured 3ʹ:  174 nt
+    Codon-valid ORF:        NO
+    Start / stop codons:    absent / TGA
+    Note: Sample gene is LONGER than reference by 348 nt (+40.1%). Extension captured: 5ʹ +174 nt, 3ʹ +174 nt. This likely reflects a genuine longer version of the gene in this sample.
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

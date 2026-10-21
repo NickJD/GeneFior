@@ -1,0 +1,57 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: sul1_5_EU780013
+Length: 867 bp
+Overall Status: FAIL
+Overall Score: 80.7/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 603 bp)
+    • orf_length: 603
+    • frame: 0
+    • coverage: 100.0%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (64.0%)
+    • gc_percent: 64.0%
+    • reference_gc: 61.9%
+    • difference: 2.1%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (50/100)
+  Coverage highly variable (CV=105.0%)
+    • mean_depth: 7.4×
+    • median_depth: 3.0×
+    • cv_percent: 105.0%
+    • discontinuities: 0
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+
+⚠ Strand Bias: WARNING (75/100)
+  Minor strand bias (32%/68%)
+    • forward_reads: 14
+    • reverse_reads: 30
+    • forward_percent: 31.8%
+    • reverse_percent: 68.2%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 603
+    • valid_positions: 603
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (264/264)
+    • total_variants: 264
+    • high_quality: 0
+    • low_quality: 264
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 264 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

@@ -1,0 +1,155 @@
+2026-10-15 15:40:38,697 - INFO - GeneFior-Reconstruct v2.2.1
+2026-10-15 15:40:38,697 - INFO - Genes requested: ['cmx_1_U85507', 'tet(Z)_1_AF121000']
+2026-10-15 15:40:38,698 - INFO - Output dir:      outputs/FAN_AMR/cohort_eval_v1/development/232763E_85
+2026-10-15 15:40:38,699 - INFO - Boundary extension: 20%  codon-aware: True  start codons: ATG,GTG,TTG  stop codons: TAA,TAG,TGA
+2026-10-15 15:40:38,699 - INFO - 
+======================================================================
+2026-10-15 15:40:38,699 - INFO - Reconstructing: cmx_1_U85507
+2026-10-15 15:40:38,700 - INFO - ======================================================================
+2026-10-15 15:40:38,727 - INFO -   Reference loaded: 1176 bp
+2026-10-15 15:40:38,729 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:40:38,731 - INFO -   GeneFior stats — reads: 300 | gene_cov: 100.00% | avg_id: 98.47% | detected: 1
+2026-10-15 15:40:38,743 - INFO -   Reading alignments via samtools: card_bowtie2_results_sorted.bam
+2026-10-15 15:40:38,771 - WARNING -   Gene not found in SAM/no alignments for Bowtie2 — skipping.
+2026-10-15 15:40:38,772 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:40:38,773 - INFO -   GeneFior stats — reads: 300 | gene_cov: 100.00% | avg_id: 98.47% | detected: 1
+2026-10-15 15:40:38,783 - INFO -   Reading alignments via samtools: resfinder_bowtie2_results_sorted.bam
+2026-10-15 15:40:38,806 - INFO -   300 alignments, 300 reads, gene length: 1176 bp
+2026-10-15 15:40:38,849 - INFO -   Consensus: 1176/1176 positions covered (100.0%)
+2026-10-15 15:40:38,850 - INFO -   Multi-version classification: MULTI (7 informative sites)
+2026-10-15 15:40:38,850 - INFO -   Estimated copy ratio: 2:1
+2026-10-15 15:40:38,854 - INFO -   Haplotype separation → hap1: 13 reads | hap2: 3 reads | ambiguous: 14 reads
+2026-10-15 15:40:38,863 - INFO -   haplotype_1 consensus grade: C
+2026-10-15 15:40:38,864 - WARNING -   haplotype_2 has < 5 reads (3) — skipping per-haplotype consensus.
+2026-10-15 15:40:38,864 - INFO -   Variants vs provided FASTA: 5 SNPs, 0 insertions, 0 low-cov positions
+2026-10-15 15:40:38,865 - INFO -   Sample divergence: 0.5% from reference (NEARLY_IDENTICAL) — 6 SNPs
+2026-10-15 15:40:38,865 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:38,866 - INFO -   Boundary extension: ±237 nt each end (20% of 1176 nt) (codon-rounded from 235 nt)
+2026-10-15 15:40:38,887 - INFO -   No sequence captured beyond reference boundaries.
+2026-10-15 15:40:38,888 - INFO -   Length: SHORTER_IN_SAMPLE — 1175 nt reconstructed vs 1176 nt reference (-0.1%)
+2026-10-15 15:40:38,888 - INFO -   ⚠ Shorter gene — codon issues: not divisible by 3, no canonical start codon, no canonical stop codon
+2026-10-15 15:40:38,890 - INFO -   Grade: C* — read-support 99.88%, coverage 100.0%, depth CV 35.1%
+2026-10-15 15:40:38,909 - INFO -   Artifact validation: FAIL (score: 91/100)
+2026-10-15 15:40:38,910 - WARNING -   ⚠  Artifact validation FAILED — sequence may not be biologically real.
+2026-10-15 15:40:38,911 - INFO -   Assembly graph saved: cmx_1_U85507_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:38,912 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bowtie2/
+2026-10-15 15:40:38,913 - INFO -   ── Tool: BWA ──
+2026-10-15 15:40:38,914 - INFO -   GeneFior stats — reads: 428 | gene_cov: 100.00% | avg_id: 99.34% | detected: 1
+2026-10-15 15:40:38,927 - INFO -   Reading alignments via samtools: card_bwa_results_sorted.bam
+2026-10-15 15:40:39,822 - WARNING -   Gene not found in SAM/no alignments for BWA — skipping.
+2026-10-15 15:40:39,823 - INFO -   ── Tool: BWA ──
+2026-10-15 15:40:39,824 - INFO -   GeneFior stats — reads: 428 | gene_cov: 100.00% | avg_id: 99.34% | detected: 1
+2026-10-15 15:40:39,834 - INFO -   Reading alignments via samtools: resfinder_bwa_results_sorted.bam
+2026-10-15 15:40:40,654 - INFO -   428 alignments, 428 reads, gene length: 1176 bp
+2026-10-15 15:40:40,704 - INFO -   Consensus: 1176/1176 positions covered (100.0%)
+2026-10-15 15:40:40,705 - INFO -   Multi-version classification: SINGLE (0 informative sites)
+2026-10-15 15:40:40,705 - INFO -   Variants vs provided FASTA: 2 SNPs, 0 insertions, 0 low-cov positions
+2026-10-15 15:40:40,706 - INFO -   Sample divergence: 0.2% from reference (NEARLY_IDENTICAL) — 2 SNPs
+2026-10-15 15:40:40,706 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:40,707 - INFO -   Boundary extension: ±237 nt each end (20% of 1176 nt) (codon-rounded from 235 nt)
+2026-10-15 15:40:40,736 - INFO -   Extension captured: 5ʹ +215 nt | 3ʹ +221 nt
+2026-10-15 15:40:40,737 - INFO -   Length: LONGER_IN_SAMPLE — 1612 nt reconstructed vs 1176 nt reference (+37.1%)
+2026-10-15 15:40:40,738 - INFO -   Gene extends beyond reference — ORF structure not fully valid
+2026-10-15 15:40:40,739 - INFO -   Grade: A — read-support 99.94%, coverage 100.0%, depth CV 14.5%
+2026-10-15 15:40:40,758 - INFO -   Artifact validation: PASS (score: 100/100)
+2026-10-15 15:40:40,759 - INFO -   Assembly graph saved: cmx_1_U85507_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:40,760 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/bwa/
+2026-10-15 15:40:40,761 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:40:40,763 - INFO -   GeneFior stats — reads: 421 | gene_cov: 100.00% | avg_id: 99.35% | detected: 1
+2026-10-15 15:40:40,773 - INFO -   Reading alignments via samtools: card_minimap2_results_sorted.bam
+2026-10-15 15:40:41,541 - WARNING -   Gene not found in SAM/no alignments for Minimap2 — skipping.
+2026-10-15 15:40:41,542 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:40:41,543 - INFO -   GeneFior stats — reads: 421 | gene_cov: 100.00% | avg_id: 99.35% | detected: 1
+2026-10-15 15:40:41,554 - INFO -   Reading alignments via samtools: resfinder_minimap2_results_sorted.bam
+2026-10-15 15:40:42,540 - INFO -   421 alignments, 421 reads, gene length: 1176 bp
+2026-10-15 15:40:42,592 - INFO -   Consensus: 1176/1176 positions covered (100.0%)
+2026-10-15 15:40:42,593 - INFO -   Multi-version classification: SINGLE (0 informative sites)
+2026-10-15 15:40:42,594 - INFO -   Variants vs provided FASTA: 2 SNPs, 0 insertions, 0 low-cov positions
+2026-10-15 15:40:42,594 - INFO -   Sample divergence: 0.2% from reference (NEARLY_IDENTICAL) — 2 SNPs
+2026-10-15 15:40:42,595 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:42,595 - INFO -   Boundary extension: ±237 nt each end (20% of 1176 nt) (codon-rounded from 235 nt)
+2026-10-15 15:40:42,627 - INFO -   Extension captured: 5ʹ +203 nt | 3ʹ +205 nt
+2026-10-15 15:40:42,627 - INFO -   Length: LONGER_IN_SAMPLE — 1584 nt reconstructed vs 1176 nt reference (+34.7%)
+2026-10-15 15:40:42,628 - INFO -   Gene extends beyond reference — ORF structure not fully valid
+2026-10-15 15:40:42,630 - INFO -   Grade: A — read-support 99.94%, coverage 100.0%, depth CV 14.9%
+2026-10-15 15:40:42,648 - INFO -   Artifact validation: PASS (score: 100/100)
+2026-10-15 15:40:42,650 - INFO -   Assembly graph saved: cmx_1_U85507_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:42,650 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/cmx_1_U85507/minimap2/
+2026-10-15 15:40:42,653 - INFO - 
+======================================================================
+2026-10-15 15:40:42,654 - INFO - Reconstructing: tet(Z)_1_AF121000
+2026-10-15 15:40:42,654 - INFO - ======================================================================
+2026-10-15 15:40:42,681 - INFO -   Reference loaded: 1155 bp
+2026-10-15 15:40:42,682 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:40:42,683 - INFO -   GeneFior stats — reads: 290 | gene_cov: 100.00% | avg_id: 98.96% | detected: 1
+2026-10-15 15:40:42,694 - INFO -   Reading alignments via samtools: card_bowtie2_results_sorted.bam
+2026-10-15 15:40:42,720 - WARNING -   Gene not found in SAM/no alignments for Bowtie2 — skipping.
+2026-10-15 15:40:42,720 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:40:42,721 - INFO -   GeneFior stats — reads: 290 | gene_cov: 100.00% | avg_id: 98.96% | detected: 1
+2026-10-15 15:40:42,730 - INFO -   Reading alignments via samtools: resfinder_bowtie2_results_sorted.bam
+2026-10-15 15:40:42,751 - INFO -   290 alignments, 290 reads, gene length: 1155 bp
+2026-10-15 15:40:42,790 - INFO -   Consensus: 1153/1155 positions covered (99.8%)
+2026-10-15 15:40:42,791 - INFO -   Multi-version classification: UNCERTAIN (3 informative sites)
+2026-10-15 15:40:42,791 - INFO -   Estimated copy ratio: 5:2
+2026-10-15 15:40:42,792 - INFO -   Attempting haplotype separation on 'uncertain' classification (use -no_hap_uncertain to disable).
+2026-10-15 15:40:42,796 - INFO -   Haplotype separation → hap1: 3 reads | hap2: 2 reads | ambiguous: 3 reads
+2026-10-15 15:40:42,796 - WARNING -   haplotype_1 has < 5 reads (3) — skipping per-haplotype consensus.
+2026-10-15 15:40:42,797 - WARNING -   haplotype_2 has < 5 reads (2) — skipping per-haplotype consensus.
+2026-10-15 15:40:42,798 - INFO -   Variants vs provided FASTA: 2 SNPs, 0 insertions, 2 low-cov positions
+2026-10-15 15:40:42,798 - INFO -   Sample divergence: 0.3% from reference (NEARLY_IDENTICAL) — 3 SNPs
+2026-10-15 15:40:42,799 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:42,800 - INFO -   Boundary extension: ±231 nt each end (20% of 1155 nt)
+2026-10-15 15:40:42,820 - INFO -   No sequence captured beyond reference boundaries.
+2026-10-15 15:40:42,821 - INFO -   Length: SHORTER_IN_SAMPLE — 1153 nt reconstructed vs 1155 nt reference (-0.2%)
+2026-10-15 15:40:42,821 - INFO -   ⚠ Shorter gene — codon issues: not divisible by 3, no canonical start codon, no canonical stop codon
+2026-10-15 15:40:42,823 - INFO -   Grade: A — read-support 99.91%, coverage 99.83%, depth CV 38.9%
+2026-10-15 15:40:42,841 - INFO -   Artifact validation: FAIL (score: 91/100)
+2026-10-15 15:40:42,841 - WARNING -   ⚠  Artifact validation FAILED — sequence may not be biologically real.
+2026-10-15 15:40:42,842 - INFO -   Assembly graph saved: tet_Z__1_AF121000_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:42,843 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bowtie2/
+2026-10-15 15:40:42,844 - INFO -   ── Tool: BWA ──
+2026-10-15 15:40:42,844 - INFO -   GeneFior stats — reads: 485 | gene_cov: 100.00% | avg_id: 99.39% | detected: 1
+2026-10-15 15:40:42,854 - INFO -   Reading alignments via samtools: card_bwa_results_sorted.bam
+2026-10-15 15:40:43,665 - WARNING -   Gene not found in SAM/no alignments for BWA — skipping.
+2026-10-15 15:40:43,666 - INFO -   ── Tool: BWA ──
+2026-10-15 15:40:43,667 - INFO -   GeneFior stats — reads: 485 | gene_cov: 100.00% | avg_id: 99.39% | detected: 1
+2026-10-15 15:40:43,679 - INFO -   Reading alignments via samtools: resfinder_bwa_results_sorted.bam
+2026-10-15 15:40:44,528 - INFO -   485 alignments, 485 reads, gene length: 1155 bp
+2026-10-15 15:40:44,583 - INFO -   Consensus: 1155/1155 positions covered (100.0%)
+2026-10-15 15:40:44,584 - INFO -   Multi-version classification: SINGLE (0 informative sites)
+2026-10-15 15:40:44,585 - INFO -   Variants vs provided FASTA: 0 SNPs, 0 insertions, 0 low-cov positions
+2026-10-15 15:40:44,585 - INFO -   Sample divergence: 0.0% from reference (NEARLY_IDENTICAL) — 0 SNPs
+2026-10-15 15:40:44,586 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:44,586 - INFO -   Boundary extension: ±231 nt each end (20% of 1155 nt)
+2026-10-15 15:40:44,619 - INFO -   Extension captured: 5ʹ +220 nt | 3ʹ +220 nt
+2026-10-15 15:40:44,620 - INFO -   Length: LONGER_IN_SAMPLE — 1595 nt reconstructed vs 1155 nt reference (+38.1%)
+2026-10-15 15:40:44,621 - INFO -   Gene extends beyond reference — ORF structure not fully valid
+2026-10-15 15:40:44,622 - INFO -   Grade: A — read-support 99.92%, coverage 100.0%, depth CV 11.6%
+2026-10-15 15:40:44,641 - INFO -   Artifact validation: PASS (score: 100/100)
+2026-10-15 15:40:44,642 - INFO -   Assembly graph saved: tet_Z__1_AF121000_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:44,643 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/bwa/
+2026-10-15 15:40:44,644 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:40:44,645 - INFO -   GeneFior stats — reads: 478 | gene_cov: 100.00% | avg_id: 99.39% | detected: 1
+2026-10-15 15:40:44,657 - INFO -   Reading alignments via samtools: card_minimap2_results_sorted.bam
+2026-10-15 15:40:45,422 - WARNING -   Gene not found in SAM/no alignments for Minimap2 — skipping.
+2026-10-15 15:40:45,423 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:40:45,424 - INFO -   GeneFior stats — reads: 478 | gene_cov: 100.00% | avg_id: 99.39% | detected: 1
+2026-10-15 15:40:45,437 - INFO -   Reading alignments via samtools: resfinder_minimap2_results_sorted.bam
+2026-10-15 15:40:46,328 - INFO -   478 alignments, 478 reads, gene length: 1155 bp
+2026-10-15 15:40:46,391 - INFO -   Consensus: 1155/1155 positions covered (100.0%)
+2026-10-15 15:40:46,392 - INFO -   Multi-version classification: SINGLE (0 informative sites)
+2026-10-15 15:40:46,393 - INFO -   Variants vs provided FASTA: 0 SNPs, 0 insertions, 0 low-cov positions
+2026-10-15 15:40:46,394 - INFO -   Sample divergence: 0.0% from reference (NEARLY_IDENTICAL) — 0 SNPs
+2026-10-15 15:40:46,394 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:40:46,395 - INFO -   Boundary extension: ±231 nt each end (20% of 1155 nt)
+2026-10-15 15:40:46,435 - INFO -   Extension captured: 5ʹ +207 nt | 3ʹ +223 nt
+2026-10-15 15:40:46,435 - INFO -   Length: LONGER_IN_SAMPLE — 1585 nt reconstructed vs 1155 nt reference (+37.2%)
+2026-10-15 15:40:46,436 - INFO -   Gene extends beyond reference — ORF structure not fully valid
+2026-10-15 15:40:46,438 - INFO -   Grade: A — read-support 99.92%, coverage 100.0%, depth CV 11.2%
+2026-10-15 15:40:46,457 - INFO -   Artifact validation: PASS (score: 100/100)
+2026-10-15 15:40:46,458 - INFO -   Assembly graph saved: tet_Z__1_AF121000_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:40:46,459 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/tet_Z__1_AF121000/minimap2/
+2026-10-15 15:40:46,462 - INFO - 
+Summary report: outputs/FAN_AMR/cohort_eval_v1/development/232763E_85/reconstruction_report.txt
+2026-10-15 15:40:46,463 - INFO - Thank you for using GeneFior-Reconstruct!
+2026-10-15 15:40:46,464 - INFO - Documentation: https://github.com/NickJD/GeneFior

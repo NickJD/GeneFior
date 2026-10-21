@@ -1,0 +1,45 @@
+2026-10-15 15:24:15,276 - INFO - GeneFior-Reconstruct v2.2.1
+2026-10-15 15:24:15,276 - INFO - Genes requested: ['fosB_5_AJ605334']
+2026-10-15 15:24:15,277 - INFO - Output dir:      outputs/FAN_AMR/cohort_eval_v1/development/232757E_7
+2026-10-15 15:24:15,278 - INFO - Boundary extension: 20%  codon-aware: True  start codons: ATG,GTG,TTG  stop codons: TAA,TAG,TGA
+2026-10-15 15:24:15,279 - INFO - 
+======================================================================
+2026-10-15 15:24:15,279 - INFO - Reconstructing: fosB_5_AJ605334
+2026-10-15 15:24:15,280 - INFO - ======================================================================
+2026-10-15 15:24:15,307 - INFO -   Reference loaded: 417 bp
+2026-10-15 15:24:15,309 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:24:15,320 - INFO -   Reading alignments via samtools: card_bowtie2_results_sorted.bam
+2026-10-15 15:24:15,407 - WARNING -   Gene not found in SAM/no alignments for Bowtie2 — skipping.
+2026-10-15 15:24:15,408 - INFO -   ── Tool: Bowtie2 ──
+2026-10-15 15:24:15,418 - INFO -   Reading alignments via samtools: resfinder_bowtie2_results_sorted.bam
+2026-10-15 15:24:15,437 - WARNING -   Gene not found in SAM/no alignments for Bowtie2 — skipping.
+2026-10-15 15:24:15,437 - INFO -   ── Tool: BWA ──
+2026-10-15 15:24:15,449 - INFO -   Reading alignments via samtools: card_bwa_results_sorted.bam
+2026-10-15 15:24:16,644 - WARNING -   Gene not found in SAM/no alignments for BWA — skipping.
+2026-10-15 15:24:16,645 - INFO -   ── Tool: BWA ──
+2026-10-15 15:24:16,655 - INFO -   Reading alignments via samtools: resfinder_bwa_results_sorted.bam
+2026-10-15 15:24:17,851 - INFO -   6 alignments, 6 reads, gene length: 417 bp
+2026-10-15 15:24:17,853 - INFO -   Consensus: 30/417 positions covered (7.2%)
+2026-10-15 15:24:17,854 - INFO -   Multi-version classification: SINGLE (0 informative sites)
+2026-10-15 15:24:17,854 - INFO -   Variants vs provided FASTA: 1 SNPs, 0 insertions, 387 low-cov positions
+2026-10-15 15:24:17,855 - INFO -   Sample divergence: 3.3% from reference (MINOR_VARIANT) — 1 SNPs
+2026-10-15 15:24:17,855 - INFO -   Codon settings — aware: True  start: ATG,GTG,TTG  stop: TAA,TAG,TGA
+2026-10-15 15:24:17,856 - INFO -   Boundary extension: ±84 nt each end (20% of 417 nt) (codon-rounded from 83 nt)
+2026-10-15 15:24:17,858 - INFO -   Extension captured: 5ʹ +41 nt | 3ʹ +0 nt
+2026-10-15 15:24:17,858 - INFO -   Length: SHORTER_IN_SAMPLE — 181 nt reconstructed vs 417 nt reference (-56.6%)
+2026-10-15 15:24:17,859 - INFO -   ⚠ Shorter gene — codon issues: not divisible by 3, no canonical start codon, no canonical stop codon
+2026-10-15 15:24:17,859 - INFO -   Grade: F — read-support 100.0%, coverage 7.19%, depth CV 359.6%
+2026-10-15 15:24:17,865 - INFO -   Artifact validation: FAIL (score: 84/100)
+2026-10-15 15:24:17,866 - WARNING -   ⚠  Artifact validation FAILED — sequence may not be biologically real.
+2026-10-15 15:24:17,866 - INFO -   Assembly graph saved: fosB_5_AJ605334_assembly_graph.gfa  (view in Bandage)
+2026-10-15 15:24:17,867 - INFO -   Outputs written to: outputs/FAN_AMR/cohort_eval_v1/development/232757E_7/fosB_5_AJ605334/bwa/
+2026-10-15 15:24:17,867 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:24:17,877 - INFO -   Reading alignments via samtools: card_minimap2_results_sorted.bam
+2026-10-15 15:24:19,018 - WARNING -   Gene not found in SAM/no alignments for Minimap2 — skipping.
+2026-10-15 15:24:19,019 - INFO -   ── Tool: Minimap2 ──
+2026-10-15 15:24:19,030 - INFO -   Reading alignments via samtools: resfinder_minimap2_results_sorted.bam
+2026-10-15 15:24:20,172 - WARNING -   Gene not found in SAM/no alignments for Minimap2 — skipping.
+2026-10-15 15:24:20,176 - INFO - 
+Summary report: outputs/FAN_AMR/cohort_eval_v1/development/232757E_7/reconstruction_report.txt
+2026-10-15 15:24:20,176 - INFO - Thank you for using GeneFior-Reconstruct!
+2026-10-15 15:24:20,177 - INFO - Documentation: https://github.com/NickJD/GeneFior

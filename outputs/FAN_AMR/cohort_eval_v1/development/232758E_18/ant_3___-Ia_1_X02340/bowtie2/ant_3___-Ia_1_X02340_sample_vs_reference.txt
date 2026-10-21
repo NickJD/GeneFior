@@ -1,0 +1,61 @@
+======================================================================
+SAMPLE vs REFERENCE DIVERGENCE ANALYSIS
+======================================================================
+
+⚠  IMPORTANT: Divergence from reference is EXPECTED and GOOD!
+
+This report shows how the reconstructed SAMPLE sequence differs
+from the DATABASE REFERENCE. These differences represent REAL BIOLOGY:
+  • Strain/species variation
+  • Natural mutations
+  • Selective adaptation
+  • Allelic differences
+
+The reference is an ALIGNMENT SCAFFOLD - consensus from YOUR READS!
+
+======================================================================
+
+Gene: ant(3'')-Ia_1_X02340
+Sample length: 972 bp
+Reference length: 972 bp
+
+----------------------------------------------------------------------
+DIVERGENCE SUMMARY
+----------------------------------------------------------------------
+
+Identity:        98.48%
+Divergence:      1.52%
+
+Classification:  MINOR_VARIANT
+Interpretation:  Sample is a minor variant of reference (1-5% divergence)
+
+SNPs:            4
+Insertions:      0 bp
+Deletions:       0 bp
+Identical:       260
+Ambiguous (N):   708
+
+----------------------------------------------------------------------
+DIVERGENT POSITIONS (sample != reference)
+----------------------------------------------------------------------
+
+Pos	Ref	Sample	Type	Depth	Support%
+----------------------------------------------------------------------
+164	A	T	SNP	5	100.0
+165	A	T	SNP	5	100.0
+166	A	T	SNP	15	100.0
+191	C	T	SNP	26	100.0
+
+----------------------------------------------------------------------
+METHODOLOGY
+----------------------------------------------------------------------
+
+Sample sequence reconstruction:
+  1. Reference used as ALIGNMENT TARGET
+  2. Reads aligned to reference coordinates
+  3. Consensus called from READ PILEUP (NOT reference!)
+  4. Most common read base = sample consensus
+
+All differences are supported by actual sample reads.
+This is the TRUE sample sequence, not reference-forced!
+

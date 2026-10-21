@@ -1,0 +1,435 @@
+{
+  "generated_at_utc": "2026-10-02T20:50:18.278029+00:00",
+  "scope": "consensus reconstructions passing against both assembly sources",
+  "qc_passing_mapper_assembly_comparisons": 42,
+  "qc_passing_sample_gene_groups": 8,
+  "inputs": [
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/enhanced_contigs/232758E_18.fasta",
+      "size_bytes": 4909429,
+      "modified_time_ns": 1673209765000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/enhanced_contigs/232759E_23.fasta",
+      "size_bytes": 5265628,
+      "modified_time_ns": 1673209764000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232758E_18/resfinder_allele_resolution.tsv",
+      "size_bytes": 10480,
+      "modified_time_ns": 1790963191000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/genefior_out/232759E_23/resfinder_allele_resolution.tsv",
+      "size_bytes": 7822,
+      "modified_time_ns": 1790963550000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/long_reads/232758E/assembly.fasta",
+      "size_bytes": 4902479,
+      "modified_time_ns": 1673900134000000000
+    },
+    {
+      "path": "/Users/nicholas/Nextcloud/Current_Work/FAN_AMR/long_reads/232759E/assembly.fasta",
+      "size_bytes": 5262451,
+      "modified_time_ns": 1673902345000000000
+    },
+    {
+      "path": "outputs/FAN_AMR/architect/architect_evaluation.tsv",
+      "size_bytes": 27953,
+      "modified_time_ns": 1790966705091938429
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/bwa/FloR_4_CP136914_consensus.fasta",
+      "size_bytes": 1860,
+      "modified_time_ns": 1790965389689077662
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/bwa/FloR_4_CP136914_depth.tsv",
+      "size_bytes": 32253,
+      "modified_time_ns": 1790965389690860670
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/bwa/FloR_4_CP136914_validation.txt",
+      "size_bytes": 3075,
+      "modified_time_ns": 1790965389691790299
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/bwa/FloR_4_CP136914_variants.tsv",
+      "size_bytes": 90,
+      "modified_time_ns": 1790965389691123338
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/minimap2/FloR_4_CP136914_consensus.fasta",
+      "size_bytes": 1803,
+      "modified_time_ns": 1790965395407893883
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/minimap2/FloR_4_CP136914_depth.tsv",
+      "size_bytes": 32053,
+      "modified_time_ns": 1790965395409393473
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/minimap2/FloR_4_CP136914_validation.txt",
+      "size_bytes": 1852,
+      "modified_time_ns": 1790965395410195936
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/FloR_4_CP136914/minimap2/FloR_4_CP136914_variants.tsv",
+      "size_bytes": 89,
+      "modified_time_ns": 1790965395409561308
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 2015,
+      "modified_time_ns": 1790965395659404555
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20880,
+      "modified_time_ns": 1790965395660701978
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1911,
+      "modified_time_ns": 1790965395661818149
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bowtie2/aadA5_1_AF137361_variants.tsv",
+      "size_bytes": 297,
+      "modified_time_ns": 1790965395661130480
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 1311,
+      "modified_time_ns": 1790965401689796644
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20989,
+      "modified_time_ns": 1790965401690987733
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/bwa/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1790965401691858446
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_consensus.fasta",
+      "size_bytes": 1311,
+      "modified_time_ns": 1790965407371503152
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_depth.tsv",
+      "size_bytes": 20976,
+      "modified_time_ns": 1790965407372832991
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/aadA5_1_AF137361/minimap2/aadA5_1_AF137361_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1790965407373880038
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bowtie2/blaOXA-1_1_HQ170510_consensus.fasta",
+      "size_bytes": 1031,
+      "modified_time_ns": 1790965699292783888
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bowtie2/blaOXA-1_1_HQ170510_depth.tsv",
+      "size_bytes": 22274,
+      "modified_time_ns": 1790965699294259561
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bowtie2/blaOXA-1_1_HQ170510_validation.txt",
+      "size_bytes": 2539,
+      "modified_time_ns": 1790965699295836194
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bowtie2/blaOXA-1_1_HQ170510_variants.tsv",
+      "size_bytes": 146,
+      "modified_time_ns": 1790965699294747855
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_consensus.fasta",
+      "size_bytes": 1357,
+      "modified_time_ns": 1790965705397015697
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_depth.tsv",
+      "size_bytes": 22590,
+      "modified_time_ns": 1790965705398624162
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/bwa/blaOXA-1_1_HQ170510_validation.txt",
+      "size_bytes": 1812,
+      "modified_time_ns": 1790965705399747251
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/minimap2/blaOXA-1_1_HQ170510_consensus.fasta",
+      "size_bytes": 1349,
+      "modified_time_ns": 1790965711104122989
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/minimap2/blaOXA-1_1_HQ170510_depth.tsv",
+      "size_bytes": 22500,
+      "modified_time_ns": 1790965711105603496
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/blaOXA-1_1_HQ170510/minimap2/blaOXA-1_1_HQ170510_validation.txt",
+      "size_bytes": 1812,
+      "modified_time_ns": 1790965711106750626
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 853,
+      "modified_time_ns": 1790965407640387613
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_depth.tsv",
+      "size_bytes": 18279,
+      "modified_time_ns": 1790965407641674452
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_validation.txt",
+      "size_bytes": 2356,
+      "modified_time_ns": 1790965407642485997
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bowtie2/catA1_1_V00622_variants.tsv",
+      "size_bytes": 186,
+      "modified_time_ns": 1790965407641877911
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 1123,
+      "modified_time_ns": 1790965413671945124
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_depth.tsv",
+      "size_bytes": 19041,
+      "modified_time_ns": 1790965413673163755
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_validation.txt",
+      "size_bytes": 1806,
+      "modified_time_ns": 1790965413674061801
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/bwa/catA1_1_V00622_variants.tsv",
+      "size_bytes": 72,
+      "modified_time_ns": 1790965413673424256
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_consensus.fasta",
+      "size_bytes": 1123,
+      "modified_time_ns": 1790965419400572600
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_depth.tsv",
+      "size_bytes": 19026,
+      "modified_time_ns": 1790965419401671605
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_validation.txt",
+      "size_bytes": 1805,
+      "modified_time_ns": 1790965419402682443
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/catA1_1_V00622/minimap2/catA1_1_V00622_variants.tsv",
+      "size_bytes": 72,
+      "modified_time_ns": 1790965419401978648
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 783,
+      "modified_time_ns": 1790965419645866534
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15762,
+      "modified_time_ns": 1790965419646848122
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 2975,
+      "modified_time_ns": 1790965419647600292
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bowtie2/dfrA36_1_CP038791_variants.tsv",
+      "size_bytes": 149,
+      "modified_time_ns": 1790965419647016665
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1790965425636838441
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15856,
+      "modified_time_ns": 1790965425637728236
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/bwa/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1790965425638312447
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_consensus.fasta",
+      "size_bytes": 1029,
+      "modified_time_ns": 1790965431315036098
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_depth.tsv",
+      "size_bytes": 15848,
+      "modified_time_ns": 1790965431315899227
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/dfrA36_1_CP038791/minimap2/dfrA36_1_CP038791_validation.txt",
+      "size_bytes": 1809,
+      "modified_time_ns": 1790965431316858982
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_consensus.fasta",
+      "size_bytes": 1420,
+      "modified_time_ns": 1790965717427199597
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_depth.tsv",
+      "size_bytes": 23183,
+      "modified_time_ns": 1790965717428581262
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_validation.txt",
+      "size_bytes": 1852,
+      "modified_time_ns": 1790965717429879121
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/bwa/sul1_5_EU780013_variants.tsv",
+      "size_bytes": 71,
+      "modified_time_ns": 1790965717429264344
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/minimap2/sul1_5_EU780013_consensus.fasta",
+      "size_bytes": 1241,
+      "modified_time_ns": 1790965723112587731
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/minimap2/sul1_5_EU780013_depth.tsv",
+      "size_bytes": 22860,
+      "modified_time_ns": 1790965723113979446
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/minimap2/sul1_5_EU780013_validation.txt",
+      "size_bytes": 1814,
+      "modified_time_ns": 1790965723115230226
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/sul1_5_EU780013/minimap2/sul1_5_EU780013_variants.tsv",
+      "size_bytes": 1340,
+      "modified_time_ns": 1790965723114548308
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bowtie2/tet_B__2_AF326777_consensus.fasta",
+      "size_bytes": 1411,
+      "modified_time_ns": 1790965431559151319
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bowtie2/tet_B__2_AF326777_depth.tsv",
+      "size_bytes": 32446,
+      "modified_time_ns": 1790965431560673367
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bowtie2/tet_B__2_AF326777_validation.txt",
+      "size_bytes": 1737,
+      "modified_time_ns": 1790965431561415912
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bowtie2/tet_B__2_AF326777_variants.tsv",
+      "size_bytes": 136,
+      "modified_time_ns": 1790965431560836785
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_consensus.fasta",
+      "size_bytes": 1846,
+      "modified_time_ns": 1790965437547217794
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_depth.tsv",
+      "size_bytes": 32990,
+      "modified_time_ns": 1790965437549003595
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/bwa/tet_B__2_AF326777_validation.txt",
+      "size_bytes": 1813,
+      "modified_time_ns": 1790965437549946516
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/minimap2/tet_B__2_AF326777_consensus.fasta",
+      "size_bytes": 1821,
+      "modified_time_ns": 1790965443227384295
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/minimap2/tet_B__2_AF326777_depth.tsv",
+      "size_bytes": 32955,
+      "modified_time_ns": 1790965443228921552
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232758E_18/tet_B__2_AF326777/minimap2/tet_B__2_AF326777_validation.txt",
+      "size_bytes": 1813,
+      "modified_time_ns": 1790965443229489471
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/bowtie2/FloR_4_CP136914_consensus.fasta",
+      "size_bytes": 1417,
+      "modified_time_ns": 1790965803793976696
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/bowtie2/FloR_4_CP136914_depth.tsv",
+      "size_bytes": 31969,
+      "modified_time_ns": 1790965803796401378
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/bowtie2/FloR_4_CP136914_validation.txt",
+      "size_bytes": 2501,
+      "modified_time_ns": 1790965803798133805
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/bowtie2/FloR_4_CP136914_variants.tsv",
+      "size_bytes": 1374,
+      "modified_time_ns": 1790965803796697046
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/minimap2/FloR_4_CP136914_consensus.fasta",
+      "size_bytes": 1814,
+      "modified_time_ns": 1790965820515716315
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/minimap2/FloR_4_CP136914_depth.tsv",
+      "size_bytes": 32552,
+      "modified_time_ns": 1790965820517510117
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/minimap2/FloR_4_CP136914_validation.txt",
+      "size_bytes": 1811,
+      "modified_time_ns": 1790965820518639123
+    },
+    {
+      "path": "outputs/FAN_AMR/reconstruction/232759E_23/FloR_4_CP136914/minimap2/FloR_4_CP136914_variants.tsv",
+      "size_bytes": 94,
+      "modified_time_ns": 1790965820517903953
+    },
+    {
+      "path": "src/GeneFior/databases/resfinder/all.gz",
+      "size_bytes": 369910,
+      "modified_time_ns": 1774811947235838401
+    }
+  ],
+  "outputs": [
+    "reconstruction-snp-profiles.png",
+    "reconstruction-snp-evidence.tsv",
+    "reconstruction-allele-evidence.png",
+    "reconstruction-allele-evidence.tsv",
+    "reconstruction-boundaries.png"
+  ]
+}

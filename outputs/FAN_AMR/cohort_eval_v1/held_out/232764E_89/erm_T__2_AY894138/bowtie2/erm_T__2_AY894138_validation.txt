@@ -1,0 +1,91 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: erm(T)_2_AY894138
+Generated: 2026-10-15T15:44:15.211864
+======================================================================
+
+  Sequence: consensus
+  Grade:    C  — Moderate confidence.  Check depth and coverage uniformity.
+
+  Coverage
+    Gene length:            735 bp
+    Covered positions:      481 (65.44%)
+    N positions:            34.56%
+  Depth
+    Mean depth:             21.3x
+    Depth CV:               113.6%  (uneven)
+  Read support
+    Support score:          99.9%
+  Reference comparison
+    Identity vs reference:  99.58%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      3
+    Mean minor-allele freq: 34.92%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   482 nt
+    Reference length:       735 nt
+    Difference:             -253 nt  (-34.4%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Start / stop codons:    TTG / absent
+    Note: Sample gene is SHORTER than reference by 253 nt (-34.4%). Codon structure INVALID: length 482 not divisible by 3; no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    C  — Moderate confidence.  Check depth and coverage uniformity.
+
+  Coverage
+    Gene length:            735 bp
+    Covered positions:      448 (60.95%)
+    N positions:            39.05%
+  Depth
+    Mean depth:             2.5x
+    Depth CV:               75.4%  (uneven)
+  Read support
+    Support score:          99.94%
+  Reference comparison
+    Identity vs reference:  99.55%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      3
+    Mean minor-allele freq: 34.92%
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_2
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            735 bp
+    Covered positions:      0 (0.0%)
+    N positions:            100.0%
+  Depth
+    Mean depth:             1.2x
+    Depth CV:               78.0%  (uneven)
+  Read support
+    Support score:          0.0%
+  Reference comparison
+    Identity vs reference:  0.0%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      3
+    Mean minor-allele freq: 34.92%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)

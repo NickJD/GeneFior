@@ -1,0 +1,55 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: ant(6)-Ia_1_AF330699
+Length: 909 bp
+Overall Status: FAIL
+Overall Score: 87.9/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 1, 423 bp)
+    • orf_length: 423
+    • frame: 1
+    • coverage: 100.0%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (38.4%)
+    • gc_percent: 38.4%
+    • reference_gc: 36.2%
+    • difference: 2.2%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (75/100)
+  Coverage moderately variable (CV=62.2%)
+    • mean_depth: 17.0×
+    • median_depth: 18.0×
+    • cv_percent: 62.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (48%/52%)
+    • forward_reads: 214
+    • reverse_reads: 233
+    • forward_percent: 47.9%
+    • reverse_percent: 52.1%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 425
+    • valid_positions: 425
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (484/484)
+    • total_variants: 484
+    • high_quality: 0
+    • low_quality: 484
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 484 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

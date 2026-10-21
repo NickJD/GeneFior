@@ -1,0 +1,59 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: tet(L)_8_AY081910
+Length: 1377 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 2, 174 bp)
+    • orf_length: 174
+    • frame: 2
+    • coverage: 100.0%
+    • internal_stops: 0
+  Recommendations:
+    → Gene may be truncated or annotation may be incorrect
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (31.8%)
+    • gc_percent: 31.8%
+    • reference_gc: 35.3%
+    • difference: 3.5%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (50/100)
+  Coverage highly variable (CV=94.5%)
+    • mean_depth: 3.6×
+    • median_depth: 1.0×
+    • cv_percent: 94.5%
+    • discontinuities: 0
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (51%/49%)
+    • forward_reads: 106
+    • reverse_reads: 101
+    • forward_percent: 51.2%
+    • reverse_percent: 48.8%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.4%)
+    • identity_percent: 99.4%
+    • matches: 175
+    • valid_positions: 176
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (1201/1202)
+    • total_variants: 1202
+    • high_quality: 1
+    • low_quality: 1201
+    • high_qual_percent: 0.1%
+  Recommendations:
+    → 1201 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

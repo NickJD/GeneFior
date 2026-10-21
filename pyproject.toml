@@ -22,6 +22,9 @@ dependencies = [
     "matplotlib>=3.10.8"
 ]
 
+[project.optional-dependencies]
+architect = ["biopython>=1.83"]
+
 [project.urls]
 Homepage = "https://github.com/NickJD/GeneFior"
 "Bug Tracker" = "https://github.com/NickJD/GeneFior/issues"
@@ -45,6 +48,12 @@ genefior-combine = "GeneFior.GeneFior_Combine:main"
 GeneFior-Reconstruct = "GeneFior.GeneFior_Reconstruct:main"
 GeneFior-reconstruct = "GeneFior.GeneFior_Reconstruct:main"
 genefior-reconstruct = "GeneFior.GeneFior_Reconstruct:main"
+GeneFior-Architect = "GeneFior.GeneFior_Architect:main"
+genefior-architect = "GeneFior.GeneFior_Architect:main"
+GeneFior-Reconstruction-Visualise = "GeneFior.GeneFior_Reconstruction_Visualise:main"
+genefior-reconstruction-visualise = "GeneFior.GeneFior_Reconstruction_Visualise:main"
+GeneFior-Metagenomic = "GeneFior.GeneFior_Metagenomic:main"
+genefior-metagenomic = "GeneFior.GeneFior_Metagenomic:main"
 
 [tool.setuptools]
 include-package-data = true

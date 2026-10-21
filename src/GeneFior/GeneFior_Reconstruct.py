@@ -122,7 +122,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 # ── version ────────────────────────────────────────────────────────────────
-RECONSTRUCT_VERSION = "v2.2.0"
+RECONSTRUCT_VERSION = "v2.2.1"
 
 # ── allow direct execution ──────────────────────────────────────────────────
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -370,6 +370,22 @@ def _round_up_to_codon(n: int) -> int:
     """Round *n* up to the nearest multiple of 3 (codon boundary)."""
     r = n % 3
     return n if r == 0 else n + (3 - r)
+
+
+def calculate_boundary_extension(gene_length: int, fraction: float = 0.20,
+                                 codon_aware: bool = True) -> int:
+    """Return the per-end search window used for boundary reconstruction."""
+    if gene_length < 1:
+        raise ValueError("gene_length must be positive")
+    if fraction < 0:
+        raise ValueError("fraction must not be negative")
+    raw = max(3, round(gene_length * fraction))
+    return _round_up_to_codon(raw) if codon_aware else raw
+
+
+def trim_extension_unknowns(sequence: str, *, from_left: bool) -> str:
+    """Remove only terminal Ns from an extension wing; preserve internal Ns."""
+    return sequence.lstrip("N") if from_left else sequence.rstrip("N")
 
 
 def _assess_codon_structure(
@@ -797,44 +813,62 @@ def _mean_std(values: List[float]) -> Tuple[float, float]:
 # Pileup helpers (reusable for both full and per-haplotype builds)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def _build_pileup(alignments: List[dict], gene_length: int):
-    """
-    base_pileup[ref_pos] = {base: count}
-    ins_pileup[ref_pos_before_ins] = {ins_seq: count}
+def _fragment_key(name: str) -> str:
+    """Normalize SAM /1 and /2 labels to the originating paired fragment."""
+    return re.sub(r"(?:/[12])+$", "", name)
+
+
+def _build_pileup(alignments: List[dict], gene_length: int,
+                  min_mapq: int = 10, min_base_quality: int = 20):
+    """Build a fragment-level pileup, counting overlapping mates once.
+
+    Conflicting overlapping mate calls are retained only when one base has a
+    Phred advantage of at least 10. Duplicate and low-MAPQ alignments are
+    excluded; low-quality bases do not contribute.
     """
     base_pileup: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    ins_pileup:  Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    ins_pileup: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    fragment_bases: Dict[str, Dict[int, tuple[str, int]]] = defaultdict(dict)
+    fragment_insertions: Dict[str, Dict[int, str]] = defaultdict(dict)
+    fragment_deletions: Dict[str, Dict[int, str]] = defaultdict(dict)
 
     for aln in alignments:
-        seq   = aln["seq"]
-        cigar = aln["cigar"]
-        pos   = aln["pos"]
-        if not seq or seq == "*" or not cigar or cigar == "*":
+        seq, cigar, pos = aln["seq"], aln["cigar"], aln["pos"]
+        if (not seq or seq == "*" or not cigar or cigar == "*"
+                or aln.get("flag", 0) & 0x400 or aln.get("mapq", 0) < min_mapq):
             continue
-        ref_pos = pos
-        read_pos = 0
-        last_ref = pos
-
+        quals = aln.get("qual", "*")
+        key = _fragment_key(aln["name"])
+        ref_pos, read_pos, last_ref = pos, 0, pos
         for count_str, op in CIGAR_RE.findall(cigar):
             length = int(count_str)
             if op in ("M", "=", "X"):
                 for k in range(length):
                     rp = read_pos + k
-                    if rp < len(seq):
-                        b = seq[rp].upper()
-                        if b not in "ACGTN":
-                            b = "N"
-                        base_pileup[ref_pos + k][b] += 1
+                    if rp >= len(seq):
+                        continue
+                    q = ord(quals[rp]) - 33 if quals != "*" and rp < len(quals) else 0
+                    if q < min_base_quality:
+                        continue
+                    base = seq[rp].upper()
+                    if base not in "ACGTN":
+                        base = "N"
+                    p = ref_pos + k
+                    previous = fragment_bases[key].get(p)
+                    if previous is None or q > previous[1]:
+                        fragment_bases[key][p] = (base, q)
+                    elif base != previous[0] and q == previous[1]:
+                        fragment_bases[key].pop(p, None)
                 last_ref = ref_pos + length - 1
-                ref_pos  += length
+                ref_pos += length
                 read_pos += length
             elif op == "I":
-                ins_seq = seq[read_pos:read_pos + length].upper()
-                ins_pileup[last_ref][ins_seq] += 1
+                ins = seq[read_pos:read_pos + length].upper()
+                fragment_insertions[key][last_ref] = ins
                 read_pos += length
             elif op == "D":
                 for k in range(length):
-                    base_pileup[ref_pos + k]["-"] += 1
+                    fragment_deletions[key][ref_pos + k] = "-"
                 last_ref = ref_pos + length - 1
                 ref_pos += length
             elif op == "N":
@@ -842,6 +876,16 @@ def _build_pileup(alignments: List[dict], gene_length: int):
             elif op == "S":
                 read_pos += length
 
+    for key, calls in fragment_bases.items():
+        for pos, (base, _) in calls.items():
+            base_pileup[pos][base] += 1
+    for key, calls in fragment_deletions.items():
+        for pos, base in calls.items():
+            if pos not in fragment_bases.get(key, {}):
+                base_pileup[pos][base] += 1
+    for calls in fragment_insertions.values():
+        for pos, ins in calls.items():
+            ins_pileup[pos][ins] += 1
     return base_pileup, ins_pileup
 
 
@@ -1025,7 +1069,13 @@ def _extract_read_alleles(
                 read_pos += length
 
         if local_map:
-            read_alleles[aln["name"]] = local_map
+            key = _fragment_key(aln["name"])
+            current = read_alleles.setdefault(key, {})
+            for rp, base in local_map.items():
+                if rp not in current:
+                    current[rp] = base
+                elif current[rp] != base:
+                    current.pop(rp, None)  # ambiguous overlapping mate call
 
     return read_alleles
 
@@ -1660,6 +1710,7 @@ class GeneReconstructor:
 
             alignments.append({
                 "name": rname, "flag": flag,
+                "mapq": int(fields[4]) if fields[4].isdigit() else 0,
                 "pos": pos, "cigar": fields[5],
                 "seq": seq, "qual": fields[10],
                 "md": md, "nm": nm,
@@ -2479,6 +2530,25 @@ class GeneReconstructor:
         """
         gene_safe = _safe_filename(self.gene_name)
 
+        # Optional outputs are only emitted when the current run has the
+        # corresponding evidence.  Remove prior versions first so a rerun
+        # cannot leave stale haplotypes, variants, or validation reports that
+        # look like current findings.
+        tool_dir = self.recon_dir / gene_safe / tool_label.lower()
+        tool_dir.mkdir(parents=True, exist_ok=True)
+        stale_suffixes = (
+            "_consensus.fasta", "_haplotypes.fasta", "_depth.tsv",
+            "_variants.tsv", "_reads.fasta", "_validation.txt",
+            "_artifact_validation.txt", "_sample_vs_reference.txt",
+            "_assembly_graph.gfa", "_reconstruction_plot.html",
+        )
+        for suffix in stale_suffixes:
+            stale_path = tool_dir / f"{gene_safe}{suffix}"
+            try:
+                stale_path.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning(f"  Could not remove stale output {stale_path}: {exc}")
+
         # ── pileup ────────────────────────────────────────────────────
         base_pileup, ins_pileup = _build_pileup(alignments, gene_length)
 
@@ -2553,7 +2623,7 @@ class GeneReconstructor:
                     )
                     continue
                 hap_set  = set(hap_names)
-                hap_alns = [a for a in alignments if a["name"] in hap_set]
+                hap_alns = [a for a in alignments if _fragment_key(a["name"]) in hap_set]
                 h_bp, h_ip = _build_pileup(hap_alns, gene_length)
                 h_cons, h_sample, h_pp = _call_consensus(
                     h_bp, h_ip, gene_length,
@@ -2600,7 +2670,9 @@ class GeneReconstructor:
         )
         if self.boundary_extension > 0:
             raw_ext = max(3, round(gene_length * self.boundary_extension))
-            ext_5   = _round_up_to_codon(raw_ext) if self.codon_aware else raw_ext
+            ext_5   = calculate_boundary_extension(
+                gene_length, self.boundary_extension, self.codon_aware
+            )
             ext_3   = ext_5
             codon_note = (
                 f" (codon-rounded from {raw_ext} nt)" if self.codon_aware and ext_5 != raw_ext
@@ -2617,8 +2689,10 @@ class GeneReconstructor:
                 self.min_depth, self.min_freq,
                 self.min_ins_depth, self.min_ins_freq,
             )
-            ext_5_seq     = ext_cons_ref[:ext_5].lstrip("N")
-            ext_3_seq     = ext_cons_ref[ext_5 + gene_length:].rstrip("N")
+            ext_5_seq     = trim_extension_unknowns(ext_cons_ref[:ext_5], from_left=True)
+            ext_3_seq     = trim_extension_unknowns(
+                ext_cons_ref[ext_5 + gene_length:], from_left=False
+            )
             captured_5_nt = len(ext_5_seq)
             captured_3_nt = len(ext_3_seq)
             if captured_5_nt or captured_3_nt:
@@ -2686,9 +2760,6 @@ class GeneReconstructor:
             f"coverage {val['coverage_pct']}%, "
             f"depth CV {val['cv_depth_pct']}%"
         )
-        tool_dir = self.recon_dir / gene_safe / tool_label.lower()
-        tool_dir.mkdir(parents=True, exist_ok=True)
-
         # Consensus FASTA — extension bases prepended/appended where captured.
         # A second entry is added when insertions shift the sample sequence.
         final_sample_with_ins = ext_5_seq + sample_seq + ext_3_seq
@@ -3283,4 +3354,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

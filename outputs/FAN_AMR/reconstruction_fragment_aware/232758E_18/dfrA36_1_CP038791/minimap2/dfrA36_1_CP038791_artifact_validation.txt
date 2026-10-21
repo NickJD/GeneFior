@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: dfrA36_1_CP038791
+Length: 588 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 585 bp)
+    • orf_length: 585
+    • frame: 0
+    • coverage: 99.5%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (34.9%)
+    • gc_percent: 34.9%
+    • reference_gc: 34.9%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=12.7%)
+    • mean_depth: 82.4×
+    • median_depth: 84.0×
+    • cv_percent: 12.7%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (57%/43%)
+    • forward_reads: 150
+    • reverse_reads: 112
+    • forward_percent: 57.3%
+    • reverse_percent: 42.7%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 588
+    • valid_positions: 588
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

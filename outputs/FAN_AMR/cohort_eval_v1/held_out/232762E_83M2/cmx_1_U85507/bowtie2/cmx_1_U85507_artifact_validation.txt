@@ -1,0 +1,55 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: cmx_1_U85507
+Length: 1176 bp
+Overall Status: FAIL
+Overall Score: 91.4/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 2, 1170 bp)
+    • orf_length: 1170
+    • frame: 2
+    • coverage: 99.7%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (63.6%)
+    • gc_percent: 63.6%
+    • reference_gc: 63.6%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=36.2%)
+    • mean_depth: 96.0×
+    • median_depth: 97.0×
+    • cv_percent: 36.2%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (57%/43%)
+    • forward_reads: 288
+    • reverse_reads: 214
+    • forward_percent: 57.4%
+    • reverse_percent: 42.6%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.4%)
+    • identity_percent: 99.4%
+    • matches: 1167
+    • valid_positions: 1174
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (2/9)
+    • total_variants: 9
+    • high_quality: 2
+    • low_quality: 2
+    • high_qual_percent: 22.2%
+  Recommendations:
+    → 2 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

@@ -1,0 +1,60 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: dfrA36_1_CP038791
+Length: 588 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 1, 561 bp)
+    • orf_length: 561
+    • frame: 1
+    • coverage: 98.9%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (35.1%)
+    • gc_percent: 35.1%
+    • reference_gc: 34.9%
+    • difference: 0.2%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=46.4%)
+    • mean_depth: 15.5×
+    • median_depth: 17.0×
+    • cv_percent: 46.4%
+    • discontinuities: 0
+
+⚠ Strand Bias: WARNING (50/100)
+  Moderate strand bias (76%/24%)
+    • forward_reads: 31
+    • reverse_reads: 10
+    • forward_percent: 75.6%
+    • reverse_percent: 24.4%
+  Recommendations:
+    → Severe strand bias may indicate:
+    →   - Strand-specific library prep
+    →   - Systematic sequencing errors
+    →   - Reference sequence on wrong strand
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.6%)
+    • identity_percent: 99.6%
+    • matches: 565
+    • valid_positions: 567
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (23/23)
+    • total_variants: 23
+    • high_quality: 0
+    • low_quality: 23
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 23 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

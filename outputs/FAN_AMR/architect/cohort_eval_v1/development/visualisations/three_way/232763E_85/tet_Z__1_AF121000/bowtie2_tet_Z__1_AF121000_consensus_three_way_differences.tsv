@@ -1,0 +1,6 @@
+source	position_1based	reference	observed	type
+reconstruction	1	G	N	AMBIGUITY
+reconstruction	2	T	H	AMBIGUITY
+reconstruction	3	G	A	SNP
+reconstruction	1154	A	G	SNP
+reconstruction	1155	A	N	AMBIGUITY

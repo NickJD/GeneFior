@@ -1,0 +1,12 @@
+H	VN:Z:1.0
+# GeneFior-Reconstruct v2.2.1 Assembly Graph
+# Gene: sul1_14_AJ517791
+# Tool: Minimap2
+# Multi-version: single
+# Consensus length: 840 bp
+P	consensus		*	LN:i:840	FC:i:0
+# Read: MNG003:261:H7WV3DRX2:1:2148:6813:14418/1 pos:270-521
+# Read: MNG003:261:H7WV3DRX2:1:2266:26277:30373/1 pos:335-586
+# Read: MNG003:261:H7WV3DRX2:2:2230:16848:6872/2 pos:518-633
+# Read: MNG003:261:H7WV3DRX2:1:2266:26277:30373/2 pos:615-841
+# Read: MNG003:261:H7WV3DRX2:1:2148:6813:14418/2 pos:732-841

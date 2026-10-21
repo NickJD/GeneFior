@@ -1,0 +1,57 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: FloR_4_CP136914
+Length: 1215 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 495 bp)
+    • orf_length: 495
+    • frame: 0
+    • coverage: 100.0%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (58.7%)
+    • gc_percent: 58.7%
+    • reference_gc: 58.4%
+    • difference: 0.2%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+⚠ Coverage Uniformity: WARNING (50/100)
+  Coverage highly variable (CV=86.3%)
+    • mean_depth: 29.3×
+    • median_depth: 29.0×
+    • cv_percent: 86.3%
+    • discontinuities: 0
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (51%/49%)
+    • forward_reads: 69
+    • reverse_reads: 65
+    • forward_percent: 51.5%
+    • reverse_percent: 48.5%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.8%)
+    • identity_percent: 99.8%
+    • matches: 495
+    • valid_positions: 496
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (719/720)
+    • total_variants: 720
+    • high_quality: 1
+    • low_quality: 719
+    • high_qual_percent: 0.1%
+  Recommendations:
+    → 719 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

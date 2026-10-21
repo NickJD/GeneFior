@@ -1,0 +1,54 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: fosB_5_AJ605334
+Length: 417 bp
+Overall Status: FAIL
+Overall Score: 84.3/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 30 bp)
+    • orf_length: 30
+    • frame: 0
+    • coverage: 100.0%
+    • internal_stops: 0
+  Recommendations:
+    → Gene may be truncated or annotation may be incorrect
+
+⚠ GC Content: WARNING (50/100)
+  Sequence too short for GC analysis
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=7.8%)
+    • mean_depth: 5.7×
+    • median_depth: 6.0×
+    • cv_percent: 7.8%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (50%/50%)
+    • forward_reads: 3
+    • reverse_reads: 3
+    • forward_percent: 50.0%
+    • reverse_percent: 50.0%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (96.7%)
+    • identity_percent: 96.7%
+    • matches: 29
+    • valid_positions: 30
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (387/388)
+    • total_variants: 388
+    • high_quality: 0
+    • low_quality: 387
+    • high_qual_percent: 0.0%
+  Recommendations:
+    → 387 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

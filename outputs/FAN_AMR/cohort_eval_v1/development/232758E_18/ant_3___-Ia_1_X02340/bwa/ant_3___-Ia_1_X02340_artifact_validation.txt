@@ -1,0 +1,57 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: ant(3'')-Ia_1_X02340
+Length: 972 bp
+Overall Status: FAIL
+Overall Score: 80.7/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 2, 918 bp)
+    • orf_length: 918
+    • frame: 2
+    • coverage: 99.7%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (52.9%)
+    • gc_percent: 52.9%
+    • reference_gc: 52.6%
+    • difference: 0.4%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✗ Coverage Uniformity: FAIL (25/100)
+  Coverage extremely variable (CV=130.0%) - possible artifact
+    • mean_depth: 65.9×
+    • median_depth: 17.0×
+    • cv_percent: 130.0%
+    • discontinuities: 0
+  Recommendations:
+    → High coverage variability suggests uneven amplification or chimera
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (45%/55%)
+    • forward_reads: 228
+    • reverse_reads: 274
+    • forward_percent: 45.4%
+    • reverse_percent: 54.6%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (99.8%)
+    • identity_percent: 99.8%
+    • matches: 920
+    • valid_positions: 922
+
+✗ Variant Quality: FAIL (40/100)
+  Many low-quality variants (50/52)
+    • total_variants: 52
+    • high_quality: 2
+    • low_quality: 50
+    • high_qual_percent: 3.8%
+  Recommendations:
+    → 50 low-quality variants detected
+    → Low-quality variants may be sequencing errors
+    → Consider increasing -min_depth threshold

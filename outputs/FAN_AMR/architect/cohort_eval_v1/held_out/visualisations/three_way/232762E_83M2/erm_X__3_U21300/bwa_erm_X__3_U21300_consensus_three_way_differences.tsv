@@ -1,0 +1,12 @@
+source	position_1based	reference	observed	type
+reconstruction	0	-	AGACCCATGTTGATTTCAGGTACCGCTTTCTTGCGGTTGCGCACCAACCGCTAAGGCGGTTTCCTACCCCGTAGGTTAAAAACCGCTCCGGTCCTTTAGCCGGGCGGCTATTTGTCATGCCCGGCTCCCTTTCAAATCCAAGGAGCACACCTG	INSERTION
+reconstruction	488	C	A	SNP
+reconstruction	755	-	NNNNNNN	INSERTION
+reconstruction	757	A	T	SNP
+reconstruction	760	-	TCCTCTC	INSERTION
+reconstruction	761	G	T	SNP
+reconstruction	762	-	CC	INSERTION
+long_read_ground_truth	488	C	A	SNP
+long_read_ground_truth	643	-	G	INSERTION
+enhanced_contig_ground_truth	488	C	A	SNP
+enhanced_contig_ground_truth	643	-	G	INSERTION

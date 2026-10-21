@@ -1,0 +1,47 @@
+======================================================================
+RECONSTRUCTION VALIDATION REPORT
+======================================================================
+Gene: aadA5_1_AF137361
+Length: 789 bp
+Overall Status: PASS
+Overall Score: 100.0/100
+======================================================================
+
+✓ ORF Integrity: PASS (100/100)
+  Complete ORF found (frame 0, 786 bp)
+    • orf_length: 786
+    • frame: 0
+    • coverage: 99.6%
+    • internal_stops: 0
+
+✓ GC Content: PASS (100/100)
+  GC content within normal range (58.3%)
+    • gc_percent: 58.3%
+    • reference_gc: 58.3%
+    • difference: 0.0%
+
+✓ Repeat Structure: PASS (100/100)
+  No unusual repeat structures detected
+
+✓ Coverage Uniformity: PASS (100/100)
+  Coverage is uniform (CV=14.8%)
+    • mean_depth: 60.6×
+    • median_depth: 58.0×
+    • cv_percent: 14.8%
+    • discontinuities: 0
+
+✓ Strand Bias: PASS (100/100)
+  No strand bias detected (45%/55%)
+    • forward_reads: 105
+    • reverse_reads: 126
+    • forward_percent: 45.5%
+    • reverse_percent: 54.5%
+
+✓ Reference Identity: PASS (100/100)
+  High identity to reference (100.0%)
+    • identity_percent: 100.0%
+    • matches: 789
+    • valid_positions: 789
+
+✓ Variant Quality: PASS (100/100)
+  No variants called (identical to reference)

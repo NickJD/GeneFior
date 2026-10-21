@@ -1,0 +1,90 @@
+RECONSTRUCTION VALIDATION REPORT
+Gene: dfrA36_1_CP038791
+Generated: 2026-10-15T14:43:02.826289
+======================================================================
+
+  Sequence: consensus
+  Grade:    C*  — Multiple versions detected — this is the blended consensus.  See haplotype FASTA for individual versions.
+
+  Coverage
+    Gene length:            588 bp
+    Covered positions:      587 (99.83%)
+    N positions:            0.17%
+  Depth
+    Mean depth:             54.2x
+    Depth CV:               43.2%  (uniform)
+  Read support
+    Support score:          99.89%
+  Reference comparison
+    Identity vs reference:  99.32%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.32%
+  Length vs reference
+    Status:                 SHORTER_IN_SAMPLE
+    Reconstructed length:   587 nt
+    Reference length:       588 nt
+    Difference:             -1 nt  (-0.2%)
+    Extension captured 5ʹ:  0 nt
+    Extension captured 3ʹ:  0 nt
+    Codon-valid ORF:        NO
+    Note: Sample gene is SHORTER than reference by 1 nt (-0.2%). Codon structure INVALID: length 587 not divisible by 3; no canonical start codon (got ''); no canonical stop codon (got ''). May indicate partial coverage or genuine truncation.
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_1
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            588 bp
+    Covered positions:      234 (39.8%)
+    N positions:            60.2%
+  Depth
+    Mean depth:             2.4x
+    Depth CV:               41.2%  (uniform)
+  Read support
+    Support score:          99.62%
+  Reference comparison
+    Identity vs reference:  100.0%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.32%
+
+----------------------------------------------------------------------
+
+  Sequence: haplotype_2
+  Grade:    F  — Low confidence.  Insufficient coverage for reliable reconstruction.
+
+  Coverage
+    Gene length:            588 bp
+    Covered positions:      0 (0.0%)
+    N positions:            100.0%
+  Depth
+    Mean depth:             1.1x
+    Depth CV:               79.5%  (uneven)
+  Read support
+    Support score:          0.0%
+  Reference comparison
+    Identity vs reference:  0.0%
+  Multi-version analysis
+    Classification:         multi
+    Informative sites:      7
+    Mean minor-allele freq: 30.32%
+
+----------------------------------------------------------------------
+
+GRADE KEY
+  A   High-confidence, single clean version
+  B   Good, minor issues
+  C   Moderate confidence
+  C*  Multiple versions detected — blended consensus; use haplotypes
+  F   Insufficient coverage
+
+LENGTH STATUS
+  MATCHES_REFERENCE  — Reconstructed length equals reference length
+  SHORTER_IN_SAMPLE  — Sample gene shorter than reference
+                       (grade adjusted when codon structure is valid)
+  LONGER_IN_SAMPLE   — Sample gene extends beyond reference boundaries
+                       (captured via boundary extension of reads)
