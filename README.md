@@ -17,7 +17,8 @@ Please see GeneFior.pdf for a draft publication.
     - hmmer >=3.4
     - seqtk >=1.4
     - pigz >=2.8
-    - fastp >=1.3.5 (optional, for paired-read trimming)
+    - fastp >=1.3.5 
+    - bedtools >=2.31.1
 
 ### Installation:
 GeneFíor is available via bioconda (https://anaconda.org/channels/bioconda/packages/genefior/overview). \
@@ -32,213 +33,69 @@ GeneFíor is also available via pip, but conda installation is recommended to en
 pip install genefior
 ```
 
-## Menu for GeneFíor (GeneFíor or GeneFíor):
-BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
-```commandline
-GeneFíor v0.11.0 GeneFíor - The Multi-Tool Gene Detection Toolkit.
-options:
-  -h, --help            show this help message and exit
+## Quick start
 
-Required selection:
-  -i INPUT, --input INPUT
-                        Input FASTA/FASTAQ file(s) with sequences to analyse - Separate FASTQ R1 and R2 with a comma for Paired-FASTQ or single file path for Single-FASTA - .gz files accepted
-  --input-dir INPUT_DIR
-                        Path to a directory containing multiple sample FASTA files (for Single-FASTA) or multiple paired FASTQ files (for Paired-FASTQ).
-  --input-subdirs INPUT_SUBDIRS
-                        Path to a directory where each subdirectory contains one sample (a FASTA or paired FASTQ files).
-  -st {Single-FASTA,Paired-FASTQ,Genes-FASTA}, --sequence-type {Single-FASTA,Paired-FASTQ,Genes-FASTA}
-                        Specify the input Sequence Type: Single-FASTA, Paired-FASTQ (R1+R2) or Genes-FASTA. When Genes-FASTA is selected the pipeline treats the input as full-length gene FASTA(s) (DNA or protein)
-                        and will skip read-mappers (bowtie2, bwa, minimap2).
-  --db-path USER_DB_PATH
-                        Path to the directory containing user-provided databases in correct format (see build_databases.sh) (can supply multiple paths separated by commas)
-  -o OUTPUT, --output OUTPUT
-                        Output directory for results
+GeneFíor searches reads or supplied gene sequences against selected reference
+databases. AMRfíor is also available as a separate command for AMR-focused
+workflows and is kept compatible with the same search and sensitivity options.
+Run either command with `--help` to see all options supported by your installed
+version.
 
-Output selection:
-  --report-fasta {all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
-                        Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for
-                        each detected gene. Evidence modes are explicit aliases; candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide allele calls. (default: None)
+### GeneFíor with a custom database
 
-Tool selection:
-  --tools {blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} ...]
-                        Specify which tools to run - "all" will run all tools (default: all except blastx/p as they can be slow!!)
-
-Query threshold Parameters:
-  --q-min-cov QUERY_MIN_COVERAGE, --query-min-coverage QUERY_MIN_COVERAGE
-                        Minimum coverage threshold in percent (HSP for blastx/n) (default: 40.0)
-  --q-min-id QUERY_MIN_IDENTITY, --query-min-identity QUERY_MIN_IDENTITY
-                        Minimum identity threshold in percent (HSP for blast/diamond) (default: 80.0)
-
-Gene Detection Parameters:
-  --d-min-cov DETECTION_MIN_COVERAGE, --detection-min-coverage DETECTION_MIN_COVERAGE
-                        Minimum coverage threshold in percent (default: 80.0)
-  --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
-                        Minimum identity threshold in percent (default: 80.0)
-  --d-min-depth DETECTION_MIN_DEPTH, --detection-min-depth DETECTION_MIN_DEPTH
-                        Minimum per-base depth required across the configured detection coverage in legacy-relaxed mode (default: 1)
-  --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
-                        Minimum number of reads required for detection (default: 1)
-
-Mode Selection:
-  --dna-only            Run only DNA-based tools
-  --protein-only        Run only protein-based tools
-  --sensitivity {default,very-fast,fast,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
-                        Preset sensitivity levels. "default" leaves tools unchanged. Other presets map to common DIAMOND and Bowtie2 presets (e.g. "very-sensitive" -> DIAMOND --very-sensitive / Bowtie2 --very-
-                        sensitive-local). Use --tool-param to override specific tool parameters if needed.
-
-Tool-Specific Parameters:
-  --minimap2-preset {sr,map-ont,map-pb,map-hifi}
-                        Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)
-  --blastx-task {blastx,blastx-fast}
-                        Run blastx with task blastx-fast (default: blastx-fast)
-  --genes-type {dna,aa}
-                        (Required when -st Genes-FASTA) Specify whether provided genes FASTA contains DNA (dna) or amino-acid sequences (aa)
-  --tool-param TOOL_PARAM
-                        Specify extra parameters for a tool as TOOL="args". Can be provided multiple times. Example: --tool-param 'diamond=--more-sensitive -e 1e-5'
-  -e EVALUE, --evalue EVALUE
-                        E-value threshold to pass to BLASTn/x and DIAMOND (default: 10)
-
-Runtime Parameters:
-  -t THREADS, --threads THREADS
-                        Number of threads to use (default: 8)
-  --chunk-jobs CHUNK_JOBS
-                        Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1
-  --chunk-threads-per-job CHUNK_THREADS_PER_JOB
-                        If set, reserve this many threads per chunk job; otherwise total threads are divided evenly across concurrent chunk jobs
-  --preserve-chunks     Keep chunk files and per-chunk outputs after concatenation (useful for debugging)
-  --max-fasta-chunk-mb MAX_FASTA_CHUNK_MB
-                        Max FASTA chunk size in MiB (default: 200.0). Inputs larger than this will be chunked for per-chunk BLAST runs
-  -tmp TEMP_DIRECTORY, --temp-directory TEMP_DIRECTORY
-                        Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - Path will also be used for all temporary files (default: output directory)
-  --force-modify-fastq  Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique
-  --fastp-trim, --fastp, --trim-reads
-                        For Paired-FASTQ input, run fastp automatic adapter and quality trimming before analysis
-  --no_cleanup
-  --verbose
-
-Miscellaneous Parameters:
-  -v, --version         Show program version and exit
-
-Examples:
-  # Basic usage with default tools (runs DNA & protein tools)
-  GeneFior -i reads.fasta -st Single-FASTA --db-path <path-to-db> -o results
-
-  # Select specific tools and output detected FASTA sequences
-  GeneFior -i reads.fasta -st Single-FASTA --db-path <path-to-db> -o results     --tools diamond bowtie2     --report_fasta detected
-
-  # Custom thresholds, paired-fastq input, threads and dna-only mode
-  GeneFior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ --db-path <path-to-db>     -o results -t 16 --d-min-cov 90 --d-min-id 85     --dna-only```
+```bash
+genefior \
+  -i reads_R1.fastq.gz,reads_R2.fastq.gz \
+  -st Paired-FASTQ \
+  --db-path /path/to/database \
+  --tools blastn diamond bowtie2 \
+  -o results \
+  -t 8
 ```
-# AMRfíor has been absorbed into GeneFíor but is still available as a separate command for backwards compatibility with the same functionality and AMR databases.
-## Menu for AMRfíor:
-CARD and resfinder databases are used by default, but user-provided databases can also be specified.
-The NCBI AMR database is also available as an option.
-All 3 databases are prepackaged and formatted as part of the bioconda installation of AMRfíor.
 
-## Menu for AMRfíor (AMRfíor or AMRFíor):
-BLASTn and BLASTx are disabled by default due to their slow speed, but can be enabled if desired.
+### AMRfíor with the built-in AMR databases
 
-```commandline
-GeneFíor v0.11.0 - AMRfíor - The Multi-Tool AMR Gene Detection Toolkit.
-
-options:
-  -h, --help            show this help message and exit
-
-Required selection:
-  -i INPUT, --input INPUT
-                        Input FASTA/FASTAQ file(s) with sequences to analyse - Separate FASTQ R1 and R2 with a comma for Paired-FASTQ or single file path for Single-FASTA - .gz files accepted
-  --input-dir INPUT_DIR
-                        Path to a directory containing multiple sample FASTA files (for Single-FASTA) or multiple paired FASTQ files (for Paired-FASTQ).
-  --input-subdirs INPUT_SUBDIRS
-                        Path to a directory where each subdirectory contains one sample (a FASTA or paired FASTQ files).
-  -st {Single-FASTA,Paired-FASTQ,Genes-FASTA}, --sequence-type {Single-FASTA,Paired-FASTQ,Genes-FASTA}
-                        Specify the input Sequence Type: Single-FASTA, Paired-FASTQ (R1+R2) or Genes-FASTA. When Genes-FASTA is selected the pipeline treats the input as full-length gene FASTA(s) (DNA or protein)
-                        and will skip read-mappers (bowtie2, bwa, minimap2).
-  -o OUTPUT, --output OUTPUT
-                        Output directory for results
-
-Output selection:
-  --report-fasta {all,detected,detected-all,evidence,evidence-all,candidate,candidate-all,exact,exact-all}
-                        Specify whether to output sequences that "mapped" to genes."all" should only be used for deep investigation/debugging."detected" will report the reads that passed detection thresholds for
-                        each detected gene. Evidence modes are explicit aliases; candidate modes restrict output to candidate allele calls; exact modes restrict output to exact nucleotide allele calls. (default: None)
-
-Tool selection:
-  --tools {blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} [{blastn,blastx,blastp,diamond,bowtie2,bwa,minimap2,all} ...]
-                        Specify which tools to run - "all" will run all tools (default: all except blastx/p as they can be slow!!)
-
-Database selection:
-  --databases {resfinder,card,ncbi,user-provided} [{resfinder,card,ncbi,user-provided} ...]
-                        Specify which AMR gene databases to use (default: resfinder and card) -If "user-provided" is selected, please ensure the path contains the appropriate databases set up as per the
-                        documentation and specify the path with --user-db-path.
-  --user-db-path USER_DB_PATH
-                        Path to the directory containing user-provided databases (required if --databases includes "user-provided")
-
-Query threshold Parameters:
-  --q-min-cov QUERY_MIN_COVERAGE, --query-min-coverage QUERY_MIN_COVERAGE
-                        Minimum coverage threshold in percent (HSP for blastx/n) (default: 40.0)
-  --q-min-id QUERY_MIN_IDENTITY, --query-min-identity QUERY_MIN_IDENTITY
-                        Minimum identity threshold in percent (HSP for blast/diamond) (default: 80.0)
-
-Gene Detection Parameters:
-  --d-min-cov DETECTION_MIN_COVERAGE, --detection-min-coverage DETECTION_MIN_COVERAGE
-                        Minimum coverage threshold in percent (default: 80.0)
-  --d-min-id DETECTION_MIN_IDENTITY, --detection-min-identity DETECTION_MIN_IDENTITY
-                        Minimum identity threshold in percent (default: 80.0)
-  --d-min-depth DETECTION_MIN_DEPTH, --detection-min-depth DETECTION_MIN_DEPTH
-                        Minimum per-base depth required across the configured detection coverage in legacy-relaxed mode (default: 1)
-  --d-min-reads DETECTION_MIN_NUM_READS, --detection-min-num-reads DETECTION_MIN_NUM_READS
-                        Minimum number of reads required for detection (default: 1)
-
-Mode Selection:
-  --dna-only            Run only DNA-based tools
-  --protein-only        Run only protein-based tools
-  --sensitivity {default,very-fast,fast,sensitive,more-sensitive,very-sensitive,ultra-sensitive}
-                        Preset sensitivity levels. "default" leaves tools unchanged. Other presets map to common DIAMOND and Bowtie2 presets (e.g. "very-sensitive" -> DIAMOND --very-sensitive / Bowtie2 --very-
-                        sensitive-local). Use --tool-param to override specific tool parameters if needed.
-
-Tool-Specific Parameters:
-  --minimap2-preset {sr,map-ont,map-pb,map-hifi}
-                        Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)
-  --blastx-task {blastx,blastx-fast}
-                        Run blastx with task blastx-fast (default: blastx-fast)
-  --genes-type {dna,aa}
-                        (Required when -st Genes-FASTA) Specify whether provided genes FASTA contains DNA (dna) or amino-acid sequences (aa)
-  --tool-param TOOL_PARAM
-                        Specify extra parameters for a tool as TOOL="args". Can be provided multiple times. Example: --tool-param 'diamond=--more-sensitive -e 1e-5'
-  -e EVALUE, --evalue EVALUE
-                        E-value threshold to pass to BLASTn/x and DIAMOND (default: 10)
-
-Runtime Parameters:
-  -t THREADS, --threads THREADS
-                        Number of threads to use (default: 8)
-  --chunk-jobs CHUNK_JOBS
-                        Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1
-  --chunk-threads-per-job CHUNK_THREADS_PER_JOB
-                        If set, reserve this many threads per chunk job; otherwise total threads are divided evenly across concurrent chunk jobs
-  --preserve-chunks     Keep chunk files and per-chunk outputs after concatenation (useful for debugging)
-  --max-fasta-chunk-mb MAX_FASTA_CHUNK_MB
-                        Max FASTA chunk size in MiB (default: 200.0). Inputs larger than this will be chunked for per-chunk BLAST runs
-  -tmp TEMP_DIRECTORY, --temp-directory TEMP_DIRECTORY
-                        Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - Path will also be used for all temporary files (default: output directory)
-  --force-modify-fastq  Force addition of /1 and /2 suffixes to paired FASTQ read IDs even if they appear unique
-  --fastp-trim, --fastp, --trim-reads
-                        For Paired-FASTQ input, run fastp automatic adapter and quality trimming before analysis
-  --no_cleanup
-  --verbose
-
-Miscellaneous Parameters:
-  -v, --version         Show program version and exit
-
-Examples:
-  # Basic usage with default tools (runs DNA & protein tools)
-  AMRfíor -i reads.fasta -st Single-FASTA -o results
-
-  # Select specific tools and output detected FASTA sequences
-  AMRfíor -i reads.fasta -st Single-FASTA -o results     --tools diamond bowtie2     --report_fasta detected
-
-  # Custom thresholds, paired-fastq input, threads and dna-only mode
-  AMRfíor -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ -o results/     -t 16 --d-min-cov 90 --d-min-id 85     --dna-only    
+```bash
+amrfior \
+  -i reads_R1.fastq.gz,reads_R2.fastq.gz \
+  -st Paired-FASTQ \
+  -o results \
+  -t 8
 ```
+
+AMRfíor uses the built-in ResFinder and CARD databases by default. GeneFíor
+uses a user-provided database path; its database setup instructions are in
+[`src/GeneFior/databases/`](src/GeneFior/databases/).
+
+### Input types
+
+- `Paired-FASTQ`: paired R1 and R2 FASTQ files separated by a comma.
+- `Single-FASTA`: a FASTA file containing reads or sequences to search.
+- `Genes-FASTA`: full-length gene sequences; specify whether they are DNA or
+  amino acid sequences with `--genes-type`.
+
+Compressed `.gz` FASTA and FASTQ inputs are supported. Optional paired-read
+trimming is described below.
+
+### Search tools and thresholds
+
+You can choose tools with `--tools`, or use the defaults shown by
+`genefior --help` / `amrfior --help`. BLASTx and BLASTp are excluded from the
+usual `all` selection because they can be slow. Query identity and coverage
+control which alignments are retained; gene-level coverage, identity, depth,
+and evidence rules control how those alignments are interpreted.
+
+Search effort is controlled separately with `--sensitivity`. The
+[plain-language sensitivity guide](docs/sensitivity-presets.md) explains what
+each preset changes, its trade-offs, and how Bowtie2 mode, BLAST task overrides,
+Minimap2 read presets, and detection thresholds interact.
+
+### Additional commands
+
+The package also includes `GeneFíor-Recompute` for recalculating detection
+results from saved alignment output, `GeneFíor-Gene-Stats` for gene-level
+visualisation, and `GeneFíor-Combine` for combining sample matrices. Their
+options are documented by each command's `--help`.
 
 ### Optional paired-read trimming
 
@@ -419,19 +276,13 @@ The hAMRonization schema currently has no separate field identifying whether
 `sequence_identity` is nucleotide or amino-acid based, so GeneFior preferentially
 uses nucleotide evidence when otherwise equivalent calls are consolidated.
 
-### Sensitivity presets map: 
-```
-Sensitivity presets provide convenient combinations of parameters for different use cases. The presets map to specific parameter settings for DIAMOND and Bowtie2 as follows:
-| Preset           | DIAMOND Sensitivity Option  | Bowtie2 Sensitivity Option      |
-|------------------|-----------------------------|---------------------------------|
-| default          | No change (DIAMOND default) | No change (Bowtie2default)      |
-| very-fast        | --faster                    | --very-fast-local               |
-| fast             | --fast                      | --fast-local                    |
-| sensitive        | --sensitive                 | --sensitive-local               |
-| more-sensitive   | --more-sensitive            | --very-sensitive-local          |
-| very-sensitive   | --very-sensitive            | --very-sensitive-local          |
-| ultra-sensitive  | --ultra-sensitive           | --very-sensitive-local          | 
-```
+### Search sensitivity
+
+The shared presets configure search effort for each compatible search tool.
+They do not change identity, coverage, or gene-detection thresholds. See the
+[plain-language sensitivity guide](docs/sensitivity-presets.md) for the current
+tool-by-tool behavior and trade-offs.
+
 ## Evidence qualification and allele resolution
 
 GeneFíor no longer treats union coverage alone as proof that one exact database
@@ -545,12 +396,12 @@ Detection-system compatibility:
   Gene-Stats likewise reports only the binary detection value for legacy runs.
 - `--detection-mode` is accepted as an alias for `--detection-system`.
 
-## Menu for GeneFíor-Recompute (or genefíor-recompute):
+## GeneFíor-Recompute (or `genefior-recompute`)
 
 ### GeneFíor-Recompute is used to recalculate detection statistics from existing sequence search outputs with different thresholds without needing to rerun the entire analysis.
 
 ```commandline
-GeneFíor v0.11.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
+GeneFíor v0.12.0 - GeneFíor-Recompute: Recalculate detection statistics from existing sequence search outputs
 
 options:
   -h, --help            show this help message and exit
@@ -609,12 +460,12 @@ Examples:
     --tools blastx --report-read-names detected --report-fasta detected \
     --query-fasta reads.fasta.gz
 ```
-## Menu for GeneFíor-Gene-Stats (or genefíor-gene-stats):
+## GeneFíor-Gene-Stats (or `genefior-gene-stats`)
 
 ### GeneFíor-Gene-Stats is used to generate summary statistics and visualisations from Genefíor results.
 
 ```commandline
-GeneFíor v0.11.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
+GeneFíor v0.12.0 - GeneFíor-Gene-Stats: Generate detailed coverage visualisations for searched genes
 
 options:
   -h, --help            show this help message and exit
@@ -677,7 +528,7 @@ Examples:
     --query-fasta reads_R1.fastq.gz,reads_R2.fastq.gz
 ```
 
-## GeneFíor-Combine (genefior-combine)
+## GeneFíor-Combine (or `genefior-combine`)
 
 GeneFíor-Combine is a small standalone tool for combining per-sample *_detection_matrix.tsv files produced by a
 multi-sample GeneFíor/AMRfíor run into per-database combined matrices. It writes:
@@ -692,7 +543,7 @@ GeneFíor-Combine -i /path/to/output_root [--samples-file samples.txt] [--output
 ```
 
 ```commandline
-GeneFíor v0.11.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
+GeneFíor v0.12.0 - GeneFíor-Combine - Combine per-sample detection matrices into per-database combined matrices
 
 options:
   -h, --help            show this help message and exit
@@ -708,12 +559,20 @@ Examples:
   GeneFior-Combine -i /path/to/output_dir --samples-file samples.txt
   ```
 
-## Database Setup: See /src/Genefior/databases/ for details on setting up user-provided databases.
-### GeneFíor includes an automated script in the Databases directory to automate the setup of user-provided databases.
+## Database setup
+
+See [`src/GeneFior/databases/`](src/GeneFior/databases/) for instructions and
+tools for setting up user-provided databases.
+
+## Development notes
+
+[`docs/DEVELOPMENT_NOTES.md`](docs/DEVELOPMENT_NOTES.md) preserves historical feature and
+implementation notes. It is an archive; use this README and the linked guides
+for current user instructions.
 
 --------------------------------------------------------------------------------
 
-## Testing and CI (repository-provided test harness) - BETA!!!
+## Testing and CI
 
 This repository includes an integration test harness that runs the GeneFíor CLI against a small set of repository-provided test inputs. The harness is located at:
 
@@ -768,10 +627,3 @@ conda activate genefior-test
 ```
 
 - The GitHub Actions CI included with this repository installs the toolchain on the runner so end-to-end tests run in CI.
-
-### Customisation
-
-- If you want a different set of files to be considered "stable outputs" (for example only `raw_outputs/` and `run_parameters.json`) I can update the harness to use a whitelist instead of the current exclusion rules.
-- If you want log normalisation (strip timestamps) included in comparisons I can add a normalisation step before checksumming to reduce false positives.
-
-If you'd like, I can also add a short `TESTING.md` to the repo and commit these harness instructions there. Tell me whether you'd like the current comparison rules changed or committed documentation added.

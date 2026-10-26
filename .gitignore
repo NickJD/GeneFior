@@ -34,3 +34,5 @@ test_data/232758E_18_qualified_rerun/
 test_data/232758E_18_detection_system_comparison.tsv
 
 real_data_test/
+
+build/

@@ -17,12 +17,8 @@ def _import_local(name: str):
 if __package__:
     # Running as package (python -m GeneFior.GeneFior)
     from .constants import *
-    from .databases import (
-        RESFINDER_DATABASES, CARD_DATABASES, NCBI_DATABASES,
-        gather_databases, gather_multiple_databases, parse_database_paths,
-    )
+    from .sensitivity_profiles import SENSITIVITY_LEVELS, build_sensitivity_params
     from .workflow import Workflow
-    from .gene_stats import GeneStats
     from .hamronization import (
         add_hamronization_arguments,
         export_from_options,
@@ -48,6 +44,7 @@ else:
     # Running as a script (python GeneFior.py) - import local modules by plain name
     try:
         from constants import *
+        from sensitivity_profiles import SENSITIVITY_LEVELS, build_sensitivity_params
     except Exception:
         # fallback: try package-style (if present in sys.path)
         from GeneFior.constants import *
@@ -125,7 +122,7 @@ Examples:
   # Select specific tools and output detected FASTA sequences
   GeneFior -i reads.fasta -st Single-FASTA --db-path <path-to-db> -o results \
     --tools diamond bowtie2 \
-    --report_fasta detected
+    --report-fasta detected
 
   # Custom thresholds, paired-fastq input, threads and dna-only mode
   GeneFior -i reads_R1.fastq,reads_R2.fastq -st Paired-FASTQ --db-path <path-to-db> \
@@ -182,6 +179,11 @@ Examples:
                                  '"evidence" and "evidence-all" are explicit aliases for the detected modes.'
                                  '"candidate" and "candidate-all" restrict output to candidate allele calls.'
                                  '"exact" and "exact-all" restrict output to exact nucleotide alleles.  (default: None)')
+    output_group.add_argument(
+        '--report-gene-ids',
+        dest='report_gene_ids_file',
+        help='CSV/TSV/text file of database gene IDs to retain read names/sequences for. '
+             'Requires --report-fasta. Detection is still calculated for the full database.')
 
     # Tool selection
     tool_group = parser.add_argument_group('Tool selection')
@@ -193,9 +195,9 @@ Examples:
                                  ' (default: all except blastx/p as they can be slow!!)')
 
     query_threshold_group = parser.add_argument_group('Query threshold Parameters')
-    query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=40.0,
+    query_threshold_group.add_argument('--q-min-cov', '--query-min-coverage', type=float, default=50.0,
                                       dest='query_min_coverage',
-                                      help='Minimum coverage threshold in percent (HSP for blastx/n) (default: 40.0)')
+                                      help='Minimum coverage threshold in percent (HSP for blastx/n) (default: 50.0)')
     query_threshold_group.add_argument('--q-min-id', '--query-min-identity', type=float, default=80.0,
                                       dest='query_min_identity',
                                       help='Minimum identity threshold in percent (HSP for blast/diamond) (default: 80.0)')
@@ -263,11 +265,24 @@ Examples:
                             help='Run only DNA-based tools')
     mode_group.add_argument('--protein-only', action='store_true',
                             help='Run only protein-based tools')
-    mode_group.add_argument('--sensitivity', type=str, default='default',
-                            choices=['default', 'very-fast', 'fast', 'sensitive', 'more-sensitive', 'very-sensitive', 'ultra-sensitive'],
-                            help='Preset sensitivity levels. "default" leaves tools unchanged. Other presets map to common '
-                                 'DIAMOND and Bowtie2 presets (e.g. "very-sensitive" -> DIAMOND --very-sensitive / Bowtie2 --very-sensitive-local). '
-                                 'Use --tool-param to override specific tool parameters if needed.')
+    mode_group.add_argument(
+        "--sensitivity",
+        choices=SENSITIVITY_LEVELS,
+        default="default",
+        help=(
+            "Tool-aware search profile. Native settings vary by tool; "
+            "this does not change detection thresholds or minimap2 read presets."
+        ),
+    )
+    mode_group.add_argument(
+        "--bowtie2-mode",
+        choices=["end-to-end", "local"],
+        default="end-to-end",
+        help=(
+            "Bowtie2 alignment mode. Independent of --sensitivity. "
+            "End-to-end aligns the whole read; local alignment permits clipping."
+        ),
+    )
 
     # Tool-specific parameters
     tool_params_group = parser.add_argument_group('Tool-Specific Parameters')
@@ -275,12 +290,31 @@ Examples:
                                    choices=['sr', 'map-ont', 'map-pb', 'map-hifi'],
                                    help='Minimap2 preset: sr=short reads, map-ont=Oxford Nanopore, '
                                         'map-pb=PacBio, map-hifi=PacBio HiFi (default: sr)')
-    tool_params_group.add_argument('--blastx-task', default='blastx-fast',
+    tool_params_group.add_argument(
+        "--blastn-task",
+        choices=["megablast", "dc-megablast", "blastn", "blastn-short"],
+        default=None,
+        help="Override the BLASTn task selected by --sensitivity.",
+    )
+    tool_params_group.add_argument('--blastx-task', default=None,
                                    choices=['blastx', 'blastx-fast'], dest='blastx_task',
-                                   help='Run blastx with task blastx-fast (default: blastx-fast)')
+                                   help='Override the BLASTx task selected by --sensitivity (default: blastx-fast)')
+    tool_params_group.add_argument(
+        "--blastp-task",
+        choices=["blastp", "blastp-fast", "blastp-short"],
+        default=None,
+        help="Override the BLASTp task selected by --sensitivity.",
+    )
     tool_params_group.add_argument('--tool-param', action='append', dest='tool_param', default=[],
                                    help="Specify extra parameters for a tool as TOOL=\"args\". Can be provided multiple times."
                                         " Example: --tool-param 'diamond=--more-sensitive -e 1e-5'")
+    tool_params_group.add_argument('--max-hits-per-read', type=int, default=None,
+                                   help='Keep at most N hits per read for BLASTn/x/p and DIAMOND (default: no limit). '
+                                        'Passed to the search tool (--max_target_seqs / -k) and enforced when filtering.')
+    tool_params_group.add_argument('--top-score-pct', type=float, default=None,
+                                   help='Keep only hits whose bitscore is within P%% of the best hit for that read '
+                                        '(e.g. 5). DIAMOND uses --top; BLAST output is filtered after the search. '
+                                        'Takes precedence over --max-hits-per-read for DIAMOND.')
     # Tool-wide evalue: belongs with tool-specific parameters
     tool_params_group.add_argument('-e', '--evalue', type=float, default=None,
                                    help='E-value threshold to pass to BLASTn/x and DIAMOND (if not set, the tools\' default is used)')
@@ -336,13 +370,13 @@ Examples:
     runtime_group.add_argument('-t', '--threads', type=int, default=8,
                               help='Number of threads to use (default: 8)')
     runtime_group.add_argument('--chunk-jobs', type=int, default=None,
-                               help='Number of concurrent BLAST chunk jobs to run when chunking is active. If unset the pipeline auto-derives concurrency from total threads or defaults to 1')
+                               help='Number of concurrent BLAST chunk jobs when chunking is active (default: 1; unset runs one job using all requested threads)')
     runtime_group.add_argument('--chunk-threads-per-job', type=int, default=None,
                                help='If set, reserve this many threads per chunk job; otherwise total threads are divided evenly across concurrent chunk jobs')
     runtime_group.add_argument('--preserve-chunks', action='store_true', default=False,
-                               help='Keep chunk files and per-chunk outputs after concatenation (useful for debugging)')
-    runtime_group.add_argument('--max-fasta-chunk-mb', type=float, default=200.0,
-                               help='Max FASTA chunk size in MiB (default: 200.0). Inputs larger than this will be chunked for per-chunk BLAST runs')
+                               help='Keep input chunks and per-chunk outputs after completion or failure (useful for debugging/reuse)')
+    runtime_group.add_argument('--max-fasta-chunk-mb', type=float, default=50.0,
+                               help='Max FASTA chunk size in MiB (default: 50.0). Inputs larger than this will be chunked for per-chunk BLAST runs')
     runtime_group.add_argument('-tmp', '--temp-directory', type=str, default=None,
                                help='Path to temporary to place input FASTA/Q file(s) for faster IO during BLAST - '
                                     'Path will also be used for all temporary files (default: output directory)')
@@ -601,20 +635,17 @@ Examples:
 
         # Map user-friendly sensitivity presets to tool-specific flags.
         # These can be overridden per-tool using --tool-param TOOL="args".
-        SENSITIVITY_MAP = {
-            'very-fast': {'diamond': '--fast', 'bowtie2': '--very-fast'},
-            'fast': {'diamond': '--fast', 'bowtie2': '--fast'},
-            'sensitive': {'diamond': '--sensitive', 'bowtie2': '--sensitive'},
-            'more-sensitive': {'diamond': '--more-sensitive', 'bowtie2': '--sensitive'},
-            'very-sensitive': {'diamond': '--very-sensitive', 'bowtie2': '--very-sensitive-local'},
-            'ultra-sensitive': {'diamond': '--ultra-sensitive', 'bowtie2': '--very-sensitive-local'},
-            'default': {}
-        }
+        try:
+            tool_sensitivity_params = build_sensitivity_params(
+                level=getattr(options, "sensitivity", "default"),
+                bowtie2_mode=getattr(options, "bowtie2_mode", "end-to-end"),
+                blastn_task_override=getattr(options, "blastn_task", None),
+                blastx_task_override=getattr(options, "blastx_task", None),
+                blastp_task_override=getattr(options, "blastp_task", None),
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
 
-        sel = getattr(options, 'sensitivity', 'default') if hasattr(options, 'sensitivity') else 'default'
-        if sel in SENSITIVITY_MAP and SENSITIVITY_MAP[sel]:
-            for t, flag in SENSITIVITY_MAP[sel].items():
-                tool_sensitivity_params[t] = {'sensitivity': flag}
         # Parse extra tool parameters passed via CLI
         tool_extra_params = {}
         try:
@@ -727,6 +758,18 @@ Examples:
         except Exception as exc:
             logger.error(f"Failed to load --always-flag-genes file: {exc}")
             sys.exit(1)
+        try:
+            options.report_gene_ids = load_gene_id_file(
+                getattr(options, 'report_gene_ids_file', None),
+                logger,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to load --report-gene-ids file: {exc}")
+            sys.exit(1)
+        if getattr(options, 'report_gene_ids_file', None) and not options.report_fasta:
+            parser.error('--report-gene-ids requires --report-fasta')
+        if getattr(options, 'report_gene_ids_file', None) and not options.report_gene_ids:
+            parser.error('--report-gene-ids file contains no gene IDs')
         if options.always_flag_genes:
             logger.info(
                 f"Always-flag review genes: {len(options.always_flag_genes)}"
@@ -766,8 +809,8 @@ Examples:
             logger.info(f"  HMMER must-flag override: {_mf_status}")
         #logger.info("=" * 70)
         # Compute max_fasta_chunk_bytes early so batch/sample loop can reuse it
-        max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 200.0))
-        logger.info(f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 200.0)} MiB ({max_fasta_chunk_bytes} bytes)")
+        max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 50.0))
+        logger.info(f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 50.0)} MiB ({max_fasta_chunk_bytes} bytes)")
 
         # Enforce rule: BLASTp only makes sense for Genes-FASTA protein queries.
         # If the user requested 'blastp' but did not select Genes-FASTA, warn and remove it
@@ -848,6 +891,8 @@ Examples:
                         'sensitivity': getattr(options, 'sensitivity', None),
                         'evalue': getattr(options, 'evalue', None),
                         'min_bitscore': getattr(options, 'min_bitscore', None),
+                        'max_hits_per_read': getattr(options, 'max_hits_per_read', None),
+                        'top_score_pct': getattr(options, 'top_score_pct', None),
                         'tool_sensitivity_params': tool_sensitivity_params,
                         'tool_extra_params': tool_extra_params,
                         'sequence_type': getattr(sample_opts, 'sequence_type', None),
@@ -904,6 +949,8 @@ Examples:
                         tool_sensitivity_params=tool_sensitivity_params,
                         evalue=options.evalue,
                         min_bitscore=options.min_bitscore,
+                        max_hits_per_read=options.max_hits_per_read,
+                        top_score_pct=options.top_score_pct,
                         extra_tool_params=tool_extra_params,
                         blastx_task=options.blastx_task,
                         query_min_coverage=options.query_min_coverage,
@@ -918,6 +965,7 @@ Examples:
                         sequence_type=sample_opts.sequence_type,
                         genes_type=('protein' if getattr(sample_opts, 'genes_type', None) == 'aa' else getattr(sample_opts, 'genes_type', None)),
                         report_fasta=sample_opts.report_fasta,
+                        report_gene_ids=getattr(options, 'report_gene_ids', set()),
                         no_cleanup=sample_opts.no_cleanup,
                         verbose=sample_opts.verbose,
                         logger=logger,
@@ -991,8 +1039,8 @@ Examples:
 
         # Run Workflow
         # Convert user-specified chunk size (MiB) into bytes and log it
-        max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 200.0))
-        logger.info(f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 200.0)} MiB ({max_fasta_chunk_bytes} bytes)")
+        max_fasta_chunk_bytes = get_max_fasta_chunk_bytes(getattr(options, 'max_fasta_chunk_mb', 50.0))
+        logger.info(f"Configured max FASTA chunk size: {getattr(options, 'max_fasta_chunk_mb', 50.0)} MiB ({max_fasta_chunk_bytes} bytes)")
 
         single_tools = list(options.tools) if options.tools is not None else None
         if getattr(options, 'db_whole_genome', False):
@@ -1013,6 +1061,8 @@ Examples:
             tool_sensitivity_params=tool_sensitivity_params,
             evalue=options.evalue,
             min_bitscore=options.min_bitscore,
+            max_hits_per_read=options.max_hits_per_read,
+            top_score_pct=options.top_score_pct,
             extra_tool_params=tool_extra_params,
             blastx_task=options.blastx_task,
             query_min_coverage=options.query_min_coverage,
@@ -1027,6 +1077,7 @@ Examples:
             sequence_type=options.sequence_type,
             genes_type=('protein' if getattr(options, 'genes_type', None) == 'aa' else getattr(options, 'genes_type', None)),
             report_fasta=options.report_fasta,
+            report_gene_ids=getattr(options, 'report_gene_ids', set()),
             no_cleanup=options.no_cleanup,
             verbose=options.verbose,
             logger=logger,
@@ -1080,6 +1131,8 @@ Examples:
                 'sensitivity': getattr(options, 'sensitivity', None),
                 'evalue': getattr(options, 'evalue', None),
                 'min_bitscore': getattr(options, 'min_bitscore', None),
+                'max_hits_per_read': getattr(options, 'max_hits_per_read', None),
+                'top_score_pct': getattr(options, 'top_score_pct', None),
                 'tool_sensitivity_params': tool_sensitivity_params,
                 'tool_extra_params': tool_extra_params,
                     'sequence_type': getattr(options, 'sequence_type', None),

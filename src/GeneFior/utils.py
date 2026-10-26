@@ -638,13 +638,21 @@ def FASTQ_to_FASTA(options, logger):
         try:
             # If no header suffix modification needed we can run a simple shell pipeline
             if not r1_suffix and not r2_suffix:
-                cmd = f"(seqtk seq -A {shlex.quote(r1_path)}; seqtk seq -A {shlex.quote(r2_path)}) | {shlex.quote(compressor)} -c > {shlex.quote(combined_fasta)}"
+                # Build compressor command: add -p <threads> if using pigz
+                comp_cmd = shlex.quote(compressor)
+                if compressor == pigz_path:
+                    comp_cmd += f" -p {options.threads}"
+                cmd = f"(seqtk seq -A {shlex.quote(r1_path)}; seqtk seq -A {shlex.quote(r2_path)}) | {comp_cmd} -c > {shlex.quote(combined_fasta)}"
                 subprocess.run(cmd, shell=True, check=True)
                 used_optimised = True
                 logger.info(f"Optimised seqtk+{os.path.basename(compressor)} conversion succeeded (no header modification needed)")
             else:
                 # Need to modify headers; stream seqtk outputs through a small modifier into pigz
                 with open(combined_fasta, 'wb') as outf:
+                    # Build the arguments list for the compressor process
+                    comp_args = [compressor, '-c']
+                    if compressor == pigz_path:
+                        comp_args.extend(['-p', str(options.threads)])
                     comp_proc = subprocess.Popen([compressor, '-c'], stdin=subprocess.PIPE, stdout=outf)
                 try:
                     for fastq_path, suffix in ((r1_path, r1_suffix), (r2_path, r2_suffix)):

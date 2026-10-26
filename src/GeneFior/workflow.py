@@ -29,7 +29,6 @@ _WHOLE_GENOME_CONTIG_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 def split_whole_genome_reference(reference: str) -> Tuple[str, str]:
     """Split a whole-genome reference into genome and contig identifiers.
 
@@ -100,6 +99,11 @@ except (ModuleNotFoundError, ImportError) as error:
 class Workflow:
     # Orchestrates alignment tools and result parsing for gene detection.
 
+    def _sensitivity_config(self, tool):
+        """Return the tool-specific settings for the selected sensitivity profile."""
+        config = (self.tool_sensitivity_params or {}).get(tool, {})
+        return config if isinstance(config, dict) else {}
+
     def __init__(self, input_fasta: str, input_fastq: str, output_dir: str,
                  databases: Dict[str, Dict[str, str]],
                  threads: int = 4,  #max_target_seqs: int = 100,
@@ -114,10 +118,13 @@ class Workflow:
                  detection_min_num_reads: int = 1,
                   evalue: Optional[float] = None,
                   min_bitscore: Optional[float] = None,
+                  max_hits_per_read: Optional[int] = None,
+                  top_score_pct: Optional[float] = None,
 
                  run_dna: bool = True, run_protein: bool = True,
                  sequence_type: str = 'Single-FASTA',
                  report_fasta: str = None,
+                 report_gene_ids: Optional[Set[str]] = None,
                  no_cleanup: bool = False,
                  verbose: bool = False,
                  logger: Optional[logging.Logger] = None,
@@ -175,7 +182,7 @@ class Workflow:
         self.threads = threads
       #  self.max_target_seqs = max_target_seqs
         self.tool_sensitivity_params = tool_sensitivity_params
-        self.blastx_task = blastx_task
+        self.blastx_task = blastx_task or 'blastx-fast'
        # self.evalue = evalue
         self.query_min_coverage = query_min_coverage
         self.query_min_identity = query_min_identity
@@ -235,6 +242,10 @@ class Workflow:
         # Minimum bitscore threshold for BLAST/DIAMOND hits. If None, no bitscore
         # filtering is applied and tool defaults / post-filtering rules are used.
         self.min_bitscore = float(min_bitscore) if min_bitscore is not None else None
+        # Per-read hit limits: keep at most N hits per read, and only hits whose bitscore is
+        # within top_score_pct % of that read's best hit.
+        self.max_hits_per_read = int(max_hits_per_read) if max_hits_per_read else None
+        self.top_score_pct = float(top_score_pct) if top_score_pct is not None else None
         # Arbitrary extra parameters to append to specific tools (dict: tool -> param string)
         self.extra_tool_params = extra_tool_params or {}
         # HMMER-specific E-value (overrides global evalue for HMMER only).
@@ -267,6 +278,9 @@ class Workflow:
         self.run_protein = run_protein
         self.sequence_type = sequence_type
         self.report_fasta = report_fasta  # 'All', 'Detected', or None
+        self.report_gene_ids = (
+            set(report_gene_ids) if report_gene_ids else None
+        )
 
         # Create output directory structure
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -800,6 +814,13 @@ class Workflow:
             self.logger.error(f"{tool_name} executable not found. Is it in your PATH?")
             return False
 
+    def _hit_limit_args(self, blast_cmd: str) -> List[str]:
+        """Search-time arguments that cap hits per read (reduces BLAST memory/output)."""
+        args: List[str] = []
+        if self.max_hits_per_read:
+            args += ['-max_target_seqs', str(self.max_hits_per_read)]
+        return args
+
     def _stream_filter_hits(self, cmd: List[str], output_file: Path, tool_name: str, gz_input: bool = False, fasta_path_str: str = None) -> bool:
         """Run a tabular-output tool and filter hits on-the-fly.
 
@@ -919,6 +940,9 @@ class Workflow:
 
             kept = 0
             total = 0
+            limit_query = None
+            limit_best = 0.0
+            limit_count = 0
             with open(output_file, 'w') as outf:
                 assert proc.stdout is not None
                 for line in proc.stdout:
@@ -958,6 +982,16 @@ class Workflow:
                             except Exception:
                                 # If bitscore parsing fails, be conservative and skip
                                 continue
+                        if self.max_hits_per_read or self.top_score_pct is not None:
+                            # BLAST output is grouped by query with the best hit first
+                            if fields[0] != limit_query:
+                                limit_query, limit_best, limit_count = fields[0], bitscore or 0.0, 0
+                            if self.max_hits_per_read and limit_count >= self.max_hits_per_read:
+                                continue
+                            if (self.top_score_pct is not None and bitscore is not None
+                                    and bitscore < limit_best * (1 - self.top_score_pct / 100.0)):
+                                continue
+                            limit_count += 1
                         outf.write(line)
                         kept += 1
 
@@ -1242,6 +1276,40 @@ class Workflow:
             raise
 
 
+    def _load_input_read_sequences(self, wanted_read_names=None):
+        """Load input sequences, optionally retaining only the requested IDs."""
+        wanted = None if wanted_read_names is None else set(wanted_read_names)
+        if wanted is not None:
+            wanted.difference_update(getattr(self, 'all_reads', {}).keys())
+            if not wanted:
+                return
+
+        import gzip
+        fasta_path = str(self.input_fasta)
+        opener = gzip.open if fasta_path.endswith(('.gz', '.gzip')) else open
+        all_reads = getattr(self, 'all_reads', {})
+        read_name = None
+        seq_lines = []
+
+        def save_current():
+            if read_name and seq_lines and (wanted is None or read_name in wanted):
+                all_reads[read_name] = ''.join(seq_lines)
+
+        try:
+            with opener(fasta_path, 'rt') as fasta_file:
+                for line in fasta_file:
+                    if line.startswith('>'):
+                        save_current()
+                        header_fields = line[1:].split()
+                        read_name = header_fields[0] if header_fields else None
+                        seq_lines = []
+                    else:
+                        seq_lines.append(line.strip())
+                save_current()
+        except Exception as exc:
+            self.logger.error(f"Error reading FASTA file for read reporting: {exc}")
+        self.all_reads = all_reads
+
     def _write_fasta_outputs(self, database: str, tool_name: str, detected_genes: Set[str],
                              gene_reads: dict, all_reads: dict):
         # Method to write FASTA files for mapped reads.
@@ -1288,7 +1356,7 @@ class Workflow:
             if getattr(self, "verbose", True):
                 self.logger.info(f"Writing FASTA files for all mapped reads in {database}...")
             for gene, read_types in gene_reads.items():
-                read_names = set(read_types['all'])  # Use set to avoid duplicates
+                read_names = set(read_types.get('all', []))  # Use set to avoid duplicates
                 if not read_names:
                     continue
 
@@ -1429,6 +1497,7 @@ class Workflow:
         # allow BLAST to use its internal default
         if getattr(self, 'evalue', None) is not None:
             cmd.extend(['-evalue', str(self.evalue)])
+        cmd.extend(self._hit_limit_args(blast_cmd))
 
         # Only add '-perc_identity' for BLAST programs that accept it (blastn).
         # We rely on post-filtering in parse_blast_results for identity thresholds
@@ -1439,13 +1508,14 @@ class Workflow:
         except Exception:
             pass
 
-        # Add blastx-specific task if requested
-        if blast_cmd == 'blastx':
-            try:
-                cmd.insert(3, '-task')
-                cmd.insert(4, str(self.blastx_task))
-            except Exception:
-                pass
+        # BLAST tasks are program-specific; the shared profile chooses a task
+        # where one was selected, with the historical blastx-fast fallback.
+        profile = self._sensitivity_config(blast_cmd)
+        task = profile.get('task')
+        if task is None and blast_cmd == 'blastx':
+            task = self.blastx_task
+        if task:
+            cmd[1:1] = ['-task', str(task)]
 
         # Append any user-specified extra parameters for this blast_cmd
         try:
@@ -1528,13 +1598,10 @@ class Workflow:
                 if getattr(self, 'chunk_jobs_user_specified', False) and self.chunk_jobs and self.chunk_jobs > 0:
                     desired = int(self.chunk_jobs)
                 else:
-                    # Auto derive from available threads: try to give a reasonable number of concurrent jobs
-                    if int(self.threads) >= 8:
-                        desired = max(1, int(self.threads) // 4)
-                    elif int(self.threads) >= 4:
-                        desired = 2
-                    else:
-                        desired = 1
+                    # A single BLAST process uses all requested threads by default.
+                    # Running multiple processes duplicates database state in RAM;
+                    # users can opt into that tradeoff with --chunk-jobs.
+                    desired = 1
 
                 # Cap desired by thread-based cap if applicable
                 if max_concurrency_by_threads is not None:
@@ -1615,9 +1682,13 @@ class Workflow:
                         ]
                         if getattr(self, 'evalue', None) is not None:
                             per_cmd.extend(['-evalue', str(self.evalue)])
-                        if blast_cmd == 'blastx':
-                            per_cmd.insert(3, '-task')
-                            per_cmd.insert(4, str(self.blastx_task))
+                        per_cmd.extend(self._hit_limit_args(blast_cmd))
+                        profile = self._sensitivity_config(blast_cmd)
+                        task = profile.get('task')
+                        if task is None and blast_cmd == 'blastx':
+                            task = self.blastx_task
+                        if task:
+                            per_cmd[1:1] = ['-task', str(task)]
                         try:
                             extra = (self.extra_tool_params or {}).get(blast_cmd)
                             if extra:
@@ -1654,13 +1725,30 @@ class Workflow:
 
                     # If failed, cleanup and abort
                     if failed:
-                        for p in part_outputs:
-                            try:
-                                os.remove(str(p))
-                            except Exception:
-                                pass
+                        pending_outputs = [
+                            output_path for _, output_path, _ in running.values()
+                        ]
+                        failed_outputs = list(dict.fromkeys(
+                            [*part_outputs, *pending_outputs]
+                        ))
+                        if getattr(self, 'preserve_chunks', False):
+                            existing_outputs = [
+                                str(path) for path in failed_outputs
+                                if Path(path).exists()
+                            ]
+                            if existing_outputs:
+                                self.logger.warning(
+                                    "Preserving completed/partial BLAST chunk outputs after failure: "
+                                    + ", ".join(existing_outputs)
+                                )
+                        else:
+                            for p in failed_outputs:
+                                try:
+                                    os.remove(str(p))
+                                except Exception:
+                                    pass
                         try:
-                            if chunk_paths_created:
+                            if chunk_paths_created and not getattr(self, 'preserve_chunks', False):
                                 chunks_dir = Path(chunk_paths_created[0]).parent
                                 for p in chunk_paths_created:
                                     try:
@@ -1758,8 +1846,7 @@ class Workflow:
         if gz_input and not self.check_gzip(fasta_path_str): # If input is gzipped, check integrity first
             return False, set()
         else: # Run DIAMOND normally
-            params = (self.tool_sensitivity_params or {}).get('diamond', None)
-            sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
+            profile = self._sensitivity_config('diamond')
 
             cmd = [
                 'diamond', str(query_mode),
@@ -1774,8 +1861,12 @@ class Workflow:
                 '-p', str(self.threads)#,
                 #'-k', '10'
             ]
-            if sensitivity and sensitivity != 'default':
-                cmd.append(sensitivity)
+            cmd.extend(profile.get('args', []))
+            # DIAMOND's --top and -k are mutually exclusive; --top (score window) wins.
+            if self.top_score_pct is not None:
+                cmd.extend(['--top', str(self.top_score_pct)])
+            elif self.max_hits_per_read:
+                cmd.extend(['-k', str(self.max_hits_per_read)])
 
             # Add evalue for DIAMOND only if the user supplied one. Otherwise
             # leave DIAMOND to use its default e-value.
@@ -1823,8 +1914,9 @@ class Workflow:
         else:
             flags = []
 
-        params = (self.tool_sensitivity_params or {}).get('bowtie2', None)
-        sensitivity = params['sensitivity'] if params and 'sensitivity' in params else None
+        profile = self._sensitivity_config('bowtie2')
+        preset = profile.get('preset')
+        mode = profile.get('mode', 'end-to-end')
 
         cmd = [
             'bowtie2',
@@ -1835,8 +1927,8 @@ class Workflow:
             '--no-unal',
             '--met-file', str(summary_file)
         ]
-        if sensitivity and sensitivity != 'default':
-            cmd.append(sensitivity)
+        cmd.append(preset or ('--local' if mode == 'local' else '--end-to-end'))
+        cmd.extend(profile.get('args', []))
 
         # Append any user-specified extra parameters for Bowtie2
         try:
@@ -1897,24 +1989,22 @@ class Workflow:
         else:
             flags = []
 
+        profile_args = self._sensitivity_config('bwa').get('args', [])
+        try:
+            extra_args = shlex.split(str((self.extra_tool_params or {}).get('bwa', '') or ''))
+        except ValueError as exc:
+            self.logger.error(f"Invalid --tool-param for BWA: {exc}")
+            return False, set()
+
         cmd = [
             'bwa', 'mem',
             '-t', str(self.threads),
             '-o', str(sam_file),
+            *profile_args,
+            *extra_args,
             db_path,
-            ] + flags + [
+            *flags,
         ]
-
-        # Append any user-specified extra parameters for BWA
-        try:
-            extra = (self.extra_tool_params or {}).get('bwa')
-            if extra:
-                extra_args = shlex.split(str(extra))
-                # Insert extra args after the 'mem' subcommand and before db/flags
-                # For simplicity append at end which is usually acceptable
-                cmd.extend(extra_args)
-        except Exception:
-            pass
 
         # Run BWA and write output to SAM file
         try:
@@ -2336,11 +2426,13 @@ class Workflow:
                 except Exception as e:
                     self.logger.warning(f"  Failed to decompress FASTA for nhmmer: {e}; attempting with compressed input.")
 
+        hmmer_profile_args = self._sensitivity_config('hmmer').get('args', [])
         cmd = [
             hmmer_cmd,
             '--tblout', str(output_file),
             '--domtblout', str(domtbl_file),
             '--cpu', str(self.threads),
+            *hmmer_profile_args,
             db_path,
             fasta_path_for_hmmer,
         ]
@@ -2419,17 +2511,37 @@ class Workflow:
         Gene detection is decided from coverage-at-depth, identity, and
         read-support thresholds.
 
-        When count_only is True, per-gene read-name lists are replaced with
-        integer counters. This is intended for GeneFior-Recompute on very large
-        tabular outputs where FASTA reporting is not being requested.
+        When count_only is True, or when FASTA reporting is disabled, per-gene
+        read-name lists are replaced with integer counters. This bounds memory
+        for large tabular outputs where read names are not needed downstream.
         """
         detected_genes = set()
         gene_lengths = {}  # Store gene lengths
-        count_only = bool(count_only and (not self.report_fasta or read_store is not None))
-        if count_only:
-            gene_reads = defaultdict(lambda: {'passing_count': 0, 'all_count': 0})
-        else:
-            gene_reads = defaultdict(lambda: {'passing': [], 'all': []})  # Track all reads per gene
+        # A normal detection run does not need the read-name lists after parsing:
+        # write_tool_stats only needs their counts. Retaining one Python string
+        # per read/gene pair makes large, repetitive BLAST outputs grow without
+        # bound, even though the TSV itself is streamed line by line.
+        count_only = bool(
+            (count_only or not self.report_fasta)
+            and (not self.report_fasta or read_store is not None)
+        )
+        compact_stats = bool(count_only or not self.report_fasta or self.report_gene_ids)
+        retain_read_names = bool(self.report_fasta and not count_only and read_store is None)
+        gene_reads = defaultdict(lambda: {'passing_count': 0, 'all_count': 0})
+
+        def gene_read_info(gene):
+            if gene not in gene_reads and retain_read_names and (
+                    self.report_gene_ids is None or gene in self.report_gene_ids):
+                gene_reads[gene] = {'passing': [], 'all': []}
+            return gene_reads[gene]
+
+        def record_gene_read(gene, read_name, passing=False):
+            info = gene_read_info(gene)
+            if 'all_count' in info:
+                key = 'passing_count' if passing else 'all_count'
+                info[key] += 1
+            else:
+                info['passing' if passing else 'all'].append(read_name)
 
         # Ensure structure exists for this database and tool (do not reset entire gene_stats)
         if database not in self.gene_stats:
@@ -2446,36 +2558,10 @@ class Workflow:
         # Recompute commonly runs without query FASTA and may process huge hit
         # tables, so avoid materialising reads unless the user explicitly needs
         # mapped-read FASTA files.
-        if self.report_fasta and read_store is None and not hasattr(self, 'all_reads'):
-            self.all_reads = {}
-            try:
-                import gzip
-                fasta_path = str(self.input_fasta)
-                # Open gzipped or plain FASTA transparently
-                if fasta_path.endswith(('.gz', '.gzip')):
-                    fasta_handle = gzip.open(fasta_path, 'rt')
-                else:
-                    fasta_handle = open(fasta_path, 'r')
-                with fasta_handle as fasta_file:
-                    read_name = None
-                    seq_lines = []
-                    for line in fasta_file:
-                        # If gzip returns bytes unexpectedly, decode
-                        if isinstance(line, bytes):
-                            line = line.decode('utf-8')
-                        if line.startswith('>'):
-                            if read_name in self.all_reads:
-                                self.logger.error(f"Warning: Duplicate read name found in FASTA: {read_name}")
-                            if read_name and seq_lines:
-                                self.all_reads[read_name] = ''.join(seq_lines)
-                            read_name = line[1:].split(' ')[0].replace('\n','') # DIAMOND/BLAST read names split at space
-                            seq_lines = []
-                        else:
-                            seq_lines.append(line.strip())
-                    if read_name and seq_lines:
-                        self.all_reads[read_name] = ''.join(seq_lines)
-            except Exception as e:
-                self.logger.error(f"Error reading FASTA file - Ignore if running Genefíor-Recompute without sequences")
+        if (self.report_fasta and read_store is None
+                and self.report_gene_ids is None
+                and not hasattr(self, 'all_reads')):
+            self._load_input_read_sequences()
         all_reads = getattr(self, 'all_reads', {})
         mapped_reads = 0
         passing_reads = 0
@@ -2505,10 +2591,7 @@ class Workflow:
                 qualifying_by_gene[gene].append(hit)
 
             for gene in raw_genes:
-                if count_only:
-                    gene_reads[gene]['all_count'] += 1
-                else:
-                    gene_reads[gene]['all'].append(read_name)
+                record_gene_read(gene, read_name, passing=False)
                 if read_store is not None:
                     read_store.add(
                         database, tool_name, gene, read_name,
@@ -2521,7 +2604,7 @@ class Workflow:
                 if gene not in self.gene_stats[database][tool_name]:
                     self.gene_stats[database][tool_name][gene] = GeneStats(
                         gene_name=gene,
-                        compact=count_only,
+                        compact=compact_stats,
                     )
                 stats = self.gene_stats[database][tool_name][gene]
                 intervals = [
@@ -2547,10 +2630,7 @@ class Workflow:
                     aggregate_identity,
                     gene_lengths.get(gene, 0),
                 )
-                if count_only:
-                    gene_reads[gene]['passing_count'] += 1
-                else:
-                    gene_reads[gene]['passing'].append(read_name)
+                record_gene_read(gene, read_name, passing=True)
                 if read_store is not None:
                     read_store.add(
                         database, tool_name, gene, read_name,
@@ -2682,6 +2762,16 @@ class Workflow:
             self.gene_stats[database][tool_name][gene].finalise()
         detected_genes = self._classify_tool_evidence(database, tool_name)
 
+        if (self.report_fasta and read_store is None
+                and self.report_gene_ids is not None):
+            selected_read_names = {
+                read_name
+                for gene, info in gene_reads.items()
+                if gene in self.report_gene_ids
+                for read_name in info.get('all', [])
+            }
+            self._load_input_read_sequences(selected_read_names)
+
         if self.report_fasta and read_store is None:
             self.logger.info(f"Input reads loaded for FASTA output in {database.upper()} using {tool_name}: {len(all_reads)}")
         # Note: mapped_reads counts hits seen in the BLAST output file
@@ -2799,14 +2889,32 @@ class Workflow:
             self.gene_stats[database][tool_name] = defaultdict(GeneStats)
 
         gene_lengths = {}  # Store gene lengths from BAM header
-        count_only = bool(count_only and (not self.report_fasta or read_store is not None))
-        if count_only:
-            gene_reads = defaultdict(lambda: {
-                'passing_count': 0, 'all_count': 0,
-                'passing_r1_count': 0, 'passing_r2_count': 0,
-            })
-        else:
-            gene_reads = defaultdict(lambda: {'passing': [], 'all': [], 'passing_r1': [], 'passing_r2': []})
+        count_only = bool(
+            (count_only or not self.report_fasta)
+            and (not self.report_fasta or read_store is not None)
+        )
+        compact_stats = bool(count_only or not self.report_fasta or self.report_gene_ids)
+        retain_read_names = bool(self.report_fasta and not count_only and read_store is None)
+        gene_reads = defaultdict(lambda: {
+            'passing_count': 0, 'all_count': 0,
+            'passing_r1_count': 0, 'passing_r2_count': 0,
+        })
+
+        def gene_read_info(gene):
+            if gene not in gene_reads and retain_read_names and (
+                    self.report_gene_ids is None or gene in self.report_gene_ids):
+                gene_reads[gene] = {
+                    'passing': [], 'all': [], 'passing_r1': [], 'passing_r2': [],
+                }
+            return gene_reads[gene]
+
+        def record_gene_read(gene, read_name, kind='all'):
+            info = gene_read_info(gene)
+            if f'{kind}_count' in info:
+                info[f'{kind}_count'] += 1
+            else:
+                info[kind].append(read_name)
+
         all_reads = {}
         mapped_reads = 0
         passing_reads = 0
@@ -2870,14 +2978,13 @@ class Workflow:
                 cigar = fields[5]
                 seq = fields[9]
                 # store read sequence if available
-                if self.report_fasta and read_store is None and read_name not in all_reads and seq and seq != '*':
+                if (self.report_fasta and read_store is None
+                        and (self.report_gene_ids is None or gene in self.report_gene_ids)
+                        and read_name not in all_reads and seq and seq != '*'):
                     all_reads[read_name] = seq
 
                 gene_len = gene_lengths.get(gene, 0)
-                if count_only:
-                    gene_reads[gene]['all_count'] += 1
-                else:
-                    gene_reads[gene]['all'].append(read_name)
+                record_gene_read(gene, read_name, 'all')
                 if read_store is not None:
                     read_store.add(
                         database, tool_name, gene, read_name,
@@ -2906,7 +3013,7 @@ class Workflow:
                     length = int(count_str)
                     if op in ('M', '=', 'X'):
                         aligned_intervals.append((ref_pos, ref_pos + length))
-                        if not count_only:
+                        if not compact_stats:
                             aligned_positions.update(range(ref_pos, ref_pos + length))
                         ref_pos += length
                         alignment_length += length
@@ -2958,9 +3065,9 @@ class Workflow:
                     if gene not in self.gene_stats[database][tool_name]:
                         self.gene_stats[database][tool_name][gene] = GeneStats(
                             gene_name=gene,
-                            compact=count_only,
+                            compact=compact_stats,
                         )
-                    if count_only:
+                    if compact_stats:
                         self.gene_stats[database][tool_name][gene].add_intervals(
                             aligned_intervals, identity, gene_len
                         )
@@ -2968,10 +3075,7 @@ class Workflow:
                         self.gene_stats[database][tool_name][gene].add_positions(
                             aligned_positions, identity, gene_len
                         )
-                    if count_only:
-                        gene_reads[gene]['passing_count'] += 1
-                    else:
-                        gene_reads[gene]['passing'].append(read_name)
+                    record_gene_read(gene, read_name, 'passing')
                     if read_store is not None:
                         read_store.add(
                             database, tool_name, gene, read_name,
@@ -2991,15 +3095,9 @@ class Workflow:
 
                     # Track R1/R2 separately based on read name suffix
                     if read_name.endswith('_R1') or '/1' in read_name:
-                        if count_only:
-                            gene_reads[gene]['passing_r1_count'] += 1
-                        else:
-                            gene_reads[gene]['passing_r1'].append(read_name)
+                        record_gene_read(gene, read_name, 'passing_r1')
                     elif read_name.endswith('_R2') or '/2' in read_name:
-                        if count_only:
-                            gene_reads[gene]['passing_r2_count'] += 1
-                        else:
-                            gene_reads[gene]['passing_r2'].append(read_name)
+                        record_gene_read(gene, read_name, 'passing_r2')
 
                     passing_reads +=1
 

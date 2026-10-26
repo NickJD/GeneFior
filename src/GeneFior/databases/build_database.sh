@@ -6,8 +6,9 @@
 # Flags:
 #  -n, --name     Database name (REQUIRED)
 #  -d, --dna      DNA FASTA file (Optional)
-#  -a, --aa       AA FASTA file (Optional)
-#  -t, --threads  Number of threads (Default: 4)
+#  -a, --aa       AA FASTA file (if identical to the DNA file, the DNA is
+#                 translated with codon table 11 to build the AA database)
+#  -t, --threads  Number of threads (Default: 8)
 
 set -e
 
@@ -15,7 +16,7 @@ set -e
 DB_NAME=""
 DNA_FASTA=""
 AA_FASTA=""
-THREADS=4
+THREADS=8
 
 # ---------------------------------------------------------------------------
 # Parse Arguments
@@ -69,6 +70,15 @@ strip_all_extensions() {
 DNA_BASE=$(strip_all_extensions "$DNA_FASTA")
 AA_BASE=$(strip_all_extensions "$AA_FASTA")
 
+# If the same file is given for DNA and AA, translate DNA (codon table 11)
+TRANSLATE_AA=0
+if [ -n "$DNA_FASTA" ] && [ -n "$AA_FASTA" ] && \
+   [ "$(realpath "$DNA_FASTA")" = "$(realpath "$AA_FASTA")" ]; then
+    TRANSLATE_AA=1
+    AA_BASE="${DNA_BASE}_translated"
+    echo "Same FASTA given for DNA and AA: AA database will be translated from DNA (codon table 11)."
+fi
+
 echo "Building Genefíor database: $DB_NAME"
 [ -n "$DNA_FASTA" ] && echo "DNA sequences:  $DNA_FASTA  (base: $DNA_BASE)"
 [ -n "$AA_FASTA" ]  && echo "AA sequences:   $AA_FASTA  (base: $AA_BASE)"
@@ -99,8 +109,49 @@ if [ -n "$DNA_FASTA" ]; then
     decompress "$DNA_FASTA" "$DNA_PLAIN"
 fi
 
-if [ -n "$AA_FASTA" ]; then
+translate_fasta() {
+    python3 - "$1" "$2" <<'PYEOF'
+import sys
+bases = "TCAG"
+aas = "FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG"
+table = {a + b + c: aas[i] for i, (a, b, c) in
+         enumerate((a, b, c) for a in bases for b in bases for c in bases)}
+
+def translate(seq):
+    seq = seq.upper().replace("U", "T")
+    prot = "".join(table.get(seq[i:i + 3], "X") for i in range(0, len(seq) - 2, 3))
+    return prot[:-1] if prot.endswith("*") else prot
+
+def flush(out, header, parts):
+    if header is not None:
+        prot = translate("".join(parts))
+        out.write(header + "\n")
+        for i in range(0, len(prot), 60):
+            out.write(prot[i:i + 60] + "\n")
+
+with open(sys.argv[1]) as fin, open(sys.argv[2], "w") as out:
+    header, parts = None, []
+    for line in fin:
+        line = line.strip()
+        if line.startswith(">"):
+            flush(out, header, parts)
+            header, parts = line, []
+        elif line:
+            parts.append(line)
+    flush(out, header, parts)
+PYEOF
+}
+
+if [ "$TRANSLATE_AA" -eq 1 ]; then
+    echo "Translating DNA to protein (codon table 11)..."
+    translate_fasta "$DNA_PLAIN" "$AA_PLAIN"
+elif [ -n "$AA_FASTA" ]; then
     decompress "$AA_FASTA" "$AA_PLAIN"
+    if ! grep -v '^>' "$AA_PLAIN" | head -n 1000 | grep -qv '^[ACGTUNacgtun[:space:]]*$'; then
+        echo "Error: the -a file contains only nucleotide letters (looks like DNA)."
+        echo "To translate it (codon table 11), pass the same file to both flags: -d <file> -a <file>"
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------------------

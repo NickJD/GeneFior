@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -315,7 +316,7 @@ def gene_abundance(best_hits: Iterable[dict], total_reads: int,
         rows.append({
             "gene_id": gene,
             "gene_title": titles.get(gene, reference_records.get(gene, (0, ""))[1]),
-            "classification": annotation.get("classification", annotation.get("family", titles.get(gene, gene))),
+            "classification": annotation.get("classification", annotation.get("family", "")),
             "subgroup": annotation.get("subgroup", ""),
             "family": annotation.get("family", ""),
             "hyddb_classification": annotation.get("hyddb_classification", ""),
@@ -336,9 +337,32 @@ def gene_abundance(best_hits: Iterable[dict], total_reads: int,
     return rows, hit_count
 
 
+def _title_without_id(gene: str, title: str) -> str:
+    parts = title.split(None, 1)
+    if parts and parts[0] == gene:
+        return parts[1] if len(parts) > 1 else ""
+    return title
+
+
+def compact_gene_rows(rows: list[dict]) -> list[str]:
+    """Strip redundant title text and return the ordered, non-empty column list."""
+    for row in rows:
+        row["gene_title"] = _title_without_id(row["gene_id"], row["gene_title"])
+    drop = {c for c in ("gene_title", "classification", "subgroup", "family", "hyddb_classification")
+            if not any(row[c] for row in rows)}
+    if len({row["identity_threshold_group"] for row in rows}) <= 1:
+        drop.add("identity_threshold_group")
+    order = ["gene_id", "gene_title", "classification", "subgroup", "family", "hyddb_classification",
+             "gene_breadth_coverage_pct", "read_count", "rpkm", "detected", "gene_length_bp_used",
+             "mean_read_identity_pct", "mean_query_coverage_pct", "identity_threshold_pct",
+             "identity_threshold_group", "tied_best_hit_reads"]
+    return [c for c in order if c not in drop]
+
+
 def write_tsv(path: Path, rows: list[dict], default_fields: Iterable[str]):
     fields = list(rows[0]) if rows else list(default_fields)
-    with path.open("w", newline="") as handle:
+    opener = gzip.open(path, "wt", newline="") if path.suffix == ".gz" else path.open("w", newline="")
+    with opener as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
@@ -379,6 +403,9 @@ def main(argv=None) -> int:
     parser.add_argument("--max-target-seqs", type=int, default=25)
     parser.add_argument("--require-diamond-version", default=None,
                         help="Require the installed DIAMOND version string to contain this value, e.g. 2.1.6.")
+    parser.add_argument("--per-read-reports", action="store_true",
+                        help="Also keep the per-read DIAMOND hits and best-read assignments (gzip-compressed). "
+                             "By default only the gene summary table and run manifest are written.")
     parser.add_argument("--include-zeroes", action="store_true",
                         help="Report every reference sequence at zero count/RPKM; requires --reference-fasta.")
     args = parser.parse_args(argv)
@@ -440,11 +467,12 @@ def main(argv=None) -> int:
     identity_rules = custom_identity_rules + default_rules
     search_identity = min([args.minimum_identity] +
                           [rule["minimum_identity"] for rule in identity_rules])
+    work_dir = Path(tempfile.mkdtemp(prefix=".genefior_mg_", dir=args.output_dir))
     raw_paths = []
     commands = []
     for mate_index, read_path in enumerate(reads, start=1):
         suffix = f".R{mate_index}" if len(reads) == 2 else ""
-        raw_path = args.output_dir / f"diamond_hits{suffix}.raw.tsv"
+        raw_path = work_dir / f"diamond_hits{suffix}.raw.tsv"
         cmd = [diamond, "blastx", "--query", str(read_path), "--db", str(args.database),
                "--out", str(raw_path), "--outfmt", "6", *FIELDS,
                "--id", str(search_identity),
@@ -459,14 +487,14 @@ def main(argv=None) -> int:
             parser.error(f"DIAMOND search failed for {read_path}: {exc}")
         raw_paths.append(raw_path)
 
-    assignment_path = args.output_dir / "best_read_assignments.tsv"
+    assignment_path = work_dir / "best_read_assignments.tsv.gz"
     assignment_fields = ("query_id", "gene_id", "gene_title", "identity_pct", "identity_threshold_pct",
                          "identity_threshold_group",
                          "query_coverage_pct", "subject_coverage_pct", "bitscore", "evalue",
                          "co_best_targets", "assignment_tie")
 
     def qualifying_hits():
-        with assignment_path.open("w", newline="") as handle:
+        with gzip.open(assignment_path, "wt", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=assignment_fields, delimiter="\t")
             writer.writeheader()
             for mate_index, raw_path in enumerate(raw_paths, start=1):
@@ -490,19 +518,24 @@ def main(argv=None) -> int:
                                                     args.minimum_identity, nucleotide_lengths,
                                                     identity_rules, not args.no_default_identity_exceptions)
     for row in abundance:
-        row["sample_id"] = args.sample_id
         row["detected"] = int(int(row["read_count"]) >= args.minimum_reads
                               and float(row["gene_breadth_coverage_pct"]) >= args.minimum_gene_coverage)
-        row["minimum_reads_threshold"] = args.minimum_reads
-        row["minimum_gene_coverage_pct_threshold"] = f"{args.minimum_gene_coverage:.2f}"
-    write_tsv(args.output_dir / "gene_abundance_rpkm.tsv", abundance,
-              ("sample_id", "gene_id", "gene_title", "classification", "subgroup", "family",
-               "hyddb_classification", "gene_length_aa", "gene_length_bp_used", "gene_length_kb_used",
-               "gene_length_source",
-               "read_count", "total_input_reads", "identity_threshold_pct", "identity_threshold_group",
-               "mean_read_identity_pct",
-               "mean_query_coverage_pct", "gene_breadth_coverage_pct", "rpkm", "tied_best_hit_reads",
-               "detected", "minimum_reads_threshold", "minimum_gene_coverage_pct_threshold"))
+    abundance.sort(key=lambda r: (-float(r["gene_breadth_coverage_pct"]), -int(r["read_count"]), r["gene_id"]))
+    columns = compact_gene_rows(abundance) if abundance else [
+        "gene_id", "gene_breadth_coverage_pct", "read_count", "rpkm", "detected"]
+    write_tsv(args.output_dir / "gene_abundance_rpkm.tsv",
+              [{c: r[c] for c in columns} for r in abundance], columns)
+
+    outputs = ["gene_abundance_rpkm.tsv"]
+    if args.per_read_reports:
+        for raw_path in raw_paths:
+            target = args.output_dir / (raw_path.name + ".gz")
+            with raw_path.open("rb") as src, gzip.open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            outputs.append(target.name)
+        shutil.move(str(assignment_path), str(args.output_dir / assignment_path.name))
+        outputs.append(assignment_path.name)
+    shutil.rmtree(work_dir, ignore_errors=True)
     manifest = {
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "sample_id": args.sample_id,
@@ -526,14 +559,15 @@ def main(argv=None) -> int:
         "rpkm_formula": "read_count / (total_input_reads / 1,000,000) / gene_length_kb",
         "protein_length_to_coding_bp_fallback": "amino_acid_length * 3",
         "commands": commands,
-        "outputs": ["diamond_hits*.raw.tsv", "best_read_assignments.tsv", "gene_abundance_rpkm.tsv"],
+        "gene_length_source": "provided_nucleotide_length" if args.gene_lengths else "protein_length_times_3",
+        "outputs": outputs,
     }
     (args.output_dir / "metagenomic_run_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Sample: {args.sample_id}")
     print(f"Input reads counted: {total_reads}")
     print(f"Reads with a threshold-passing best target: {passing_read_count}")
-    print("Raw DIAMOND alignments: " + ", ".join(map(str, raw_paths)))
-    print(f"Best read assignments: {args.output_dir / 'best_read_assignments.tsv'}")
+    if args.per_read_reports:
+        print("Per-read reports: " + ", ".join(outputs[1:]))
     print(f"RPKM abundance table: {args.output_dir / 'gene_abundance_rpkm.tsv'}")
     print(f"Run metadata: {args.output_dir / 'metagenomic_run_manifest.json'}")
     return 0
